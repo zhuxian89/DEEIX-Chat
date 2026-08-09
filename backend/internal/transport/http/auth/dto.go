@@ -76,6 +76,7 @@ type EmailRegistrationCompleteRequest struct {
 	Password       string `json:"password" binding:"required,min=8,max=128"`
 	Code           string `json:"code,omitempty" binding:"omitempty,len=6"`
 	TurnstileToken string `json:"turnstileToken,omitempty" binding:"omitempty,max=2048"`
+	RegistrationCode string `json:"registrationCode" binding:"required,max=128"`
 }
 
 type PasswordResetStartRequest struct {
@@ -214,6 +215,7 @@ type LoginOptionsResponse struct {
 	EmailEnabled                 bool                       `json:"emailEnabled"`
 	EmailRegistrationEnabled     bool                       `json:"emailRegistrationEnabled"`
 	EmailVerificationEnabled     bool                       `json:"emailVerificationEnabled"`
+	RegistrationCodeRequired     bool                       `json:"registrationCodeRequired"`
 	PasswordResetEnabled         bool                       `json:"passwordResetEnabled"`
 	TurnstileRegistrationEnabled bool                       `json:"turnstileRegistrationEnabled"`
 	TurnstileSiteKey             string                     `json:"turnstileSiteKey"`
@@ -261,6 +263,7 @@ type CompleteProviderLoginRequest struct {
 	RedirectURI  string `json:"redirectURI" binding:"required,max=2048"`
 	CodeVerifier string `json:"codeVerifier" binding:"required,min=43,max=128"`
 	Intent       string `json:"intent,omitempty" binding:"omitempty,oneof=login register bind"`
+	RegistrationCode string `json:"registrationCode,omitempty" binding:"omitempty,max=128"`
 }
 
 type ProviderAuthBridgeStartRequest struct {
@@ -270,6 +273,7 @@ type ProviderAuthBridgeStartRequest struct {
 	ClientState   string `json:"clientState" binding:"required,min=43,max=128"`
 	Intent        string `json:"intent,omitempty" binding:"omitempty,oneof=login register"`
 	Next          string `json:"next,omitempty" binding:"omitempty,max=2048"`
+	RegistrationCode string `json:"registrationCode,omitempty" binding:"omitempty,max=128"`
 }
 
 type ProviderAuthBridgeStartResponse struct {
@@ -684,6 +688,7 @@ func toLoginOptionsResponse(d *appauth.LoginOptions) LoginOptionsResponse {
 		EmailEnabled:                 d.EmailEnabled,
 		EmailRegistrationEnabled:     d.EmailRegistrationEnabled,
 		EmailVerificationEnabled:     d.EmailVerificationEnabled,
+		RegistrationCodeRequired:     d.RegistrationCodeRequired,
 		PasswordResetEnabled:         d.PasswordResetEnabled,
 		TurnstileRegistrationEnabled: d.TurnstileRegistrationEnabled,
 		TurnstileSiteKey:             d.TurnstileSiteKey,

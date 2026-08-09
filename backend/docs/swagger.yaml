@@ -1436,6 +1436,39 @@ definitions:
     - data
     - errorMsg
     type: object
+  CodeResponse:
+    properties:
+      code:
+        type: string
+      codeHint:
+        type: string
+      createdAt:
+        type: string
+      createdByUserID:
+        type: integer
+      id:
+        type: integer
+      status:
+        type: string
+      updatedAt:
+        type: string
+      usedAt:
+        type: string
+        x-nullable: true
+        x-omitempty: false
+      usedByUserID:
+        type: integer
+    required:
+    - code
+    - codeHint
+    - createdAt
+    - createdByUserID
+    - id
+    - status
+    - updatedAt
+    - usedAt
+    - usedByUserID
+    type: object
   ContextArtifactResponse:
     properties:
       content:
@@ -2368,6 +2401,32 @@ definitions:
     required:
     - mode
     type: object
+  CreateRequest:
+    properties:
+      quantity:
+        maximum: 100
+        minimum: 1
+        type: integer
+    required:
+    - quantity
+    type: object
+  CreateResponseDoc:
+    properties:
+      data:
+        properties:
+          results:
+            items:
+              $ref: '#/definitions/CodeResponse'
+            type: array
+        required:
+        - results
+        type: object
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
   CreateServerRequest:
     properties:
       authToken:
@@ -2574,6 +2633,21 @@ definitions:
     - data
     - errorMsg
     type: object
+  DeleteResponseDoc:
+    properties:
+      data:
+        properties:
+          deleted:
+            type: boolean
+        required:
+        - deleted
+        type: object
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
   DeleteServerResponse:
     properties:
       deleted:
@@ -2619,12 +2693,16 @@ definitions:
         maxLength: 128
         minLength: 8
         type: string
+      registrationCode:
+        maxLength: 128
+        type: string
       turnstileToken:
         maxLength: 2048
         type: string
     required:
     - email
     - password
+    - registrationCode
     type: object
   EmailRegistrationStartRequest:
     properties:
@@ -3174,6 +3252,28 @@ definitions:
     - data
     - errorMsg
     type: object
+  ListResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/CodeResponse'
+        type: array
+      total:
+        type: integer
+    required:
+    - results
+    - total
+    type: object
+  ListResponseDoc:
+    properties:
+      data:
+        $ref: '#/definitions/ListResponse'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
   LoginOptionsResponse:
     properties:
       emailEnabled:
@@ -3190,6 +3290,8 @@ definitions:
         items:
           $ref: '#/definitions/IdentityProviderResponse'
         type: array
+      registrationCodeRequired:
+        type: boolean
       turnstileRegistrationEnabled:
         type: boolean
       turnstileSiteKey:
@@ -3203,6 +3305,7 @@ definitions:
     - passwordResetEnabled
     - providerAuthBridge
     - providers
+    - registrationCodeRequired
     - turnstileRegistrationEnabled
     - turnstileSiteKey
     - usernameEnabled
@@ -5057,6 +5160,9 @@ definitions:
       redirectURI:
         maxLength: 2048
         type: string
+      registrationCode:
+        maxLength: 128
+        type: string
     required:
     - clientID
     - clientState
@@ -5549,6 +5655,20 @@ definitions:
       data:
         $ref: '#/definitions/LoginResponse'
       errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  RegistrationcodeErrorDoc:
+    properties:
+      data: {}
+      details: {}
+      errorCode:
+        type: string
+      errorMsg:
+        type: string
+      requestId:
         type: string
     required:
     - data
@@ -11729,6 +11849,87 @@ paths:
       summary: 管理员更新内置提示词
       tags:
       - admin-prompt-presets
+  /admin/registration-codes:
+    get:
+      parameters:
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 状态：active/used
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ListResponseDoc'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/RegistrationcodeErrorDoc'
+      security:
+      - BearerAuth: []
+      summary: 管理员查询注册码
+      tags:
+      - admin-registration-codes
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 生成数量
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CreateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CreateResponseDoc'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/RegistrationcodeErrorDoc'
+      security:
+      - BearerAuth: []
+      summary: 管理员生成注册码
+      tags:
+      - admin-registration-codes
+  /admin/registration-codes/{id}:
+    delete:
+      parameters:
+      - description: 注册码 ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DeleteResponseDoc'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/RegistrationcodeErrorDoc'
+      security:
+      - BearerAuth: []
+      summary: 删除未使用注册码
+      tags:
+      - admin-registration-codes
   /admin/settings:
     get:
       description: 按 namespace 分组返回全部动态配置项

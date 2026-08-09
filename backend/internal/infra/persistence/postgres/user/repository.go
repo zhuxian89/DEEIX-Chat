@@ -9,6 +9,7 @@ import (
 	"time"
 
 	domainbilling "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/billing"
+	domainregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/registrationcode"
 	domainskill "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/skill"
 	domainuser "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/user"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/dberror"
@@ -435,6 +436,41 @@ func (r *Repo) CreateWithCredential(
 	}))
 }
 
+// CreateWithCredentialAndRegistrationCode atomically creates an account and consumes its registration code.
+func (r *Repo) CreateWithCredentialAndRegistrationCode(
+	ctx context.Context,
+	user *domainuser.User,
+	credential domainuser.Credential,
+	subscriptionPlanID uint,
+	subscriptionPriceID uint,
+	subscriptionEndAt *time.Time,
+	autoRenew bool,
+	registrationCode string,
+	verificationID uint,
+	verifiedAt time.Time,
+) error {
+	return translateError(r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := r.createWithCredentialTx(tx, user, credential, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew); err != nil {
+			return err
+		}
+		if err := consumeRegistrationCodeTx(tx, registrationCode, user.ID, verifiedAt); err != nil {
+			return err
+		}
+		if verificationID != 0 {
+			result := tx.Model(&model.UserContactVerification{}).
+				Where("id = ? AND status = ?", verificationID, model.ContactVerificationStatusPending).
+				Updates(map[string]interface{}{"status": model.ContactVerificationStatusVerified, "verified_at": verifiedAt, "consumed_at": verifiedAt})
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return repository.ErrNotFound
+			}
+		}
+		return nil
+	}))
+}
+
 // CreateWithCredentialAndIdentity 在同一事务中创建用户、凭据与第三方身份。
 func (r *Repo) CreateWithCredentialAndIdentity(
 	ctx context.Context,
@@ -463,6 +499,54 @@ func (r *Repo) CreateWithCredentialAndIdentity(
 		identity.UpdatedAt = dbIdentity.UpdatedAt
 		return nil
 	}))
+}
+
+// CreateWithCredentialAndIdentityAndRegistrationCode atomically creates an OAuth account and consumes its registration code.
+func (r *Repo) CreateWithCredentialAndIdentityAndRegistrationCode(
+	ctx context.Context,
+	user *domainuser.User,
+	credential domainuser.Credential,
+	identity *domainuser.UserIdentity,
+	subscriptionPlanID uint,
+	subscriptionPriceID uint,
+	subscriptionEndAt *time.Time,
+	autoRenew bool,
+	registrationCode string,
+	verifiedAt time.Time,
+) error {
+	return translateError(r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := r.createWithCredentialTx(tx, user, credential, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew); err != nil {
+			return err
+		}
+		if identity != nil {
+			identity.UserID = user.ID
+			dbIdentity := toModelUserIdentity(identity)
+			if err := tx.Create(dbIdentity).Error; err != nil {
+				return translateError(err)
+			}
+			identity.ID = dbIdentity.ID
+			identity.CreatedAt = dbIdentity.CreatedAt
+			identity.UpdatedAt = dbIdentity.UpdatedAt
+		}
+		return consumeRegistrationCodeTx(tx, registrationCode, user.ID, verifiedAt)
+	}))
+}
+
+func consumeRegistrationCodeTx(tx *gorm.DB, code string, userID uint, now time.Time) error {
+	trimmed := strings.ToUpper(strings.TrimSpace(code))
+	if trimmed == "" || userID == 0 {
+		return repository.ErrInvalidInput
+	}
+	result := tx.Model(&model.RegistrationCode{}).
+		Where("code = ? AND status = ?", trimmed, domainregistrationcode.StatusActive).
+		Updates(map[string]interface{}{"status": domainregistrationcode.StatusUsed, "used_by_user_id": userID, "used_at": now})
+	if result.Error != nil {
+		return translateError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return repository.ErrConflict
+	}
+	return nil
 }
 
 // ImportUsersWithCredentialsAndBalances 在同一事务中导入用户、凭据与初始余额账户。

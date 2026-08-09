@@ -23,6 +23,7 @@ import {
   normalizeTwoFactorInput,
   providerAuthBridgeStorageKey,
   providerPKCEStorageKey,
+  providerRegistrationCodeStorageKey,
   TWO_FACTOR_CHALLENGE_STORAGE_KEY,
   TWO_FACTOR_METHODS_STORAGE_KEY,
   type LoginMode,
@@ -67,6 +68,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
   const [mode, setMode] = React.useState<LoginMode>("login");
   const [registerEmail, setRegisterEmail] = React.useState("");
   const [registerPassword, setRegisterPassword] = React.useState("");
+  const [registrationCode, setRegistrationCode] = React.useState("");
   const [registerCode, setRegisterCode] = React.useState("");
   const [registerDebugCode, setRegisterDebugCode] = React.useState("");
   const [resetEmail, setResetEmail] = React.useState("");
@@ -99,6 +101,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
   const passwordResetEnabled = passwordLoginEnabled && options.passwordResetEnabled;
   const registerTurnstileSiteKey = options.turnstileSiteKey?.trim() ?? "";
   const registerTurnstileRequired = options.turnstileRegistrationEnabled && Boolean(registerTurnstileSiteKey);
+  const registrationCodeRequired = Boolean((options as typeof options & { registrationCodeRequired?: boolean }).registrationCodeRequired);
   const canShowRegister = emailRegistrationEnabled;
 
   React.useEffect(() => {
@@ -239,6 +242,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
       if (!options.providerAuthBridge.enabled) {
         const params = new URLSearchParams();
         window.sessionStorage.setItem(providerPKCEStorageKey(slug), pkce.verifier);
+        window.sessionStorage.setItem(providerRegistrationCodeStorageKey(slug), registrationCode.trim());
         params.set("redirect_uri", redirectURI);
         params.set("next", resolvedNextPath);
         params.set("code_challenge", pkce.challenge);
@@ -260,15 +264,17 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
         clientState,
         intent,
         next: resolvedNextPath,
+        registrationCode: registrationCode.trim(),
       });
       // OAuth must use a full document navigation so the provider redirect can leave the app origin.
       window.location.href = result.authorizationURL;
     } catch {
       window.sessionStorage.removeItem(providerAuthBridgeStorageKey(slug));
       window.sessionStorage.removeItem(providerPKCEStorageKey(slug));
+      window.sessionStorage.removeItem(providerRegistrationCodeStorageKey(slug));
       toast.error(t("toasts.providerStartFailed"));
     }
-  }, [options.providerAuthBridge.enabled, resolvedNextPath, t]);
+  }, [options.providerAuthBridge.enabled, registrationCode, resolvedNextPath, t]);
 
   const requestRegisterCode = React.useCallback(async () => {
     if (!emailVerificationEnabled || sendingCode || registerCodeCooldownSeconds > 0) {
@@ -359,6 +365,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
           registerEmail,
           registerPassword,
           emailVerificationEnabled ? registerCode : "",
+          registrationCode,
           registerTurnstileRequired ? registerTurnstileToken : undefined,
         );
         completeAuth(result.accessToken, result.sessionID);
@@ -371,7 +378,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
         setSubmitting(false);
       }
     },
-    [completeAuth, emailVerificationEnabled, registerCode, registerEmail, registerPassword, registerTurnstileRequired, registerTurnstileToken, resetRegisterTurnstile, resolveErrorMessage, submitting, t],
+    [completeAuth, emailVerificationEnabled, registerCode, registerEmail, registerPassword, registrationCode, registerTurnstileRequired, registerTurnstileToken, resetRegisterTurnstile, resolveErrorMessage, submitting, t],
   );
 
   const onPasswordResetSubmit = React.useCallback(
@@ -469,6 +476,8 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
     registerDebugCode,
     registerEmail,
     registerPassword,
+    registrationCodeRequired,
+    registrationCode,
     registerTurnstileRequired,
     registerTurnstileResetSignal,
     registerTurnstileSiteKey,
@@ -486,6 +495,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
     setPassword,
     setRegisterCode: (value: string) => setRegisterCode(normalizeRegisterCode(value)),
     setRegisterPassword,
+    setRegistrationCode,
     setRegisterTurnstileToken,
     setResetCode: (value: string) => setResetCode(normalizeRegisterCode(value)),
     setResetPassword,

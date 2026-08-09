@@ -588,6 +588,18 @@ export interface CleanupLogsResponseDoc {
   errorMsg: string;
 }
 
+export interface CodeResponse {
+  code: string;
+  codeHint: string;
+  createdAt: string;
+  createdByUserID: number;
+  id: number;
+  status: string;
+  updatedAt: string;
+  usedAt: string | null;
+  usedByUserID: number;
+}
+
 export interface ContextArtifactResponse {
   content: string;
   createdAt: string;
@@ -1013,6 +1025,21 @@ export interface CreateRedemptionCodeRequest {
   quantity?: number;
 }
 
+export interface CreateRequest {
+  /**
+   * @min 1
+   * @max 100
+   */
+  quantity: number;
+}
+
+export interface CreateResponseDoc {
+  data: {
+    results: CodeResponse[];
+  };
+  errorMsg: string;
+}
+
 export interface CreateServerRequest {
   authToken?: string;
   baseURL: string;
@@ -1136,6 +1163,13 @@ export interface DeletePermissionGroupResponseDoc {
   errorMsg: string;
 }
 
+export interface DeleteResponseDoc {
+  data: {
+    deleted: boolean;
+  };
+  errorMsg: string;
+}
+
 export interface DeleteServerResponse {
   deleted: boolean;
 }
@@ -1163,6 +1197,8 @@ export interface EmailRegistrationCompleteRequest {
    * @maxLength 128
    */
   password: string;
+  /** @maxLength 128 */
+  registrationCode: string;
   /** @maxLength 2048 */
   turnstileToken?: string;
 }
@@ -1407,6 +1443,16 @@ export interface ImportUpstreamModelsResponseDoc {
   errorMsg: string;
 }
 
+export interface ListResponse {
+  results: CodeResponse[];
+  total: number;
+}
+
+export interface ListResponseDoc {
+  data: ListResponse;
+  errorMsg: string;
+}
+
 export interface LoginOptionsResponse {
   emailEnabled: boolean;
   emailRegistrationEnabled: boolean;
@@ -1414,6 +1460,7 @@ export interface LoginOptionsResponse {
   passwordResetEnabled: boolean;
   providerAuthBridge: ProviderAuthBridgeResponse;
   providers: IdentityProviderResponse[];
+  registrationCodeRequired: boolean;
   turnstileRegistrationEnabled: boolean;
   turnstileSiteKey: string;
   usernameEnabled: boolean;
@@ -2256,6 +2303,8 @@ export interface ProviderAuthBridgeStartRequest {
   next?: string;
   /** @maxLength 2048 */
   redirectURI: string;
+  /** @maxLength 128 */
+  registrationCode?: string;
 }
 
 export interface ProviderAuthBridgeStartResponse {
@@ -2453,6 +2502,14 @@ export interface RedemptionResponse {
 export interface RefreshTokenResponseDoc {
   data: LoginResponse;
   errorMsg: string;
+}
+
+export interface RegistrationcodeErrorDoc {
+  data: any;
+  details?: any;
+  errorCode?: string;
+  errorMsg: string;
+  requestId?: string;
 }
 
 export interface RenameConversationRequest {
@@ -5535,6 +5592,64 @@ export namespace Admin {
     export type RequestBody = PatchPromptPresetRequest;
     export type RequestHeaders = {};
     export type ResponseBody = PromptPresetResponseDoc;
+  }
+
+  /**
+   * No description
+   * @tags admin-registration-codes
+   * @name RegistrationCodesList
+   * @summary 管理员查询注册码
+   * @request GET:/admin/registration-codes
+   * @secure
+   */
+  export namespace RegistrationCodesList {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** 页码 */
+      page?: number;
+      /** 每页数量 */
+      page_size?: number;
+      /** 状态：active/used */
+      status?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ListResponseDoc;
+  }
+
+  /**
+   * No description
+   * @tags admin-registration-codes
+   * @name RegistrationCodesCreate
+   * @summary 管理员生成注册码
+   * @request POST:/admin/registration-codes
+   * @secure
+   */
+  export namespace RegistrationCodesCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CreateRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = CreateResponseDoc;
+  }
+
+  /**
+   * No description
+   * @tags admin-registration-codes
+   * @name RegistrationCodesDelete
+   * @summary 删除未使用注册码
+   * @request DELETE:/admin/registration-codes/{id}
+   * @secure
+   */
+  export namespace RegistrationCodesDelete {
+    export type RequestParams = {
+      /** 注册码 ID */
+      id: number;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DeleteResponseDoc;
   }
 
   /**

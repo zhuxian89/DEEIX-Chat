@@ -30,6 +30,7 @@ type LoginOptions struct {
 	EmailEnabled                 bool
 	EmailRegistrationEnabled     bool
 	EmailVerificationEnabled     bool
+	RegistrationCodeRequired     bool
 	PasswordResetEnabled         bool
 	TurnstileRegistrationEnabled bool
 	TurnstileSiteKey             string
@@ -151,6 +152,7 @@ func (s *Service) GetLoginOptions(ctx context.Context) (*LoginOptions, error) {
 		EmailEnabled:                 cfg.EmailLoginEnabled,
 		EmailRegistrationEnabled:     cfg.EmailRegistrationEnabled,
 		EmailVerificationEnabled:     cfg.EmailVerificationEnabled,
+		RegistrationCodeRequired:     true,
 		PasswordResetEnabled:         passwordResetEnabled(cfg),
 		TurnstileRegistrationEnabled: cfg.TurnstileRegistrationEnabled,
 		TurnstileSiteKey:             cfg.TurnstileSiteKey,
@@ -317,6 +319,12 @@ func (s *Service) CompleteProviderLogin(
 	requestID string,
 	auditCtx requestmeta.SessionAuditContext,
 ) (*LoginResult, error) {
+	return s.completeProviderLoginWithRegistrationCode(ctx, slug, code, state, redirectURI, codeVerifier, intent, "", requestID, auditCtx)
+}
+
+func (s *Service) completeProviderLoginWithRegistrationCode(
+	ctx context.Context, slug, code, state, redirectURI, codeVerifier, intent, registrationCode, requestID string, auditCtx requestmeta.SessionAuditContext,
+) (*LoginResult, error) {
 	if !s.cfg.Snapshot().ThirdPartyLoginEnabled {
 		return nil, fmt.Errorf("third-party login is disabled")
 	}
@@ -350,7 +358,7 @@ func (s *Service) CompleteProviderLogin(
 		return nil, err
 	}
 
-	userItem, subject, err := s.resolveProviderLoginCode(ctx, *provider, trimmedCode, redirectURI, strings.TrimSpace(codeVerifier), verifiedState.Intent)
+	userItem, subject, err := s.resolveProviderLoginCode(ctx, *provider, trimmedCode, redirectURI, strings.TrimSpace(codeVerifier), verifiedState.Intent, registrationCode)
 	if err != nil {
 		return nil, err
 	}
@@ -364,6 +372,7 @@ func (s *Service) resolveProviderLoginCode(
 	redirectURI string,
 	codeVerifier string,
 	intent string,
+	registrationCode string,
 ) (*domainuser.User, string, error) {
 	tokenResponse, err := s.exchangeProviderCode(ctx, provider, code, redirectURI, codeVerifier)
 	if err != nil {
@@ -385,7 +394,7 @@ func (s *Service) resolveProviderLoginCode(
 	displayName := firstNonEmpty(claimString(profile, provider.NameField), email, subject)
 	avatarURL := claimString(profile, provider.AvatarField)
 	emailVerified := resolveProviderEmailVerified(profile, provider)
-	userItem, err := s.resolveProviderUser(ctx, provider, subject, email, displayName, avatarURL, emailVerified, string(profileJSON), intent)
+	userItem, err := s.resolveProviderUserWithRegistrationCode(ctx, provider, subject, email, displayName, avatarURL, emailVerified, string(profileJSON), intent, registrationCode)
 	if err != nil {
 		return nil, "", err
 	}
@@ -900,6 +909,10 @@ func (s *Service) BuildProviderAuthURL(ctx context.Context, slug string, redirec
 	return buildProviderAuthURL(*provider, authURL, redirectURI, state, codeChallenge)
 }
 
+func (s *Service) CompleteProviderLoginWithRegistrationCode(ctx context.Context, slug, code, state, redirectURI, codeVerifier, intent, registrationCode, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
+	return s.completeProviderLoginWithRegistrationCode(ctx, slug, code, state, redirectURI, codeVerifier, intent, registrationCode, requestID, auditCtx)
+}
+
 func (s *Service) exchangeProviderCode(ctx context.Context, provider domainuser.IdentityProvider, code string, redirectURI string, codeVerifier string) (*oauthTokenResponse, error) {
 	_, tokenURL, _, err := s.resolveProviderEndpoints(ctx, provider)
 	if err != nil {
@@ -1156,6 +1169,10 @@ func providerTrustedEndpoints(provider domainuser.IdentityProvider) []string {
 }
 
 func (s *Service) resolveProviderUser(ctx context.Context, provider domainuser.IdentityProvider, subject string, email string, displayName string, avatarURL string, emailVerified bool, profileJSON string, intent string) (*domainuser.User, error) {
+	return s.resolveProviderUserWithRegistrationCode(ctx, provider, subject, email, displayName, avatarURL, emailVerified, profileJSON, intent, "")
+}
+
+func (s *Service) resolveProviderUserWithRegistrationCode(ctx context.Context, provider domainuser.IdentityProvider, subject string, email string, displayName string, avatarURL string, emailVerified bool, profileJSON string, intent string, registrationCode string) (*domainuser.User, error) {
 	identity, err := s.repo.GetUserIdentityByProviderSubject(ctx, provider.ID, subject)
 	if err == nil {
 		if !provider.LoginEnabled {
@@ -1211,7 +1228,6 @@ func (s *Service) resolveProviderUser(ctx context.Context, provider domainuser.I
 	if !provider.RegistrationEnabled {
 		return nil, fmt.Errorf("provider account is not registered")
 	}
-
 	emailVerifiedAt := (*time.Time)(nil)
 	emailSource := domainuser.EmailSourceProviderUnverified
 	if emailVerified && normalizedEmail != "" {
@@ -1236,13 +1252,16 @@ func (s *Service) resolveProviderUser(ctx context.Context, provider domainuser.I
 		return nil, err
 	}
 	providerIdentity := s.newProviderIdentity(userItem.ID, provider, subject, displayName, normalizedEmail, emailVerified, profileJSON, now)
-	if err = s.createWithCredentialAndIdentityUsingAvailableUsername(ctx, userItem, domainuser.Credential{
+	if err = s.createWithCredentialAndIdentityUsingAvailableUsernameAndRegistrationCode(ctx, userItem, domainuser.Credential{
 		PasswordHash:      string(passwordHash),
 		PasswordAlgo:      "bcrypt",
 		PasswordEnabled:   false,
 		PasswordUpdatedAt: &now,
 		PasswordOrigin:    domainuser.PasswordOriginSSOPlaceholder,
-	}, providerIdentity, 0, 0, nil, false); err != nil {
+	}, providerIdentity, 0, 0, nil, false, registrationCode, now); err != nil {
+		if errors.Is(err, repository.ErrConflict) || errors.Is(err, repository.ErrInvalidInput) || errors.Is(err, repository.ErrNotFound) {
+			return nil, fmt.Errorf("registration code is invalid or already used")
+		}
 		return nil, err
 	}
 	return userItem, nil
@@ -1295,6 +1314,35 @@ func (s *Service) createWithCredentialAndIdentityUsingAvailableUsername(
 		userItem.ID = 0
 		userItem.Username = generatedUsernameWithSuffix(baseUsername, attempt)
 		err := s.repo.CreateWithCredentialAndIdentity(ctx, userItem, credential, identity, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew)
+		if errors.Is(err, repository.ErrDuplicateUsername) {
+			continue
+		}
+		return err
+	}
+	return ErrUsernameTaken
+}
+
+func (s *Service) createWithCredentialAndIdentityUsingAvailableUsernameAndRegistrationCode(
+	ctx context.Context,
+	userItem *domainuser.User,
+	credential domainuser.Credential,
+	identity *domainuser.UserIdentity,
+	subscriptionPlanID uint,
+	subscriptionPriceID uint,
+	subscriptionEndAt *time.Time,
+	autoRenew bool,
+	registrationCode string,
+	registeredAt time.Time,
+) error {
+	repo, ok := s.repo.(providerRegistrationCodeAuthRepository)
+	if !ok {
+		return fmt.Errorf("registration code persistence is unavailable")
+	}
+	baseUsername := userItem.Username
+	for attempt := 0; attempt < 20; attempt++ {
+		userItem.ID = 0
+		userItem.Username = generatedUsernameWithSuffix(baseUsername, attempt)
+		err := repo.CreateWithCredentialAndIdentityAndRegistrationCode(ctx, userItem, credential, identity, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew, strings.ToUpper(strings.TrimSpace(registrationCode)), registeredAt)
 		if errors.Is(err, repository.ErrDuplicateUsername) {
 			continue
 		}

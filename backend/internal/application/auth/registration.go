@@ -152,6 +152,10 @@ func (s *Service) RequestEmailRegistration(ctx context.Context, email string, tu
 }
 
 func (s *Service) RegisterWithEmail(ctx context.Context, email string, password string, code string, turnstileToken string, remoteIP string, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
+	return s.RegisterWithEmailAndRegistrationCode(ctx, email, password, code, "", turnstileToken, remoteIP, requestID, auditCtx)
+}
+
+func (s *Service) RegisterWithEmailAndRegistrationCode(ctx context.Context, email string, password string, code string, registrationCode string, turnstileToken string, remoteIP string, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
 	cfg := s.cfg.Snapshot()
 	if !cfg.EmailLoginEnabled || !cfg.EmailRegistrationEnabled {
 		return nil, fmt.Errorf("email registration is disabled")
@@ -179,7 +183,6 @@ func (s *Service) RegisterWithEmail(ctx context.Context, email string, password 
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return nil, err
 	}
-
 	now := time.Now()
 	var verification *domainuser.ContactVerification
 	if cfg.EmailVerificationEnabled {
@@ -220,20 +223,22 @@ func (s *Service) RegisterWithEmail(ctx context.Context, email string, password 
 		Locale:          "en-US",
 		EmailVerifiedAt: verifiedAt,
 	}
-	if err = s.createWithCredentialUsingAvailableUsername(ctx, userItem, domainuser.Credential{
+	verificationID := uint(0)
+	if verification != nil {
+		verificationID = verification.ID
+	}
+	if err = s.createWithCredentialUsingAvailableUsernameAndRegistrationCode(ctx, userItem, domainuser.Credential{
 		PasswordHash:      string(passwordHash),
 		PasswordAlgo:      "bcrypt",
 		PasswordEnabled:   true,
 		PasswordUpdatedAt: &now,
 		PasswordSetAt:     &now,
 		PasswordOrigin:    domainuser.PasswordOriginLocalRegister,
-	}, 0, 0, nil, false); err != nil {
-		return nil, err
-	}
-	if verification != nil {
-		if err = s.repo.MarkContactVerificationVerified(ctx, verification.ID, now); err != nil {
-			return nil, err
+	}, 0, 0, nil, false, registrationCode, verificationID, now); err != nil {
+		if errors.Is(err, repository.ErrConflict) || errors.Is(err, repository.ErrInvalidInput) || errors.Is(err, repository.ErrNotFound) {
+			return nil, fmt.Errorf("registration code is invalid or already used")
 		}
+		return nil, err
 	}
 
 	normalizedAuditCtx := s.resolveSessionAuditContext(ctx, auditCtx)
@@ -968,6 +973,35 @@ func (s *Service) createWithCredentialUsingAvailableUsername(
 		userItem.ID = 0
 		userItem.Username = generatedUsernameWithSuffix(baseUsername, attempt)
 		err := s.repo.CreateWithCredential(ctx, userItem, credential, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew)
+		if errors.Is(err, repository.ErrDuplicateUsername) {
+			continue
+		}
+		return err
+	}
+	return ErrUsernameTaken
+}
+
+func (s *Service) createWithCredentialUsingAvailableUsernameAndRegistrationCode(
+	ctx context.Context,
+	userItem *domainuser.User,
+	credential domainuser.Credential,
+	subscriptionPlanID uint,
+	subscriptionPriceID uint,
+	subscriptionEndAt *time.Time,
+	autoRenew bool,
+	registrationCode string,
+	verificationID uint,
+	verifiedAt time.Time,
+) error {
+	repo, ok := s.repo.(emailRegistrationCodeAuthRepository)
+	if !ok {
+		return fmt.Errorf("registration code persistence is unavailable")
+	}
+	baseUsername := userItem.Username
+	for attempt := 0; attempt < 20; attempt++ {
+		userItem.ID = 0
+		userItem.Username = generatedUsernameWithSuffix(baseUsername, attempt)
+		err := repo.CreateWithCredentialAndRegistrationCode(ctx, userItem, credential, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew, strings.ToUpper(strings.TrimSpace(registrationCode)), verificationID, verifiedAt)
 		if errors.Is(err, repository.ErrDuplicateUsername) {
 			continue
 		}

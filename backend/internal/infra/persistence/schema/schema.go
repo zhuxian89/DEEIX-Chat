@@ -13,6 +13,7 @@ func Models() []interface{} {
 	return []interface{}{
 		&model.User{},
 		&model.UserContactVerification{},
+		&model.RegistrationCode{},
 		&model.UserCredential{},
 		&model.UserSession{},
 		&model.UserAuthEvent{},

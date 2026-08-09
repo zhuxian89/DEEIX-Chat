@@ -52,6 +52,8 @@ export function LoginPage({ nextPath }: LoginPageProps) {
     registerDebugCode,
     registerEmail,
     registerPassword,
+    registrationCodeRequired,
+    registrationCode,
     registerTurnstileRequired,
     registerTurnstileResetSignal,
     registerTurnstileSiteKey,
@@ -68,6 +70,7 @@ export function LoginPage({ nextPath }: LoginPageProps) {
     setPassword,
     setRegisterCode,
     setRegisterPassword,
+    setRegistrationCode,
     setRegisterTurnstileToken,
     setResetCode,
     setResetPassword,
@@ -354,6 +357,22 @@ export function LoginPage({ nextPath }: LoginPageProps) {
                     required
                   />
                 </div>
+                {registrationCodeRequired ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none text-foreground" htmlFor="registration-code">
+                      {t("registrationCode")}
+                    </label>
+                    <Input
+                      id="registration-code"
+                      autoComplete="off"
+                      className="h-9 border-input/50"
+                      placeholder={t("registrationCodePlaceholder")}
+                      value={registrationCode}
+                      onChange={(event) => setRegistrationCode(event.target.value.toUpperCase())}
+                      required
+                    />
+                  </div>
+                ) : null}
                 {registerTurnstileRequired ? (
                   <TurnstileWidget
                     siteKey={registerTurnstileSiteKey}
@@ -404,6 +423,21 @@ export function LoginPage({ nextPath }: LoginPageProps) {
 
             {mode === "login" && !twoFactorChallengeToken && loginProviders.length > 0 ? (
               <div className={cn("space-y-2.5", passwordLoginEnabled ? "mt-5" : "mt-7")}>
+                {registrationCodeRequired ? (
+                  <div className="mb-3 space-y-2">
+                    <label className="text-sm font-medium leading-none text-foreground" htmlFor="provider-registration-code">
+                      {t("registrationCode")}
+                    </label>
+                    <Input
+                      id="provider-registration-code"
+                      autoComplete="off"
+                      className="h-9 border-input/50"
+                      placeholder={t("registrationCodePlaceholder")}
+                      value={registrationCode}
+                      onChange={(event) => setRegistrationCode(event.target.value.toUpperCase())}
+                    />
+                  </div>
+                ) : null}
                 {loginProviders.map((provider) => (
                   <Button
                     key={provider.publicID}

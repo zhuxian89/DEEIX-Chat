@@ -47,6 +47,7 @@ type ProviderAuthBridgeStartInput struct {
 	ClientState   string
 	Intent        string
 	Next          string
+	RegistrationCode string
 }
 
 type ProviderAuthBridgeStartResult struct {
@@ -140,6 +141,7 @@ func (s *Service) StartProviderAuthBridge(
 		ProviderCodeVerifier: providerVerifier,
 		Intent:               normalizedIntent,
 		Next:                 normalizeProviderNextPath(input.Next),
+		RegistrationCode:     strings.TrimSpace(input.RegistrationCode),
 		ExpiresAt:            expiresAt,
 	}
 	if err = s.providerAuthBridge.PutProviderAuthTransaction(ctx, transactionID, transaction, providerAuthTransactionTTL); err != nil {
@@ -214,6 +216,7 @@ func (s *Service) CompleteProviderAuthBridgeCallback(
 					callbackURL,
 					transaction.ProviderCodeVerifier,
 					transaction.Intent,
+					transaction.RegistrationCode,
 				)
 			}
 		}

@@ -946,6 +946,21 @@ func (r *providerLoginRepo) CreateWithCredentialAndIdentity(
 	return nil
 }
 
+func (r *providerLoginRepo) CreateWithCredentialAndIdentityAndRegistrationCode(
+	ctx context.Context,
+	item *domainuser.User,
+	credential domainuser.Credential,
+	identity *domainuser.UserIdentity,
+	subscriptionPlanID uint,
+	subscriptionPriceID uint,
+	subscriptionEndAt *time.Time,
+	autoRenew bool,
+	registrationCode string,
+	verifiedAt time.Time,
+) error {
+	return r.CreateWithCredentialAndIdentity(ctx, item, credential, identity, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew)
+}
+
 func (r *providerLoginRepo) CreateUserIdentity(ctx context.Context, identity *domainuser.UserIdentity) (*domainuser.UserIdentity, error) {
 	if r.createIdentityErr != nil {
 		return nil, r.createIdentityErr

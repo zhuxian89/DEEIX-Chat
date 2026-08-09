@@ -15,6 +15,7 @@ type ProviderAuthTransaction struct {
 	ClientCodeChallenge  string    `json:"clientCodeChallenge"`
 	ProviderCodeVerifier string    `json:"providerCodeVerifier"`
 	Intent               string    `json:"intent"`
+	RegistrationCode     string    `json:"registrationCode,omitempty"`
 	Next                 string    `json:"next"`
 	ExpiresAt            time.Time `json:"expiresAt"`
 }
@@ -26,6 +27,7 @@ type ProviderAuthGrant struct {
 	ClientID     string    `json:"clientID"`
 	UserID       uint      `json:"userID"`
 	Subject      string    `json:"subject"`
+	RegistrationCode string `json:"registrationCode,omitempty"`
 	ErrorCode    string    `json:"errorCode,omitempty"`
 	ErrorMessage string    `json:"errorMessage,omitempty"`
 	ErrorDetails string    `json:"errorDetails,omitempty"`

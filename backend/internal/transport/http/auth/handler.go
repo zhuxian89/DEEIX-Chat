@@ -160,11 +160,12 @@ func (h *Handler) CompleteEmailRegistration(c *gin.Context) {
 		response.InvalidRequestBody(c, err)
 		return
 	}
-	result, err := h.service.RegisterWithEmail(
+	result, err := h.service.RegisterWithEmailAndRegistrationCode(
 		c.Request.Context(),
 		req.Email,
 		req.Password,
 		req.Code,
+		req.RegistrationCode,
 		req.TurnstileToken,
 		c.ClientIP(),
 		middleware.MustRequestID(c),
@@ -552,12 +553,13 @@ func (h *Handler) StartProviderAuthBridge(c *gin.Context) {
 		return
 	}
 	result, err := h.service.StartProviderAuthBridge(c.Request.Context(), c.Param("slug"), appauth.ProviderAuthBridgeStartInput{
-		ClientID:      req.ClientID,
-		RedirectURI:   req.RedirectURI,
-		CodeChallenge: req.CodeChallenge,
-		ClientState:   req.ClientState,
-		Intent:        req.Intent,
-		Next:          req.Next,
+		ClientID:         req.ClientID,
+		RedirectURI:      req.RedirectURI,
+		CodeChallenge:    req.CodeChallenge,
+		ClientState:      req.ClientState,
+		Intent:           req.Intent,
+		Next:             req.Next,
+		RegistrationCode: req.RegistrationCode,
 	})
 	if err != nil {
 		response.ErrorFrom(c, http.StatusBadRequest, err)
@@ -642,7 +644,7 @@ func (h *Handler) CompleteProviderLogin(c *gin.Context) {
 		response.InvalidRequestBody(c, err)
 		return
 	}
-	result, err := h.service.CompleteProviderLogin(
+	result, err := h.service.CompleteProviderLoginWithRegistrationCode(
 		c.Request.Context(),
 		c.Param("slug"),
 		req.Code,
@@ -650,6 +652,7 @@ func (h *Handler) CompleteProviderLogin(c *gin.Context) {
 		req.RedirectURI,
 		req.CodeVerifier,
 		req.Intent,
+		req.RegistrationCode,
 		middleware.MustRequestID(c),
 		middleware.ResolveSessionAuditContext(c),
 	)

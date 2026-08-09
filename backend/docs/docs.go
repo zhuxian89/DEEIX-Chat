@@ -5409,6 +5409,137 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/registration-codes": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-registration-codes"
+                ],
+                "summary": "管理员查询注册码",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态：active/used",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ListResponseDoc"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/RegistrationcodeErrorDoc"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-registration-codes"
+                ],
+                "summary": "管理员生成注册码",
+                "parameters": [
+                    {
+                        "description": "生成数量",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CreateRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CreateResponseDoc"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/RegistrationcodeErrorDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/registration-codes/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-registration-codes"
+                ],
+                "summary": "删除未使用注册码",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "注册码 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/DeleteResponseDoc"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/RegistrationcodeErrorDoc"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/settings": {
             "get": {
                 "security": [
@@ -13934,6 +14065,51 @@ const docTemplate = `{
                 }
             }
         },
+        "CodeResponse": {
+            "type": "object",
+            "required": [
+                "code",
+                "codeHint",
+                "createdAt",
+                "createdByUserID",
+                "id",
+                "status",
+                "updatedAt",
+                "usedAt",
+                "usedByUserID"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "codeHint": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "createdByUserID": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "usedAt": {
+                    "type": "string",
+                    "x-nullable": true,
+                    "x-omitempty": false
+                },
+                "usedByUserID": {
+                    "type": "integer"
+                }
+            }
+        },
         "ContextArtifactResponse": {
             "type": "object",
             "required": [
@@ -15241,6 +15417,45 @@ const docTemplate = `{
                 }
             }
         },
+        "CreateRequest": {
+            "type": "object",
+            "required": [
+                "quantity"
+            ],
+            "properties": {
+                "quantity": {
+                    "type": "integer",
+                    "maximum": 100,
+                    "minimum": 1
+                }
+            }
+        },
+        "CreateResponseDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "required": [
+                        "results"
+                    ],
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/CodeResponse"
+                            }
+                        }
+                    }
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
         "CreateServerRequest": {
             "type": "object",
             "required": [
@@ -15535,6 +15750,29 @@ const docTemplate = `{
                 }
             }
         },
+        "DeleteResponseDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "required": [
+                        "deleted"
+                    ],
+                    "properties": {
+                        "deleted": {
+                            "type": "boolean"
+                        }
+                    }
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
         "DeleteServerResponse": {
             "type": "object",
             "required": [
@@ -15591,7 +15829,8 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
-                "password"
+                "password",
+                "registrationCode"
             ],
             "properties": {
                 "code": {
@@ -15605,6 +15844,10 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 128,
                     "minLength": 8
+                },
+                "registrationCode": {
+                    "type": "string",
+                    "maxLength": 128
                 },
                 "turnstileToken": {
                     "type": "string",
@@ -16398,6 +16641,39 @@ const docTemplate = `{
                 }
             }
         },
+        "ListResponse": {
+            "type": "object",
+            "required": [
+                "results",
+                "total"
+            ],
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CodeResponse"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "ListResponseDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/ListResponse"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
         "LoginOptionsResponse": {
             "type": "object",
             "required": [
@@ -16407,6 +16683,7 @@ const docTemplate = `{
                 "passwordResetEnabled",
                 "providerAuthBridge",
                 "providers",
+                "registrationCodeRequired",
                 "turnstileRegistrationEnabled",
                 "turnstileSiteKey",
                 "usernameEnabled"
@@ -16432,6 +16709,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/IdentityProviderResponse"
                     }
+                },
+                "registrationCodeRequired": {
+                    "type": "boolean"
                 },
                 "turnstileRegistrationEnabled": {
                     "type": "boolean"
@@ -19082,6 +19362,10 @@ const docTemplate = `{
                 "redirectURI": {
                     "type": "string",
                     "maxLength": 2048
+                },
+                "registrationCode": {
+                    "type": "string",
+                    "maxLength": 128
                 }
             }
         },
@@ -19774,6 +20058,26 @@ const docTemplate = `{
                     "$ref": "#/definitions/LoginResponse"
                 },
                 "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "RegistrationcodeErrorDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {},
+                "details": {},
+                "errorCode": {
+                    "type": "string"
+                },
+                "errorMsg": {
+                    "type": "string"
+                },
+                "requestId": {
                     "type": "string"
                 }
             }

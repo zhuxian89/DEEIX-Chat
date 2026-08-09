@@ -28,6 +28,7 @@ import (
 	skillhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/skill"
 	userhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/user"
 	usersettingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/usersettings"
+	registrationcodehttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/registrationcode"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -64,6 +65,7 @@ type Modules struct {
 	Settings     *settingshttp.Module
 	User         *userhttp.Module
 	UserSettings *usersettingshttp.Module
+	RegistrationCode *registrationcodehttp.Module
 	StartupLog   func(*zap.Logger)
 }
 
@@ -172,11 +174,14 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 	if modules.User != nil {
 		modules.User.RegisterRoutes(authRequired)
 	}
-	if modules.Admin != nil || modules.Auth != nil || modules.Billing != nil || modules.Channel != nil || modules.MCP != nil || modules.Settings != nil || modules.Announcement != nil || modules.PromptPreset != nil || modules.Skill != nil {
+	if modules.Admin != nil || modules.Auth != nil || modules.Billing != nil || modules.Channel != nil || modules.MCP != nil || modules.Settings != nil || modules.Announcement != nil || modules.PromptPreset != nil || modules.Skill != nil || modules.RegistrationCode != nil {
 		adminGroup := authRequired.Group("/admin")
 		adminGroup.Use(middleware.AdminOnly())
 		if modules.Auth != nil {
 			modules.Auth.RegisterAdminRoutes(adminGroup)
+		}
+		if modules.RegistrationCode != nil {
+			modules.RegistrationCode.RegisterAdminRoutes(adminGroup)
 		}
 		if modules.Admin != nil {
 			modules.Admin.RegisterRoutes(adminGroup)

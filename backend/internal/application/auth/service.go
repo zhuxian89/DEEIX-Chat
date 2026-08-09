@@ -65,6 +65,14 @@ type avatarFileValidator interface {
 	ValidateImageFile(ctx context.Context, userID uint, fileID string) error
 }
 
+type emailRegistrationCodeAuthRepository interface {
+	CreateWithCredentialAndRegistrationCode(ctx context.Context, user *domainuser.User, credential domainuser.Credential, subscriptionPlanID uint, subscriptionPriceID uint, subscriptionEndAt *time.Time, autoRenew bool, registrationCode string, verificationID uint, verifiedAt time.Time) error
+}
+
+type providerRegistrationCodeAuthRepository interface {
+	CreateWithCredentialAndIdentityAndRegistrationCode(ctx context.Context, user *domainuser.User, credential domainuser.Credential, identity *domainuser.UserIdentity, subscriptionPlanID uint, subscriptionPriceID uint, subscriptionEndAt *time.Time, autoRenew bool, registrationCode string, verifiedAt time.Time) error
+}
+
 // NewServiceWithRuntime 创建使用运行时配置容器的服务。
 func NewServiceWithRuntime(
 	cfg *config.Runtime,

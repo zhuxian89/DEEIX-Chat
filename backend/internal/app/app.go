@@ -31,6 +31,7 @@ import (
 	appskill "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/skill"
 	appsystemevent "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/systemevent"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/user"
+	appregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/registrationcode"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/usersettings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/embedding"
@@ -58,6 +59,7 @@ import (
 	skillrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/skill"
 	systemeventrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/systemevent"
 	userrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/user"
+	registrationcoderepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/registrationcode"
 	usersettingsrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/usersettings"
 	platformruntime "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/runtime"
 	platformhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http"
@@ -74,6 +76,7 @@ import (
 	skillhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/skill"
 	userhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/user"
 	usersettingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/usersettings"
+	registrationcodehttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/registrationcode"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
@@ -226,6 +229,10 @@ func NewApp() (*App, error) {
 	authService.SetAuditWriter(auditService)
 	settingsService.SetAuthSafetyService(authService)
 	authService.SetSubscriptionResolver(billingService)
+	registrationCodeRepo := registrationcoderepo.NewRepo(db)
+	registrationCodeService := appregistrationcode.NewService(registrationCodeRepo)
+	registrationCodeHandler := registrationcodehttp.NewHandler(registrationCodeService)
+	registrationCodeModule := registrationcodehttp.NewModule(registrationCodeHandler)
 	bootstrapSuperAdmin, err := authService.EnsureBootstrapSuperAdmin(context.Background())
 	if err != nil {
 		return nil, err
@@ -352,6 +359,7 @@ func NewApp() (*App, error) {
 		Memory:       memoryModule,
 		Billing:      billingModule,
 		Admin:        adminModule,
+		RegistrationCode: registrationCodeModule,
 		Announcement: announcementModule,
 		PromptPreset: promptPresetModule,
 		Skill:        skillModule,

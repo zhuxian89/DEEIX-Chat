@@ -11,6 +11,8 @@
   "twoFactorPlaceholder": "验证码或恢复码",
   "verificationCode": "验证码",
   "verificationCodePlaceholder": "6 位验证码",
+  "registrationCode": "注册码",
+  "registrationCodePlaceholder": "请输入注册码",
   "useEmailVerification": "使用邮箱验证",
   "useTwoFactorVerification": "使用两步验证",
   "signIn": "登录",

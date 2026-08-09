@@ -137,10 +137,10 @@ export async function startEmailRegistration(email: string, turnstileToken?: str
   });
 }
 
-export async function completeEmailRegistration(email: string, password: string, code: string, turnstileToken?: string): Promise<LoginData> {
+export async function completeEmailRegistration(email: string, password: string, code: string, registrationCode: string, turnstileToken?: string): Promise<LoginData> {
   return apiRequest<LoginData>("/api/v1/auth/register/email/complete", {
     method: "POST",
-    body: { email, password, code, turnstileToken },
+    body: { email, password, code, registrationCode, turnstileToken },
   });
 }
 
@@ -312,10 +312,11 @@ export async function completeProviderLogin(
   redirectURI: string,
   codeVerifier: string,
   intent: "login" | "register" | "bind",
+  registrationCode = "",
 ): Promise<LoginData> {
   return apiRequest<LoginData>(`/api/v1/auth/providers/${pathParam(slug)}/callback`, {
     method: "POST",
-    body: { code, state, redirectURI: redirectURI, codeVerifier: codeVerifier, intent },
+    body: { code, state, redirectURI: redirectURI, codeVerifier: codeVerifier, intent, registrationCode },
   });
 }
 
@@ -333,6 +334,7 @@ export async function startProviderAuthBridge(
     clientState: string;
     intent: "login" | "register";
     next: string;
+    registrationCode?: string;
   },
 ): Promise<ProviderAuthBridgeStartData> {
   return apiRequest<ProviderAuthBridgeStartData>(`/api/v1/auth/providers/${pathParam(slug)}/authorize`, {

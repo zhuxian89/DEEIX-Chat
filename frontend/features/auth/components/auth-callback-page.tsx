@@ -9,6 +9,7 @@ import { SpinnerLabel } from "@/components/ui/spinner";
 import {
   providerAuthBridgeStorageKey,
   providerPKCEStorageKey,
+  providerRegistrationCodeStorageKey,
   TWO_FACTOR_CHALLENGE_STORAGE_KEY,
   TWO_FACTOR_METHODS_STORAGE_KEY,
 } from "@/features/auth/model/login-page";
@@ -69,6 +70,7 @@ export function AuthCallbackPage() {
     if (provider && grant) {
       const stored = readProviderAuthBridgeRequest(provider);
       window.sessionStorage.removeItem(providerAuthBridgeStorageKey(provider));
+      window.sessionStorage.removeItem(providerRegistrationCodeStorageKey(provider));
       if (!stored || !constantTimeStringEqual(params.get("state") ?? "", stored.state)) {
         setError(t("expiredSession"));
         return;
@@ -112,6 +114,8 @@ export function AuthCallbackPage() {
     }
     const codeVerifier = window.sessionStorage.getItem(providerPKCEStorageKey(provider)) ?? "";
     window.sessionStorage.removeItem(providerPKCEStorageKey(provider));
+    const registrationCode = window.sessionStorage.getItem(providerRegistrationCodeStorageKey(provider)) ?? "";
+    window.sessionStorage.removeItem(providerRegistrationCodeStorageKey(provider));
     if (!codeVerifier) {
       setError(t("expiredSession"));
       return;
@@ -135,7 +139,7 @@ export function AuthCallbackPage() {
       return;
     }
 
-    void completeProviderLogin(provider, code, state, redirectURI, codeVerifier, intent)
+    void completeProviderLogin(provider, code, state, redirectURI, codeVerifier, intent, registrationCode)
       .then((result) => {
         if (result.twoFactorRequired) {
           window.sessionStorage.setItem(TWO_FACTOR_CHALLENGE_STORAGE_KEY, result.twoFactorChallengeToken ?? "");

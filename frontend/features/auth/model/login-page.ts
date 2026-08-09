@@ -13,6 +13,7 @@ export const DEFAULT_LOGIN_OPTIONS: LoginOptionsData = {
   usernameEnabled: true,
   emailEnabled: true,
   emailRegistrationEnabled: true,
+  registrationCodeRequired: true,
   emailVerificationEnabled: false,
   passwordResetEnabled: false,
   turnstileRegistrationEnabled: false,
@@ -38,6 +39,10 @@ export function normalizeRegisterCode(value: string): string {
 
 export function providerPKCEStorageKey(slug: string): string {
   return `deeix-chat:oauth:${slug}:pkce_verifier`;
+}
+
+export function providerRegistrationCodeStorageKey(slug: string): string {
+  return `deeix-chat:oauth:${slug}:registration_code`;
 }
 
 export type ProviderAuthBridgeRequest = {

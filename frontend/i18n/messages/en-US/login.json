@@ -11,6 +11,8 @@
   "twoFactorPlaceholder": "Code or recovery code",
   "verificationCode": "Verification code",
   "verificationCodePlaceholder": "6-digit code",
+  "registrationCode": "Registration code",
+  "registrationCodePlaceholder": "Enter your registration code",
   "useEmailVerification": "Use email instead",
   "useTwoFactorVerification": "Use two-factor instead",
   "signIn": "Sign in",
