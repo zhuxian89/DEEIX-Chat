@@ -89,7 +89,7 @@ func (h *Handler) Delete(c *gin.Context) {
 		return
 	}
 	if err = h.service.Delete(c.Request.Context(), id); err != nil {
-		response.Error(c, http.StatusConflict, "delete registration code failed")
+		response.ErrorFrom(c, http.StatusConflict, err)
 		return
 	}
 	response.Success(c, gin.H{"deleted": true})

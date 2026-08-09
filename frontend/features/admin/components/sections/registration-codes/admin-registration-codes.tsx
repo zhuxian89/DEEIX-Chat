@@ -14,12 +14,22 @@ import {
   type AdminRegistrationCodeDTO,
 } from "@/features/admin/api";
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
+import { writeClipboardText } from "@/shared/lib/clipboard";
 
 export function AdminRegistrationCodesPage() {
   const [items, setItems] = React.useState<AdminRegistrationCodeDTO[]>([]);
   const [quantity, setQuantity] = React.useState("10");
   const [loading, setLoading] = React.useState(true);
   const [creating, setCreating] = React.useState(false);
+
+  const copyCode = async (value: string) => {
+    try {
+      await writeClipboardText(value);
+      toast.success("Copied registration code.");
+    } catch {
+      toast.error("Failed to copy registration code.");
+    }
+  };
 
   const load = React.useCallback(async () => {
     const token = await resolveAccessToken();
@@ -45,8 +55,8 @@ export function AdminRegistrationCodesPage() {
     try {
       const result = await createAdminRegistrationCodes(token, count);
       setItems((current) => [...result.results, ...current]);
-      await navigator.clipboard?.writeText(result.results.map((item) => item.code).join("\n"));
-      toast.success(`Generated ${result.results.length} registration codes and copied them.`);
+      await copyCode(result.results.map((item) => item.code).join("\n"));
+      toast.success(`Generated ${result.results.length} registration codes.`);
     } catch {
       toast.error("Failed to generate registration codes.");
     } finally {
@@ -100,7 +110,7 @@ export function AdminRegistrationCodesPage() {
                 <TableCell>{item.usedByUserID || "-"}</TableCell>
                 <TableCell className="text-right">
                   <div className="flex justify-end gap-1">
-                    <Button size="icon" variant="ghost" title="Copy" onClick={() => void navigator.clipboard?.writeText(item.code)}><Copy className="size-4" /></Button>
+                    <Button size="icon" variant="ghost" title="Copy" onClick={() => void copyCode(item.code)}><Copy className="size-4" /></Button>
                     {item.status === "active" ? <Button size="icon" variant="ghost" title="Delete" onClick={() => void remove(item.id)}><Trash2 className="size-4" /></Button> : null}
                   </div>
                 </TableCell>

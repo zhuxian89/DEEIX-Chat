@@ -75,7 +75,8 @@
     "usernameChangeRequired": "请修改初始化用户名。",
     "verificationCodeAttemptsExceeded": "验证码尝试次数过多，请重新获取验证码。",
     "verificationCodeInvalid": "验证码无效或已过期。",
-    "verificationCodeRecent": "验证码刚刚已发送，请稍后再试。"
+    "verificationCodeRecent": "验证码刚刚已发送，请稍后再试。",
+    "registrationCodeInvalid": "注册码无效或已被使用。"
   },
   "billing": {
     "insufficientBalance": "余额不足。",
