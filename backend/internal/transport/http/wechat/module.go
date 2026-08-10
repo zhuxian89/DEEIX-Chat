@@ -16,9 +16,18 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Module struct{ Handler *Handler }
+type Module struct {
+	Handler      *Handler
+	AdminHandler *AdminHandler
+}
 
-func NewModule(handler *Handler) *Module { return &Module{Handler: handler} }
+func NewModule(handler *Handler, adminHandlers ...*AdminHandler) *Module {
+	module := &Module{Handler: handler}
+	if len(adminHandlers) > 0 {
+		module.AdminHandler = adminHandlers[0]
+	}
+	return module
+}
 
 type Handler struct {
 	service *appwechat.Service
@@ -32,6 +41,24 @@ func NewHandler(service *appwechat.Service, token string) *Handler {
 func (m *Module) RegisterPublicRoutes(api *gin.RouterGroup) {
 	api.GET("/wechat/callback", m.Handler.Verify)
 	api.POST("/wechat/callback", m.Handler.Receive)
+}
+
+func (m *Module) RegisterAdminRoutes(adminGroup *gin.RouterGroup) {
+	if m.AdminHandler == nil {
+		return
+	}
+	adminGroup.GET("/wechat/actions", m.AdminHandler.Actions)
+	adminGroup.GET("/wechat/summary", m.AdminHandler.Summary)
+	adminGroup.GET("/wechat/rules", m.AdminHandler.ListRules)
+	adminGroup.POST("/wechat/rules", m.AdminHandler.CreateRule)
+	adminGroup.PATCH("/wechat/rules/:id", m.AdminHandler.UpdateRule)
+	adminGroup.PATCH("/wechat/rules/:id/enabled", m.AdminHandler.SetRuleEnabled)
+	adminGroup.GET("/wechat/templates", m.AdminHandler.ListTemplates)
+	adminGroup.POST("/wechat/templates", m.AdminHandler.CreateTemplate)
+	adminGroup.PATCH("/wechat/templates/:id", m.AdminHandler.UpdateTemplate)
+	adminGroup.PATCH("/wechat/templates/:id/enabled", m.AdminHandler.SetTemplateEnabled)
+	adminGroup.GET("/wechat/issuances", m.AdminHandler.ListIssuances)
+	adminGroup.GET("/wechat/logs", m.AdminHandler.ListLogs)
 }
 
 type inboundMessage struct {
@@ -75,19 +102,23 @@ func (h *Handler) Receive(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "invalid wechat message")
 		return
 	}
-	if message.MsgType != "text" || !appwechat.IsRegistrationKeyword(message.Content) {
+	if message.MsgType != "text" {
 		c.String(http.StatusOK, "success")
 		return
 	}
-	code, err := h.service.IssueRegistrationCode(c.Request.Context(), message.FromUserName)
+	result, err := h.service.HandleTextMessage(c.Request.Context(), message.FromUserName, message.Content)
 	if err != nil {
-		response.Error(c, http.StatusInternalServerError, "issue registration code failed")
+		response.Error(c, http.StatusInternalServerError, "handle wechat keyword failed")
+		return
+	}
+	if !result.Matched {
+		c.String(http.StatusOK, "success")
 		return
 	}
 	reply, err := xml.Marshal(textReply{
 		ToUserName: message.FromUserName, FromUserName: message.ToUserName,
 		CreateTime: time.Now().Unix(), MsgType: "text",
-		Content: "您的专属注册码：" + code,
+		Content: result.Content,
 	})
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "build wechat reply failed")

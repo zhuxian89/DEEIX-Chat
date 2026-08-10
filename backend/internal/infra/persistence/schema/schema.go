@@ -15,6 +15,9 @@ func Models() []interface{} {
 		&model.UserContactVerification{},
 		&model.RegistrationCode{},
 		&model.WeChatRegistrationIssuance{},
+		&model.WeChatReplyTemplate{},
+		&model.WeChatKeywordRule{},
+		&model.WeChatKeywordInvocationLog{},
 		&model.UserCredential{},
 		&model.UserSession{},
 		&model.UserAuthEvent{},
@@ -127,7 +130,24 @@ func Migrate(db *gorm.DB) error {
 	if err := backfillContextArtifactMessageIDs(db); err != nil {
 		return err
 	}
+	if err := seedWeChatDefaults(db); err != nil {
+		return err
+	}
 	return backfillUsageLedgerBillingAt(db)
+}
+
+func seedWeChatDefaults(db *gorm.DB) error {
+	template := model.WeChatReplyTemplate{
+		Name:         "注册码回复",
+		ResponseType: "text",
+		Content:      "你的专属注册码：{{CODE}}",
+		Enabled:      true,
+	}
+	if err := db.Where("name = ?", template.Name).FirstOrCreate(&template).Error; err != nil {
+		return err
+	}
+	rule := model.WeChatKeywordRule{Keyword: "13003", Action: "issue_registration_code", TemplateID: template.ID, Enabled: true}
+	return db.Where("keyword = ?", rule.Keyword).FirstOrCreate(&rule).Error
 }
 
 // backfillContextArtifactMessageIDs 将旧证据统一迁移到产生该证据的助手运行节点。

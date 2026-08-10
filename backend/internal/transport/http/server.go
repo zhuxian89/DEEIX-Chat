@@ -179,7 +179,7 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 	if modules.User != nil {
 		modules.User.RegisterRoutes(authRequired)
 	}
-	if modules.Admin != nil || modules.Auth != nil || modules.Billing != nil || modules.Channel != nil || modules.MCP != nil || modules.Settings != nil || modules.Announcement != nil || modules.PromptPreset != nil || modules.Skill != nil || modules.RegistrationCode != nil {
+	if modules.Admin != nil || modules.Auth != nil || modules.Billing != nil || modules.Channel != nil || modules.MCP != nil || modules.Settings != nil || modules.Announcement != nil || modules.PromptPreset != nil || modules.Skill != nil || modules.RegistrationCode != nil || modules.WeChat != nil {
 		adminGroup := authRequired.Group("/admin")
 		adminGroup.Use(middleware.AdminOnly())
 		if modules.Auth != nil {
@@ -187,6 +187,9 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 		}
 		if modules.RegistrationCode != nil {
 			modules.RegistrationCode.RegisterAdminRoutes(adminGroup)
+		}
+		if modules.WeChat != nil {
+			modules.WeChat.RegisterAdminRoutes(adminGroup)
 		}
 		if modules.Admin != nil {
 			modules.Admin.RegisterRoutes(adminGroup)

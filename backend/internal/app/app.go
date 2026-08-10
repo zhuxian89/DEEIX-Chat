@@ -238,7 +238,8 @@ func NewApp() (*App, error) {
 	registrationCodeModule := registrationcodehttp.NewModule(registrationCodeHandler)
 	wechatRepo := wechatrepo.NewRepo(db)
 	wechatService := appwechat.NewService(wechatRepo)
-	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, cfg.WeChatCallbackToken))
+	wechatAdminService := appwechat.NewAdminService(wechatRepo)
+	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, cfg.WeChatCallbackToken), wechathttp.NewAdminHandler(wechatAdminService))
 	bootstrapSuperAdmin, err := authService.EnsureBootstrapSuperAdmin(context.Background())
 	if err != nil {
 		return nil, err
