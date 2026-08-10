@@ -24,11 +24,12 @@ import (
 	memoryhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/memory"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/middleware"
 	promptpresethttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/promptpreset"
+	registrationcodehttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/registrationcode"
 	settingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/settings"
 	skillhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/skill"
 	userhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/user"
 	usersettingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/usersettings"
-	registrationcodehttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/registrationcode"
+	wechathttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/wechat"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -51,22 +52,23 @@ type HealthChecker interface {
 
 // Modules 聚合可注册的业务模块。
 type Modules struct {
-	Auth         *authhttp.Module
-	AuthService  middleware.SessionValidator
-	Channel      *channelhttp.Module
-	Conversation *conversationhttp.Module
-	MCP          *mcphttp.Module
-	Memory       *memoryhttp.Module
-	Billing      *billinghttp.Module
-	Admin        *adminhttp.Module
-	Announcement *announcementhttp.Module
-	PromptPreset *promptpresethttp.Module
-	Skill        *skillhttp.Module
-	Settings     *settingshttp.Module
-	User         *userhttp.Module
-	UserSettings *usersettingshttp.Module
+	Auth             *authhttp.Module
+	AuthService      middleware.SessionValidator
+	Channel          *channelhttp.Module
+	Conversation     *conversationhttp.Module
+	MCP              *mcphttp.Module
+	Memory           *memoryhttp.Module
+	Billing          *billinghttp.Module
+	Admin            *adminhttp.Module
+	Announcement     *announcementhttp.Module
+	PromptPreset     *promptpresethttp.Module
+	Skill            *skillhttp.Module
+	Settings         *settingshttp.Module
+	User             *userhttp.Module
+	UserSettings     *usersettingshttp.Module
 	RegistrationCode *registrationcodehttp.Module
-	StartupLog   func(*zap.Logger)
+	WeChat           *wechathttp.Module
+	StartupLog       func(*zap.Logger)
 }
 
 // NewEngine 创建并注册 API 路由。
@@ -114,6 +116,9 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 		c.Header("Pragma", "no-cache")
 		c.JSON(http.StatusOK, buildinfo.Snapshot())
 	})
+	if modules.WeChat != nil {
+		modules.WeChat.RegisterPublicRoutes(api)
+	}
 	if modules.Auth != nil || modules.Settings != nil || modules.Billing != nil || modules.Conversation != nil || modules.User != nil {
 		publicAuth := api.Group("")
 		publicAuth.Use(middleware.PublicAuthRateLimit(limiter, cfg))
@@ -208,7 +213,6 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 			modules.Skill.RegisterAdminRoutes(adminGroup)
 		}
 	}
-
 	if modules.StartupLog != nil {
 		modules.StartupLog(log)
 	}

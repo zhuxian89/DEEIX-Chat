@@ -378,6 +378,7 @@ type Config struct {
 	SMTPPassword                 string
 	SMTPFrom                     string
 	TurnstileSiteverifyURL       string
+	WeChatCallbackToken          string
 	OTelEnabled                  *bool
 	OTelExporterOTLPEndpoint     string
 	OTelExporterOTLPHeaders      string
@@ -613,6 +614,7 @@ func Load() Config {
 		SMTPPassword:                 "",
 		SMTPFrom:                     "",
 		TurnstileSiteverifyURL:       envOr("TURNSTILE_SITEVERIFY_URL", yc.Security.TurnstileSiteverifyURL, DefaultTurnstileSiteverifyURL),
+		WeChatCallbackToken:          strings.TrimSpace(os.Getenv("WECHAT_CALLBACK_TOKEN")),
 		OTelEnabled:                  envOrBoolOptional("OTEL_ENABLED", yc.Observability.Tracing.Enabled),
 		OTelExporterOTLPEndpoint:     envOr("OTEL_EXPORTER_OTLP_ENDPOINT", yc.Observability.Tracing.Endpoint, ""),
 		OTelExporterOTLPHeaders:      envOr("OTEL_EXPORTER_OTLP_HEADERS", yc.Observability.Tracing.Headers, ""),

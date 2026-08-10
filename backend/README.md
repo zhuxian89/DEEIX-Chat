@@ -85,6 +85,9 @@ cp config.sqlite.example.yaml config.yaml
 - `OTEL_EXPORTER_OTLP_INSECURE`：是否使用明文传输
 - `OTEL_EXPORTER_OTLP_PROTOCOL`：OTLP exporter 协议，支持 `grpc`、`http`、`http/protobuf`，默认 `grpc`
 - `OTEL_TRACES_SAMPLER_ARG` / `OTEL_SAMPLING_RATE`：Trace 采样率，范围 `0~1`
+- `WECHAT_CALLBACK_TOKEN`：微信公众号服务器配置中的 Token。配置后回调地址为 `/api/v1/wechat/callback`；当前支持明文模式，用户发送精确关键词 `13003` 时按 OpenID 幂等发放注册码。
+
+公众号回调使用独立的 `wechat_registration_issuances` 表记录 OpenID 与注册码的关系，不修改既有用户表。首次发送 `13003` 会创建一个 `active` 注册码；同一 OpenID 再次发送会返回原注册码。部署到微信公众号后台时，将服务器地址设置为 `<PUBLIC_API_BASE_URL>/api/v1/wechat/callback`，消息加解密模式选择“明文模式”，并填写与 `WECHAT_CALLBACK_TOKEN` 相同的 Token。
 
 对应 YAML：
 

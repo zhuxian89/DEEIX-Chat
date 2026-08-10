@@ -14,6 +14,7 @@ func Models() []interface{} {
 		&model.User{},
 		&model.UserContactVerification{},
 		&model.RegistrationCode{},
+		&model.WeChatRegistrationIssuance{},
 		&model.UserCredential{},
 		&model.UserSession{},
 		&model.UserAuthEvent{},

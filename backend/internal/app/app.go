@@ -26,13 +26,14 @@ import (
 	appprocessing "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/processing"
 	apppromptpreset "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/promptpreset"
 	apprag "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/rag"
+	appregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/registrationcode"
 	appruntime "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/runtime"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/settings"
 	appskill "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/skill"
 	appsystemevent "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/systemevent"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/user"
-	appregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/registrationcode"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/usersettings"
+	appwechat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/wechat"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/embedding"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/geoip"
@@ -55,12 +56,13 @@ import (
 	mcprepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/mcp"
 	memoryrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/memory"
 	promptpresetrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/promptpreset"
+	registrationcoderepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/registrationcode"
 	settingsrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/settings"
 	skillrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/skill"
 	systemeventrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/systemevent"
 	userrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/user"
-	registrationcoderepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/registrationcode"
 	usersettingsrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/usersettings"
+	wechatrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/wechat"
 	platformruntime "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/runtime"
 	platformhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http"
 	adminhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/admin"
@@ -72,11 +74,12 @@ import (
 	mcphttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/mcp"
 	memoryhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/memory"
 	promptpresethttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/promptpreset"
+	registrationcodehttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/registrationcode"
 	settingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/settings"
 	skillhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/skill"
 	userhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/user"
 	usersettingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/usersettings"
-	registrationcodehttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/registrationcode"
+	wechathttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/wechat"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
@@ -233,6 +236,9 @@ func NewApp() (*App, error) {
 	registrationCodeService := appregistrationcode.NewService(registrationCodeRepo)
 	registrationCodeHandler := registrationcodehttp.NewHandler(registrationCodeService)
 	registrationCodeModule := registrationcodehttp.NewModule(registrationCodeHandler)
+	wechatRepo := wechatrepo.NewRepo(db)
+	wechatService := appwechat.NewService(wechatRepo)
+	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, cfg.WeChatCallbackToken))
 	bootstrapSuperAdmin, err := authService.EnsureBootstrapSuperAdmin(context.Background())
 	if err != nil {
 		return nil, err
@@ -351,21 +357,22 @@ func NewApp() (*App, error) {
 	hc := newHealthChecker(db, cfg.CacheDriver, redisClient)
 	rateLimiter := buildRateLimiter(cfg, redisClient, memoryCache)
 	engine, err := platformhttp.NewEngine(runtimeCfg, log, platformhttp.Modules{
-		Auth:         authModule,
-		AuthService:  authService,
-		Channel:      channelModule,
-		Conversation: conversationModule,
-		MCP:          mcpModule,
-		Memory:       memoryModule,
-		Billing:      billingModule,
-		Admin:        adminModule,
+		Auth:             authModule,
+		AuthService:      authService,
+		Channel:          channelModule,
+		Conversation:     conversationModule,
+		MCP:              mcpModule,
+		Memory:           memoryModule,
+		Billing:          billingModule,
+		Admin:            adminModule,
 		RegistrationCode: registrationCodeModule,
-		Announcement: announcementModule,
-		PromptPreset: promptPresetModule,
-		Skill:        skillModule,
-		Settings:     settingsModule,
-		UserSettings: userSettingsModule,
-		User:         userModule,
+		WeChat:           wechatModule,
+		Announcement:     announcementModule,
+		PromptPreset:     promptPresetModule,
+		Skill:            skillModule,
+		Settings:         settingsModule,
+		UserSettings:     userSettingsModule,
+		User:             userModule,
 		StartupLog: func(log *zap.Logger) {
 			if log == nil || bootstrapSuperAdmin == nil {
 				return

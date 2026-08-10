@@ -71,6 +71,14 @@ func (r *Repo) GetByID(ctx context.Context, id uint) (*domainregistrationcode.Re
 }
 
 func (r *Repo) DeleteUnused(ctx context.Context, id uint) error {
+	var issuanceCount int64
+	if err := r.db.WithContext(ctx).Model(&model.WeChatRegistrationIssuance{}).
+		Where("registration_code_id = ?", id).Count(&issuanceCount).Error; err != nil {
+		return translateError(err)
+	}
+	if issuanceCount > 0 {
+		return repository.ErrConflict
+	}
 	result := r.db.WithContext(ctx).Where("id = ? AND status = ?", id, domainregistrationcode.StatusActive).Delete(&model.RegistrationCode{})
 	if result.Error != nil {
 		return translateError(result.Error)
