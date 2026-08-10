@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 type LoginPageProps = {
   nextPath: string;
+  invite?: string;
 };
 
 function LoginBrandMark() {
@@ -28,9 +29,9 @@ function LoginBrandMark() {
   );
 }
 
-export function LoginPage({ nextPath }: LoginPageProps) {
+export function LoginPage({ nextPath, invite }: LoginPageProps) {
   const t = useTranslations("login");
-  const loginPage = useLoginPage({ nextPath });
+  const loginPage = useLoginPage({ nextPath, invite });
   const {
     cancelTwoFactorChallenge,
     canShowRegisterSwitch,

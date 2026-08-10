@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -32,6 +32,7 @@ import {
 
 type UseLoginPageInput = {
   nextPath: string;
+  invite?: string;
 };
 
 const VERIFICATION_CODE_RESEND_COOLDOWN_MS = 60_000;
@@ -52,11 +53,11 @@ function parseSecurityVerificationMethods(value: string | null): SecurityVerific
   }
 }
 
-export function useLoginPage({ nextPath }: UseLoginPageInput) {
+export function useLoginPage({ nextPath, invite }: UseLoginPageInput) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const t = useTranslations("login");
   const resolveErrorMessage = useLocalizedErrorMessage();
+  const initialInvite = (invite ?? "").trim();
   const [settings, setSettings] = React.useState<LoginPageSettings>(DEFAULT_LOGIN_SETTINGS);
   const [options, setOptions] = React.useState<LoginOptionsData>(DEFAULT_LOGIN_OPTIONS);
   const [username, setUsername] = React.useState("");
@@ -66,11 +67,11 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
   const [twoFactorVerificationMethod, setTwoFactorVerificationMethod] = React.useState<SecurityVerificationMethod>("two_factor");
   const [twoFactorCode, setTwoFactorCode] = React.useState("");
   const [twoFactorEmailDebugCode, setTwoFactorEmailDebugCode] = React.useState("");
-  const [mode, setMode] = React.useState<LoginMode>("login");
+  const [mode, setMode] = React.useState<LoginMode>(initialInvite ? "register" : "login");
   const [registerEmail, setRegisterEmail] = React.useState("");
   const [registerPassword, setRegisterPassword] = React.useState("");
   const [registrationCode, setRegistrationCode] = React.useState("");
-  const [invitationCode, setInvitationCode] = React.useState(searchParams?.get("invite") ?? "");
+  const [invitationCode, setInvitationCode] = React.useState(initialInvite);
   const [registerCode, setRegisterCode] = React.useState("");
   const [registerDebugCode, setRegisterDebugCode] = React.useState("");
   const [resetEmail, setResetEmail] = React.useState("");

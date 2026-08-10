@@ -70,8 +70,11 @@ func (s *Service) buildInviteLink(code string) string {
 		base = s.cfg.Snapshot().PublicWebBaseURL
 	}
 	base = strings.TrimRight(strings.TrimSpace(base), "/")
+	// 项目只有 /login 路由（注册是其 mode），邀请链接指向 /login?invite= 并带 mode=register，
+	// 前端识别后自动进入注册界面并预填邀请码。
+	suffix := "/login?invite=" + code + "&mode=register"
 	if base == "" {
-		return "/register?invite=" + code
+		return suffix
 	}
-	return base + "/register?invite=" + code
+	return base + suffix
 }

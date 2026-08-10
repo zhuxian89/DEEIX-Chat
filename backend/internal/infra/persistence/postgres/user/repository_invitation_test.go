@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	domainuser "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/user"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/invitation"
+	domainuser "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/user"
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -143,6 +143,107 @@ func TestCreateWithInvitationCodeLenientOnInvalidCode(t *testing.T) {
 	db.Model(&model.InvitationCode{}).Where("user_id = ?", invitee.ID).Count(&codeCount)
 	if codeCount != 1 {
 		t.Fatalf("invitee own code should be generated even with invalid invitation code, got %d", codeCount)
+	}
+}
+
+func TestCreateWithInvitationCodeSkipsSuspendedInviter(t *testing.T) {
+	db := invitationTestDB(t, "invitation_suspended_inviter")
+	repo := NewRepo(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	inviter := newInvitationUser(repo, 1, "suspended_inviter")
+	if err := repo.CreateWithCredential(ctx, inviter, domainuser.Credential{PasswordHash: "x", PasswordAlgo: "bcrypt", PasswordEnabled: true, PasswordOrigin: domainuser.PasswordOriginLocalRegister}, 0, 0, nil, false); err != nil {
+		t.Fatalf("create inviter: %v", err)
+	}
+	inviterCode, err := invitation.GenerateCode(invitation.DefaultCodeLength)
+	if err != nil {
+		t.Fatalf("generate inviter code: %v", err)
+	}
+	if err := db.Create(&model.InvitationCode{UserID: inviter.ID, Code: inviterCode}).Error; err != nil {
+		t.Fatalf("seed inviter code: %v", err)
+	}
+	if err := repo.UpdateUserStatus(ctx, inviter.ID, domainuser.StatusSuspended); err != nil {
+		t.Fatalf("suspend inviter: %v", err)
+	}
+
+	invitee := newInvitationUser(repo, 0, "suspended_invitee")
+	input := invitation.ApplyInput{
+		Code:                 inviterCode,
+		Enabled:              true,
+		InviteeRewardNanousd: 500_000_000,
+		InviterRewardNanousd: 500_000_000,
+		CodeLength:           invitation.DefaultCodeLength,
+	}
+	if err := repo.CreateWithCredentialAndInvitationCode(ctx, invitee, domainuser.Credential{PasswordHash: "x", PasswordAlgo: "bcrypt", PasswordEnabled: true, PasswordOrigin: domainuser.PasswordOriginLocalRegister}, 0, 0, nil, false, "", 0, now, input); err != nil {
+		t.Fatalf("register with suspended inviter should succeed: %v", err)
+	}
+
+	var relationshipCount int64
+	if err := db.Model(&model.InvitationRelationship{}).Count(&relationshipCount).Error; err != nil {
+		t.Fatalf("count relationships: %v", err)
+	}
+	if relationshipCount != 0 {
+		t.Fatalf("suspended inviter should not create a relationship, got %d", relationshipCount)
+	}
+	var accountCount int64
+	if err := db.Model(&model.BillingAccount{}).Count(&accountCount).Error; err != nil {
+		t.Fatalf("count billing accounts: %v", err)
+	}
+	if accountCount != 0 {
+		t.Fatalf("suspended inviter should not grant rewards, got %d accounts", accountCount)
+	}
+}
+
+func TestCreateWithInvitationCodeDoesNotRewardSameEmailTwice(t *testing.T) {
+	db := invitationTestDB(t, "invitation_same_email_once")
+	repo := NewRepo(db)
+	ctx := context.Background()
+	now := time.Now()
+
+	inviter := newInvitationUser(repo, 1, "same_email_inviter")
+	if err := repo.CreateWithCredential(ctx, inviter, domainuser.Credential{PasswordHash: "x", PasswordAlgo: "bcrypt", PasswordEnabled: true, PasswordOrigin: domainuser.PasswordOriginLocalRegister}, 0, 0, nil, false); err != nil {
+		t.Fatalf("create inviter: %v", err)
+	}
+	inviterCode, err := invitation.GenerateCode(invitation.DefaultCodeLength)
+	if err != nil {
+		t.Fatalf("generate inviter code: %v", err)
+	}
+	if err := db.Create(&model.InvitationCode{UserID: inviter.ID, Code: inviterCode}).Error; err != nil {
+		t.Fatalf("seed inviter code: %v", err)
+	}
+
+	input := invitation.ApplyInput{
+		Code:                 inviterCode,
+		Enabled:              true,
+		InviteeRewardNanousd: 500_000_000,
+		InviterRewardNanousd: 500_000_000,
+		CodeLength:           invitation.DefaultCodeLength,
+	}
+	first := newInvitationUser(repo, 0, "same_email_first")
+	first.Email = "Repeat@Example.com"
+	if err := repo.CreateWithCredentialAndInvitationCode(ctx, first, domainuser.Credential{PasswordHash: "x", PasswordAlgo: "bcrypt", PasswordEnabled: true, PasswordOrigin: domainuser.PasswordOriginLocalRegister}, 0, 0, nil, false, "", 0, now, input); err != nil {
+		t.Fatalf("register first invitee: %v", err)
+	}
+	second := newInvitationUser(repo, 0, "same_email_second")
+	second.Email = " repeat@example.com "
+	if err := repo.CreateWithCredentialAndInvitationCode(ctx, second, domainuser.Credential{PasswordHash: "x", PasswordAlgo: "bcrypt", PasswordEnabled: true, PasswordOrigin: domainuser.PasswordOriginLocalRegister}, 0, 0, nil, false, "", 0, now, input); err != nil {
+		t.Fatalf("register second invitee: %v", err)
+	}
+
+	var relationshipCount int64
+	if err := db.Model(&model.InvitationRelationship{}).Count(&relationshipCount).Error; err != nil {
+		t.Fatalf("count relationships: %v", err)
+	}
+	if relationshipCount != 1 {
+		t.Fatalf("same email should create one relationship, got %d", relationshipCount)
+	}
+	var inviterAccount model.BillingAccount
+	if err := db.Where("user_id = ?", inviter.ID).First(&inviterAccount).Error; err != nil {
+		t.Fatalf("load inviter account: %v", err)
+	}
+	if inviterAccount.BalanceNanousd != 500_000_000 {
+		t.Fatalf("same email should not grant inviter twice, got %d", inviterAccount.BalanceNanousd)
 	}
 }
 

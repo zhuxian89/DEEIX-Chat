@@ -16,6 +16,7 @@ type InvitationRelationship struct {
 	ControlPlaneModel
 	InviterUserID        uint       `gorm:"not null;index:idx_invitation_relationships_inviter;comment:邀请人ID"`
 	InvitedUserID        uint       `gorm:"not null;uniqueIndex:uk_invitation_relationships_invited;comment:被邀请人ID"`
+	InviteeEmail         string     `gorm:"size:128;not null;uniqueIndex:uk_invitation_relationships_invitee_email;comment:被邀请人注册邮箱（规范化）"`
 	InvitationCode       string     `gorm:"size:32;not null;default:'';comment:使用的邀请码"`
 	InviteeRewardNanousd int64      `gorm:"not null;default:0;comment:被邀请人实发奖励"`
 	InviterRewardNanousd int64      `gorm:"not null;default:0;comment:邀请人实发奖励"`

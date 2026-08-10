@@ -638,10 +638,26 @@ func applyInvitationTx(tx *gorm.DB, invitedUserID uint, input domaininvitation.A
 		}
 		return translateError(err)
 	}
+	var inviter model.User
+	if err := tx.Where("id = ? AND status = ?", inviterCode.UserID, model.UserStatusActive).First(&inviter).Error; err != nil {
+		if dberror.IsRecordNotFound(err) {
+			return nil // 停用或不存在的邀请人：邀请码失效，不发奖。
+		}
+		return translateError(err)
+	}
+	var invitee model.User
+	if err := tx.Where("id = ?", invitedUserID).First(&invitee).Error; err != nil {
+		return translateError(err)
+	}
+	inviteeEmail := strings.ToLower(strings.TrimSpace(invitee.Email))
+	if inviteeEmail == "" {
+		return nil
+	}
 	// 写邀请关系（invited_user_id 唯一）。已被邀请过则宽松放行，不重复发奖。
 	rel := model.InvitationRelationship{
 		InviterUserID:        inviterCode.UserID,
 		InvitedUserID:        invitedUserID,
+		InviteeEmail:         inviteeEmail,
 		InvitationCode:       trimmedCode,
 		InviteeRewardNanousd: input.InviteeRewardNanousd,
 		InviterRewardNanousd: input.InviterRewardNanousd,
