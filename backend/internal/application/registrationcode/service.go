@@ -84,7 +84,8 @@ func (s *Service) Delete(ctx context.Context, id uint) error { return s.repo.Del
 // registrationCodePrefix 是注册码的固定前缀，用于与邀请码（INV-）区分。
 const registrationCodePrefix = "REG-"
 
-func generateCode() (string, error) {
+// GenerateCode 生成带 REG- 前缀的注册码。导出以便 wechat 等模块复用，避免重复定义。
+func GenerateCode() (string, error) {
 	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	buf := make([]byte, codeLength)
 	raw := make([]byte, codeLength)
@@ -96,3 +97,5 @@ func generateCode() (string, error) {
 	}
 	return fmt.Sprintf("%s%s", registrationCodePrefix, string(buf)), nil
 }
+
+func generateCode() (string, error) { return GenerateCode() }

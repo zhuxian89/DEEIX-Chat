@@ -2,11 +2,10 @@ package wechat
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
-	"fmt"
 	"strings"
 
+	appregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/registrationcode"
 	domainwechat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/wechat"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/repository"
 )
@@ -154,15 +153,5 @@ func (s *Service) logFailure(ctx context.Context, repo repository.WeChatAdminRep
 	return repository.ErrInvalidInput
 }
 
-func generateCode() (string, error) {
-	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
-	raw := make([]byte, 16)
-	if _, err := rand.Read(raw); err != nil {
-		return "", err
-	}
-	buf := make([]byte, len(raw))
-	for i := range raw {
-		buf[i] = alphabet[int(raw[i])%len(alphabet)]
-	}
-	return fmt.Sprintf("%s-%s-%s-%s", string(buf[:4]), string(buf[4:8]), string(buf[8:12]), string(buf[12:])), nil
-}
+// generateCode 复用 registrationcode 包的统一生成函数，保证注册码格式单一来源（REG- 前缀）。
+func generateCode() (string, error) { return appregistrationcode.GenerateCode() }
