@@ -20,6 +20,7 @@ import (
 	billinghttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/billing"
 	channelhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/channel"
 	conversationhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/conversation"
+	invitationhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/invitation"
 	mcphttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/mcp"
 	memoryhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/memory"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/middleware"
@@ -68,6 +69,7 @@ type Modules struct {
 	UserSettings     *usersettingshttp.Module
 	RegistrationCode *registrationcodehttp.Module
 	WeChat           *wechathttp.Module
+	Invitation       *invitationhttp.Module
 	StartupLog       func(*zap.Logger)
 }
 
@@ -179,7 +181,10 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 	if modules.User != nil {
 		modules.User.RegisterRoutes(authRequired)
 	}
-	if modules.Admin != nil || modules.Auth != nil || modules.Billing != nil || modules.Channel != nil || modules.MCP != nil || modules.Settings != nil || modules.Announcement != nil || modules.PromptPreset != nil || modules.Skill != nil || modules.RegistrationCode != nil || modules.WeChat != nil {
+	if modules.Invitation != nil {
+		modules.Invitation.RegisterRoutes(authRequired)
+	}
+	if modules.Admin != nil || modules.Auth != nil || modules.Billing != nil || modules.Channel != nil || modules.MCP != nil || modules.Settings != nil || modules.Announcement != nil || modules.PromptPreset != nil || modules.Skill != nil || modules.RegistrationCode != nil || modules.WeChat != nil || modules.Invitation != nil {
 		adminGroup := authRequired.Group("/admin")
 		adminGroup.Use(middleware.AdminOnly())
 		if modules.Auth != nil {
@@ -190,6 +195,9 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 		}
 		if modules.WeChat != nil {
 			modules.WeChat.RegisterAdminRoutes(adminGroup)
+		}
+		if modules.Invitation != nil {
+			modules.Invitation.RegisterAdminRoutes(adminGroup)
 		}
 		if modules.Admin != nil {
 			modules.Admin.RegisterRoutes(adminGroup)

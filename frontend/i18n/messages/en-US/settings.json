@@ -455,6 +455,30 @@
       "retryLater": "Please try again later."
     }
   },
+  "invitationPage": {
+    "title": "Invitation rewards",
+    "invitationCode": "My invitation code",
+    "inviteLink": "Invite link",
+    "inviteCount": "Invited {count} user(s)",
+    "invitedList": "Invited users",
+    "noInvitedUsers": "No invitations yet",
+    "loading": "Loading…",
+    "copyInvitationCode": "Copy invitation code",
+    "copyInviteLink": "Copy invite link",
+    "pagination": "Page {page} of {total}",
+    "actions": {
+      "prev": "Previous",
+      "next": "Next"
+    },
+    "toasts": {
+      "copied": "Copied",
+      "copyFailed": "Copy failed",
+      "retryLater": "Please try again later."
+    },
+    "errors": {
+      "loadFailed": "Failed to load invitation info. Please try again later."
+    }
+  },
   "subscriptionPage": {
     "title": "Subscription",
     "actions": {

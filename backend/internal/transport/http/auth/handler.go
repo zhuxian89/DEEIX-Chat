@@ -160,12 +160,13 @@ func (h *Handler) CompleteEmailRegistration(c *gin.Context) {
 		response.InvalidRequestBody(c, err)
 		return
 	}
-	result, err := h.service.RegisterWithEmailAndRegistrationCode(
+	result, err := h.service.RegisterWithEmailAndInvitationCode(
 		c.Request.Context(),
 		req.Email,
 		req.Password,
 		req.Code,
 		req.RegistrationCode,
+		req.InvitationCode,
 		req.TurnstileToken,
 		c.ClientIP(),
 		middleware.MustRequestID(c),

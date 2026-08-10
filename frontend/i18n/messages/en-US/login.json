@@ -13,6 +13,7 @@
   "verificationCodePlaceholder": "6-digit code",
   "registrationCode": "Registration code",
   "registrationCodePlaceholder": "Enter your registration code",
+  "invitationCode": "Invitation code",
   "useEmailVerification": "Use email instead",
   "useTwoFactorVerification": "Use two-factor instead",
   "signIn": "Sign in",

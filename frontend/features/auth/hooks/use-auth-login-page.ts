@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
 
@@ -54,6 +54,7 @@ function parseSecurityVerificationMethods(value: string | null): SecurityVerific
 
 export function useLoginPage({ nextPath }: UseLoginPageInput) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const t = useTranslations("login");
   const resolveErrorMessage = useLocalizedErrorMessage();
   const [settings, setSettings] = React.useState<LoginPageSettings>(DEFAULT_LOGIN_SETTINGS);
@@ -69,6 +70,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
   const [registerEmail, setRegisterEmail] = React.useState("");
   const [registerPassword, setRegisterPassword] = React.useState("");
   const [registrationCode, setRegistrationCode] = React.useState("");
+  const [invitationCode, setInvitationCode] = React.useState(searchParams?.get("invite") ?? "");
   const [registerCode, setRegisterCode] = React.useState("");
   const [registerDebugCode, setRegisterDebugCode] = React.useState("");
   const [resetEmail, setResetEmail] = React.useState("");
@@ -367,6 +369,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
           emailVerificationEnabled ? registerCode : "",
           registrationCode,
           registerTurnstileRequired ? registerTurnstileToken : undefined,
+          invitationCode.trim() || undefined,
         );
         completeAuth(result.accessToken, result.sessionID);
       } catch (error) {
@@ -378,7 +381,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
         setSubmitting(false);
       }
     },
-    [completeAuth, emailVerificationEnabled, registerCode, registerEmail, registerPassword, registrationCode, registerTurnstileRequired, registerTurnstileToken, resetRegisterTurnstile, resolveErrorMessage, submitting, t],
+    [completeAuth, emailVerificationEnabled, registerCode, registerEmail, registerPassword, registrationCode, invitationCode, registerTurnstileRequired, registerTurnstileToken, resetRegisterTurnstile, resolveErrorMessage, submitting, t],
   );
 
   const onPasswordResetSubmit = React.useCallback(
@@ -478,6 +481,7 @@ export function useLoginPage({ nextPath }: UseLoginPageInput) {
     registerPassword,
     registrationCodeRequired,
     registrationCode,
+    invitationCode,
     registerTurnstileRequired,
     registerTurnstileResetSignal,
     registerTurnstileSiteKey,

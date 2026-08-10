@@ -22,6 +22,7 @@ import (
 	"time"
 
 	userapp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/user"
+	domaininvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/invitation"
 	domainuser "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/user"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/pkg/conv"
@@ -156,6 +157,30 @@ func (s *Service) RegisterWithEmail(ctx context.Context, email string, password 
 }
 
 func (s *Service) RegisterWithEmailAndRegistrationCode(ctx context.Context, email string, password string, code string, registrationCode string, turnstileToken string, remoteIP string, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
+	prepared, err := s.prepareEmailRegistration(ctx, email, password, code, turnstileToken, remoteIP)
+	if err != nil {
+		return nil, err
+	}
+	if err = s.createWithCredentialUsingAvailableUsernameAndRegistrationCode(ctx, prepared.userItem, prepared.credential, 0, 0, nil, false, registrationCode, prepared.verificationID, prepared.now); err != nil {
+		if errors.Is(err, repository.ErrConflict) || errors.Is(err, repository.ErrInvalidInput) || errors.Is(err, repository.ErrNotFound) {
+			return nil, fmt.Errorf("registration code is invalid or already used")
+		}
+		return nil, err
+	}
+	return s.finalizeEmailRegistration(ctx, prepared, requestID, auditCtx)
+}
+
+// preparedRegistration 封装邮箱注册前置检查的产物，供注册码/邀请码两条路径复用。
+type preparedRegistration struct {
+	userItem       *domainuser.User
+	credential     domainuser.Credential
+	verificationID uint
+	now            time.Time
+}
+
+// prepareEmailRegistration 执行邮箱注册的前置检查（开关、邮箱规范、Turnstile、邮箱占用、验证码），
+// 并构造待创建的 user 与 credential。注册码路径与邀请码路径共享此逻辑。
+func (s *Service) prepareEmailRegistration(ctx context.Context, email string, password string, code string, turnstileToken string, remoteIP string) (*preparedRegistration, error) {
 	cfg := s.cfg.Snapshot()
 	if !cfg.EmailLoginEnabled || !cfg.EmailRegistrationEnabled {
 		return nil, fmt.Errorf("email registration is disabled")
@@ -227,22 +252,25 @@ func (s *Service) RegisterWithEmailAndRegistrationCode(ctx context.Context, emai
 	if verification != nil {
 		verificationID = verification.ID
 	}
-	if err = s.createWithCredentialUsingAvailableUsernameAndRegistrationCode(ctx, userItem, domainuser.Credential{
-		PasswordHash:      string(passwordHash),
-		PasswordAlgo:      "bcrypt",
-		PasswordEnabled:   true,
-		PasswordUpdatedAt: &now,
-		PasswordSetAt:     &now,
-		PasswordOrigin:    domainuser.PasswordOriginLocalRegister,
-	}, 0, 0, nil, false, registrationCode, verificationID, now); err != nil {
-		if errors.Is(err, repository.ErrConflict) || errors.Is(err, repository.ErrInvalidInput) || errors.Is(err, repository.ErrNotFound) {
-			return nil, fmt.Errorf("registration code is invalid or already used")
-		}
-		return nil, err
-	}
+	return &preparedRegistration{
+		userItem: userItem,
+		credential: domainuser.Credential{
+			PasswordHash:      string(passwordHash),
+			PasswordAlgo:      "bcrypt",
+			PasswordEnabled:   true,
+			PasswordUpdatedAt: &now,
+			PasswordSetAt:     &now,
+			PasswordOrigin:    domainuser.PasswordOriginLocalRegister,
+		},
+		verificationID: verificationID,
+		now:            now,
+	}, nil
+}
 
+// finalizeEmailRegistration 在持久化成功后签发登录结果并记录审计事件。
+func (s *Service) finalizeEmailRegistration(ctx context.Context, prepared *preparedRegistration, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
 	normalizedAuditCtx := s.resolveSessionAuditContext(ctx, auditCtx)
-	result, err := s.issueLoginResult(ctx, userItem, normalizedAuditCtx, now)
+	result, err := s.issueLoginResult(ctx, prepared.userItem, normalizedAuditCtx, prepared.now)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +278,7 @@ func (s *Service) RegisterWithEmailAndRegistrationCode(ctx context.Context, emai
 		ctx, result.User.ID, requestID, "email_register", "success", "",
 		normalizedAuditCtx.ClientIP, normalizedAuditCtx.UserAgent,
 		marshalAuthEventDetail(map[string]interface{}{
-			"email":      normalizedEmail,
+			"email":      prepared.userItem.Email,
 			"session_id": result.SessionID,
 		}),
 	)
@@ -1002,6 +1030,60 @@ func (s *Service) createWithCredentialUsingAvailableUsernameAndRegistrationCode(
 		userItem.ID = 0
 		userItem.Username = generatedUsernameWithSuffix(baseUsername, attempt)
 		err := repo.CreateWithCredentialAndRegistrationCode(ctx, userItem, credential, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew, strings.ToUpper(strings.TrimSpace(registrationCode)), verificationID, verifiedAt)
+		if errors.Is(err, repository.ErrDuplicateUsername) {
+			continue
+		}
+		return err
+	}
+	return ErrUsernameTaken
+}
+
+// RegisterWithEmailAndInvitationCode 执行邮箱注册，同时处理注册码（可选）与邀请码奖励。
+// 邀请码宽松放行：无效/关闭/重复均不阻断注册。
+func (s *Service) RegisterWithEmailAndInvitationCode(ctx context.Context, email string, password string, code string, registrationCode string, invitationCode string, turnstileToken string, remoteIP string, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
+	prepared, err := s.prepareEmailRegistration(ctx, email, password, code, turnstileToken, remoteIP)
+	if err != nil {
+		return nil, err
+	}
+	cfg := s.cfg.Snapshot()
+	invitationInput := domaininvitation.ApplyInput{
+		Code:                 strings.TrimSpace(invitationCode),
+		Enabled:              cfg.InvitationEnabled,
+		InviteeRewardNanousd: domaininvitation.UsdToNanousd(cfg.InvitationInviteeRewardUSD),
+		InviterRewardNanousd: domaininvitation.UsdToNanousd(cfg.InvitationInviterRewardUSD),
+		CodeLength:           cfg.InvitationCodeLength,
+	}
+	if err = s.createWithCredentialUsingAvailableUsernameInvitation(ctx, prepared.userItem, prepared.credential, 0, 0, nil, false, registrationCode, prepared.verificationID, prepared.now, invitationInput); err != nil {
+		if errors.Is(err, repository.ErrConflict) || errors.Is(err, repository.ErrInvalidInput) || errors.Is(err, repository.ErrNotFound) {
+			return nil, fmt.Errorf("registration code is invalid or already used")
+		}
+		return nil, err
+	}
+	return s.finalizeEmailRegistration(ctx, prepared, requestID, auditCtx)
+}
+
+func (s *Service) createWithCredentialUsingAvailableUsernameInvitation(
+	ctx context.Context,
+	userItem *domainuser.User,
+	credential domainuser.Credential,
+	subscriptionPlanID uint,
+	subscriptionPriceID uint,
+	subscriptionEndAt *time.Time,
+	autoRenew bool,
+	registrationCode string,
+	verificationID uint,
+	verifiedAt time.Time,
+	invitation domaininvitation.ApplyInput,
+) error {
+	repo, ok := s.repo.(invitationAuthRepository)
+	if !ok {
+		return fmt.Errorf("invitation persistence is unavailable")
+	}
+	baseUsername := userItem.Username
+	for attempt := 0; attempt < 20; attempt++ {
+		userItem.ID = 0
+		userItem.Username = generatedUsernameWithSuffix(baseUsername, attempt)
+		err := repo.CreateWithCredentialAndInvitationCode(ctx, userItem, credential, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew, strings.ToUpper(strings.TrimSpace(registrationCode)), verificationID, verifiedAt, invitation)
 		if errors.Is(err, repository.ErrDuplicateUsername) {
 			continue
 		}

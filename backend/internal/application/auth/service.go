@@ -18,6 +18,7 @@ import (
 	appstorage "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/objectstorage"
 	userapp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/user"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/userview"
+	domaininvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/invitation"
 	domainuser "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/user"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/geoip"
@@ -71,6 +72,11 @@ type emailRegistrationCodeAuthRepository interface {
 
 type providerRegistrationCodeAuthRepository interface {
 	CreateWithCredentialAndIdentityAndRegistrationCode(ctx context.Context, user *domainuser.User, credential domainuser.Credential, identity *domainuser.UserIdentity, subscriptionPlanID uint, subscriptionPriceID uint, subscriptionEndAt *time.Time, autoRenew bool, registrationCode string, verifiedAt time.Time) error
+}
+
+// invitationAuthRepository 暴露注册事务内的邀请码生成与奖励发放能力。
+type invitationAuthRepository interface {
+	CreateWithCredentialAndInvitationCode(ctx context.Context, user *domainuser.User, credential domainuser.Credential, subscriptionPlanID uint, subscriptionPriceID uint, subscriptionEndAt *time.Time, autoRenew bool, registrationCode string, verificationID uint, verifiedAt time.Time, invitation domaininvitation.ApplyInput) error
 }
 
 // NewServiceWithRuntime 创建使用运行时配置容器的服务。

@@ -9,11 +9,13 @@ import (
 	"time"
 
 	domainbilling "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/billing"
+	domaininvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/invitation"
 	domainregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/registrationcode"
 	domainskill "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/skill"
 	domainuser "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/user"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/dberror"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/models"
+	billingrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/billing"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/repository"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -471,6 +473,48 @@ func (r *Repo) CreateWithCredentialAndRegistrationCode(
 	}))
 }
 
+// CreateWithCredentialAndInvitationCode atomically creates an account, consumes its registration code (optional),
+// generates the new user's invitation code, and applies invitation rewards. Lenient: invalid invitation codes never block registration.
+func (r *Repo) CreateWithCredentialAndInvitationCode(
+	ctx context.Context,
+	user *domainuser.User,
+	credential domainuser.Credential,
+	subscriptionPlanID uint,
+	subscriptionPriceID uint,
+	subscriptionEndAt *time.Time,
+	autoRenew bool,
+	registrationCode string,
+	verificationID uint,
+	verifiedAt time.Time,
+	invitation domaininvitation.ApplyInput,
+) error {
+	return translateError(r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := r.createWithCredentialTx(tx, user, credential, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew); err != nil {
+			return err
+		}
+		if strings.TrimSpace(registrationCode) != "" {
+			if err := consumeRegistrationCodeTx(tx, registrationCode, user.ID, verifiedAt); err != nil {
+				return err
+			}
+		}
+		if verificationID != 0 {
+			result := tx.Model(&model.UserContactVerification{}).
+				Where("id = ? AND status = ?", verificationID, model.ContactVerificationStatusPending).
+				Updates(map[string]interface{}{"status": model.ContactVerificationStatusVerified, "verified_at": verifiedAt, "consumed_at": verifiedAt})
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return repository.ErrNotFound
+			}
+		}
+		if err := createInvitationCodeForUserTx(tx, user.ID, invitation.CodeLength); err != nil {
+			return err
+		}
+		return applyInvitationTx(tx, user.ID, invitation, verifiedAt)
+	}))
+}
+
 // CreateWithCredentialAndIdentity 在同一事务中创建用户、凭据与第三方身份。
 func (r *Repo) CreateWithCredentialAndIdentity(
 	ctx context.Context,
@@ -547,6 +591,90 @@ func consumeRegistrationCodeTx(tx *gorm.DB, code string, userID uint, now time.T
 		return repository.ErrConflict
 	}
 	return nil
+}
+
+// createInvitationCodeForUserTx 在事务内为新用户生成邀请码（带重试规避极小概率碰撞）。
+func createInvitationCodeForUserTx(tx *gorm.DB, userID uint, codeLength int) error {
+	if userID == 0 {
+		return nil
+	}
+	for attempt := 0; attempt < 10; attempt++ {
+		code, err := domaininvitation.GenerateCode(codeLength)
+		if err != nil {
+			return err
+		}
+		item := model.InvitationCode{UserID: userID, Code: code}
+		if err := tx.Create(&item).Error; err != nil {
+			if dberror.IsUniqueConstraint(err) {
+				// 碰撞或该用户已有码：确认是否已是该用户的码，是则视为成功。
+				var existing model.InvitationCode
+				if findErr := tx.Where("user_id = ?", userID).First(&existing).Error; findErr == nil {
+					return nil
+				}
+				continue
+			}
+			return translateError(err)
+		}
+		return nil
+	}
+	return repository.ErrDuplicate
+}
+
+// applyInvitationTx 在事务内处理邀请：解析邀请人、写邀请关系、向双方发奖。
+// 宽松放行：功能关闭 / 邀请码无效 / 被邀请人已被邀请 —— 均不阻断，只跳过发奖。
+func applyInvitationTx(tx *gorm.DB, invitedUserID uint, input domaininvitation.ApplyInput, now time.Time) error {
+	if invitedUserID == 0 || !input.Enabled {
+		return nil
+	}
+	trimmedCode := strings.ToUpper(strings.TrimSpace(input.Code))
+	if trimmedCode == "" {
+		return nil
+	}
+	// 解析邀请人：按邀请码查 invitation_codes，排除自我邀请。
+	var inviterCode model.InvitationCode
+	if err := tx.Where("code = ? AND user_id <> ?", trimmedCode, invitedUserID).First(&inviterCode).Error; err != nil {
+		if dberror.IsRecordNotFound(err) {
+			return nil // 邀请码无效：宽松放行，不发奖。
+		}
+		return translateError(err)
+	}
+	// 写邀请关系（invited_user_id 唯一）。已被邀请过则宽松放行，不重复发奖。
+	rel := model.InvitationRelationship{
+		InviterUserID:        inviterCode.UserID,
+		InvitedUserID:        invitedUserID,
+		InvitationCode:       trimmedCode,
+		InviteeRewardNanousd: input.InviteeRewardNanousd,
+		InviterRewardNanousd: input.InviterRewardNanousd,
+	}
+	if err := tx.Create(&rel).Error; err != nil {
+		if dberror.IsUniqueConstraint(err) {
+			return nil // 该用户已被邀请过：宽松放行。
+		}
+		return translateError(err)
+	}
+	// 发被邀请人奖励。
+	if input.InviteeRewardNanousd > 0 {
+		if _, _, err := billingrepo.ApplyInvitationReward(tx, invitedUserID, input.InviteeRewardNanousd, "invitation_relationship", rel.ID, "invitation:invitee:"+uintToString(rel.ID), "邀请注册奖励"); err != nil {
+			return err
+		}
+		if err := tx.Model(&model.InvitationRelationship{}).Where("id = ?", rel.ID).Update("invitee_rewarded_at", now).Error; err != nil {
+			return translateError(err)
+		}
+	}
+	// 发邀请人奖励。
+	if input.InviterRewardNanousd > 0 {
+		if _, _, err := billingrepo.ApplyInvitationReward(tx, inviterCode.UserID, input.InviterRewardNanousd, "invitation_relationship", rel.ID, "invitation:inviter:"+uintToString(rel.ID), "邀请拉新奖励"); err != nil {
+			return err
+		}
+		if err := tx.Model(&model.InvitationRelationship{}).Where("id = ?", rel.ID).Update("inviter_rewarded_at", now).Error; err != nil {
+			return translateError(err)
+		}
+	}
+	return nil
+}
+
+func uintToString(value uint) string {
+	return fmt.Sprintf("%d", value)
 }
 
 // ImportUsersWithCredentialsAndBalances 在同一事务中导入用户、凭据与初始余额账户。

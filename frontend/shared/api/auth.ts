@@ -137,10 +137,10 @@ export async function startEmailRegistration(email: string, turnstileToken?: str
   });
 }
 
-export async function completeEmailRegistration(email: string, password: string, code: string, registrationCode: string, turnstileToken?: string): Promise<LoginData> {
+export async function completeEmailRegistration(email: string, password: string, code: string, registrationCode: string, turnstileToken?: string, invitationCode?: string): Promise<LoginData> {
   return apiRequest<LoginData>("/api/v1/auth/register/email/complete", {
     method: "POST",
-    body: { email, password, code, registrationCode, turnstileToken },
+    body: { email, password, code, registrationCode, turnstileToken, invitationCode },
   });
 }
 

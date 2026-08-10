@@ -2318,6 +2318,44 @@ func applyRedemptionBalance(tx *gorm.DB, userID uint, code model.RedemptionCode,
 	return account, transaction.ID, nil
 }
 
+// ApplyInvitationReward 在事务内为用户增量发放邀请奖励余额并写流水。
+// 仿 applyRedemptionBalance：getOrCreateBillingAccountForUpdate + gorm.Expr 增量 + 流水。
+// 导出以便注册事务（位于 user repo）在同一 *gorm.DB 事务内调用。
+func ApplyInvitationReward(tx *gorm.DB, userID uint, rewardNanousd int64, refType string, refID uint, refNo, description string) (*model.BillingAccount, uint, error) {
+	if userID == 0 || rewardNanousd <= 0 {
+		return nil, 0, nil
+	}
+	account, err := getOrCreateBillingAccountForUpdate(tx, userID)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := tx.Model(account).Updates(map[string]interface{}{
+		"balance_nanousd": gorm.Expr("balance_nanousd + ?", rewardNanousd),
+		"currency":        "USD",
+		"status":          "active",
+	}).Error; err != nil {
+		return nil, 0, translateError(err)
+	}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", account.ID).First(account).Error; err != nil {
+		return nil, 0, translateError(err)
+	}
+	transaction := model.BalanceTransaction{
+		AccountID:           account.ID,
+		UserID:              userID,
+		Type:                domainbilling.BalanceTransactionTypeInvitation,
+		AmountNanousd:       rewardNanousd,
+		BalanceAfterNanousd: account.BalanceNanousd,
+		RefType:             refType,
+		RefID:               refID,
+		RefNo:               strings.TrimSpace(refNo),
+		Description:         description,
+	}
+	if err := tx.Create(&transaction).Error; err != nil {
+		return nil, 0, translateError(err)
+	}
+	return account, transaction.ID, nil
+}
+
 func applyRedemptionSubscription(tx *gorm.DB, userID uint, code model.RedemptionCode, now time.Time) (*model.Subscription, error) {
 	var plan model.BillingPlan
 	if err := tx.Where("id = ? AND is_active = ?", code.PlanID, true).First(&plan).Error; err != nil {

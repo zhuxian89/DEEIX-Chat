@@ -100,6 +100,8 @@ const (
 	BalanceTransactionTypeAdminSet = "admin_set"
 	// BalanceTransactionTypeRedemption 表示兑换码入账。
 	BalanceTransactionTypeRedemption = "redemption"
+	// BalanceTransactionTypeInvitation 表示邀请奖励入账。
+	BalanceTransactionTypeInvitation = "invitation_reward"
 
 	// UsageReservationStatusActive 表示用量预算仍被当前请求占用。
 	UsageReservationStatusActive = "active"

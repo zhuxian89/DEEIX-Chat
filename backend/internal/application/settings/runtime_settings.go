@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	domaininvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/invitation"
 	domainsettings "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/pkg/secretbox"
@@ -361,6 +362,15 @@ func (r *RuntimeSettings) applyItem(cfg *config.Config, item domainsettings.Syst
 		cfg.MCPMaxToolCallsPerRun = toInt(item.Value, cfg.MCPMaxToolCallsPerRun)
 	case "mcp:mcp_tool_prompt":
 		cfg.MCPToolPrompt = item.Value
+		// 邀请奖励配置
+	case "invitation:enabled":
+		cfg.InvitationEnabled = toBool(item.Value, cfg.InvitationEnabled)
+	case "invitation:invitee_reward_credit_usd":
+		cfg.InvitationInviteeRewardUSD = toFloat(item.Value, cfg.InvitationInviteeRewardUSD)
+	case "invitation:inviter_reward_credit_usd":
+		cfg.InvitationInviterRewardUSD = toFloat(item.Value, cfg.InvitationInviterRewardUSD)
+	case "invitation:code_length":
+		cfg.InvitationCodeLength = toInt(item.Value, cfg.InvitationCodeLength)
 
 	}
 }
@@ -399,6 +409,9 @@ func (r *RuntimeSettings) normalizeConfig(cfg *config.Config) {
 	}
 	if strings.TrimSpace(cfg.ModelOptionDeniedPaths) == "" {
 		cfg.ModelOptionDeniedPaths = config.DefaultModelOptionDeniedPathsJSON()
+	}
+	if cfg.InvitationCodeLength < domaininvitation.DefaultCodeLength {
+		cfg.InvitationCodeLength = domaininvitation.DefaultCodeLength
 	}
 	if cfg.MCPMaxSelectedToolsPerMessage <= 0 {
 		cfg.MCPMaxSelectedToolsPerMessage = config.DefaultMCPMaxSelectedToolsPerMessage

@@ -455,6 +455,30 @@
       "retryLater": "请稍后重试。"
     }
   },
+  "invitationPage": {
+    "title": "邀请奖励",
+    "invitationCode": "我的邀请码",
+    "inviteLink": "邀请链接",
+    "inviteCount": "已邀请 {count} 位用户",
+    "invitedList": "已邀请用户",
+    "noInvitedUsers": "暂无邀请记录",
+    "loading": "加载中…",
+    "copyInvitationCode": "复制邀请码",
+    "copyInviteLink": "复制邀请链接",
+    "pagination": "第 {page} / {total} 页",
+    "actions": {
+      "prev": "上一页",
+      "next": "下一页"
+    },
+    "toasts": {
+      "copied": "已复制",
+      "copyFailed": "复制失败",
+      "retryLater": "请稍后重试。"
+    },
+    "errors": {
+      "loadFailed": "加载邀请信息失败，请稍后重试。"
+    }
+  },
   "subscriptionPage": {
     "title": "订阅",
     "actions": {

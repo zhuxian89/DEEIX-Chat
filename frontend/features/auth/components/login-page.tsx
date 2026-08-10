@@ -54,6 +54,7 @@ export function LoginPage({ nextPath }: LoginPageProps) {
     registerPassword,
     registrationCodeRequired,
     registrationCode,
+    invitationCode,
     registerTurnstileRequired,
     registerTurnstileResetSignal,
     registerTurnstileSiteKey,
@@ -370,6 +371,21 @@ export function LoginPage({ nextPath }: LoginPageProps) {
                       value={registrationCode}
                       onChange={(event) => setRegistrationCode(event.target.value.toUpperCase())}
                       required
+                    />
+                  </div>
+                ) : null}
+                {invitationCode ? (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium leading-none text-foreground" htmlFor="invitation-code">
+                      {t("invitationCode")}
+                    </label>
+                    <Input
+                      id="invitation-code"
+                      autoComplete="off"
+                      className="h-9 border-input/50 opacity-60"
+                      value={invitationCode}
+                      disabled
+                      readOnly
                     />
                   </div>
                 ) : null}

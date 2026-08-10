@@ -24,7 +24,7 @@ func TestDeleteUnusedRejectsWeChatIssuedCode(t *testing.T) {
 		t.Fatalf("migrate: %v", err)
 	}
 
-	item := model.RegistrationCode{Code: "AAAA-BBBB-CCCC-DDDD", CodeHint: "DDDD", Status: registrationcode.StatusActive}
+	item := model.RegistrationCode{Code: "REG-AAAABBBBCCCCDDDD", CodeHint: "DDDD", Status: registrationcode.StatusActive}
 	if err := db.Create(&item).Error; err != nil {
 		t.Fatalf("create code: %v", err)
 	}

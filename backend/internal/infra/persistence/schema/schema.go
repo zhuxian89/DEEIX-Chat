@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	domainchannel "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/channel"
+	domaininvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/invitation"
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/models"
 	"gorm.io/gorm"
 )
@@ -72,6 +73,8 @@ func Models() []interface{} {
 		&model.PermissionGroupModelAccess{},
 		&model.PermissionGroupModelRule{},
 		&model.PermissionGroupUserAccess{},
+		&model.InvitationCode{},
+		&model.InvitationRelationship{},
 	}
 }
 
@@ -133,7 +136,10 @@ func Migrate(db *gorm.DB) error {
 	if err := seedWeChatDefaults(db); err != nil {
 		return err
 	}
-	return backfillUsageLedgerBillingAt(db)
+	if err := backfillUsageLedgerBillingAt(db); err != nil {
+		return err
+	}
+	return backfillInvitationCodes(db)
 }
 
 func seedWeChatDefaults(db *gorm.DB) error {
@@ -207,7 +213,61 @@ func backfillUsageLedgerBillingAt(db *gorm.DB) error {
 		Update("billing_at", gorm.Expr("created_at")).Error
 }
 
-// CleanupRemovedColumns drops columns that were removed from the Gorm models.
+// backfillInvitationCodes 为存量用户（无邀请码记录）批量生成邀请码。
+// 仅插入 invitation_codes 新表，不修改 identity_users。分批处理避免大表长锁。
+func backfillInvitationCodes(db *gorm.DB) error {
+	if !db.Migrator().HasTable(&model.InvitationCode{}) || !db.Migrator().HasTable(&model.User{}) {
+		return nil
+	}
+	const batchSize = 500
+	for {
+		var userIDs []uint
+		if err := db.Model(&model.User{}).
+			Where("id NOT IN (?)", db.Model(&model.InvitationCode{}).Select("user_id")).
+			Limit(batchSize).
+			Pluck("id", &userIDs).Error; err != nil {
+			return err
+		}
+		if len(userIDs) == 0 {
+			return nil
+		}
+		codes := make([]model.InvitationCode, 0, len(userIDs))
+		for _, userID := range userIDs {
+			code, err := domaininvitation.GenerateCode(domaininvitation.DefaultCodeLength)
+			if err != nil {
+				return err
+			}
+			codes = append(codes, model.InvitationCode{UserID: userID, Code: code})
+		}
+		if err := db.Create(&codes).Error; err != nil {
+			// 批量插入可能因极小概率碰撞失败；退化为逐条插入：已存在则跳过，
+			// 不存在则用新邀请码创建，其他错误立即返回，避免静默丢失用户。
+			for _, userID := range userIDs {
+				if hasInvitationCode(db, userID) {
+					continue
+				}
+				code, genErr := domaininvitation.GenerateCode(domaininvitation.DefaultCodeLength)
+				if genErr != nil {
+					return genErr
+				}
+				if createErr := db.Create(&model.InvitationCode{UserID: userID, Code: code}).Error; createErr != nil {
+					return createErr
+				}
+			}
+		}
+		if len(userIDs) < batchSize {
+			return nil
+		}
+	}
+}
+
+// hasInvitationCode 报告指定用户是否已有邀请码记录。
+func hasInvitationCode(db *gorm.DB, userID uint) bool {
+	var count int64
+	_ = db.Model(&model.InvitationCode{}).Where("user_id = ?", userID).Count(&count).Error
+	return count > 0
+}
+
 func CleanupRemovedColumns(db *gorm.DB) error {
 	if err := dropColumns(db, &model.PromptPreset{}, []string{"use_count", "last_used_at", "category", "tags_json"}); err != nil {
 		return err

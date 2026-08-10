@@ -527,6 +527,11 @@ type Config struct {
 	MCPMaxLLMCallsPerRun          int
 	MCPMaxToolCallsPerRun         int
 	MCPToolPrompt                 string
+	// 邀请奖励配置
+	InvitationEnabled          bool
+	InvitationInviteeRewardUSD float64
+	InvitationInviterRewardUSD float64
+	InvitationCodeLength       int
 }
 
 // defaultYAMLPaths 固定读取仓库根目录的 config.yaml。

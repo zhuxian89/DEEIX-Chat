@@ -76,7 +76,8 @@ type EmailRegistrationCompleteRequest struct {
 	Password       string `json:"password" binding:"required,min=8,max=128"`
 	Code           string `json:"code,omitempty" binding:"omitempty,len=6"`
 	TurnstileToken string `json:"turnstileToken,omitempty" binding:"omitempty,max=2048"`
-	RegistrationCode string `json:"registrationCode" binding:"required,max=128"`
+	RegistrationCode string `json:"registrationCode,omitempty" binding:"omitempty,max=128"`
+	InvitationCode string `json:"invitationCode,omitempty" binding:"omitempty,max=32"`
 }
 
 type PasswordResetStartRequest struct {

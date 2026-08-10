@@ -19,6 +19,7 @@ import (
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/conversation"
 	appembedding "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/embedding"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/extraction"
+	appinvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/invitation"
 	applogcleanup "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/logcleanup"
 	appmcp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/mcp"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/memory"
@@ -52,6 +53,7 @@ import (
 	billingrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/billing"
 	channelrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/channel"
 	conversationrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/conversation"
+	invitationrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/invitation"
 	logcleanuprepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/logcleanup"
 	mcprepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/mcp"
 	memoryrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/memory"
@@ -71,6 +73,7 @@ import (
 	billinghttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/billing"
 	channelhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/channel"
 	conversationhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/conversation"
+	invitationhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/invitation"
 	mcphttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/mcp"
 	memoryhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/memory"
 	promptpresethttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/promptpreset"
@@ -236,6 +239,9 @@ func NewApp() (*App, error) {
 	registrationCodeService := appregistrationcode.NewService(registrationCodeRepo)
 	registrationCodeHandler := registrationcodehttp.NewHandler(registrationCodeService)
 	registrationCodeModule := registrationcodehttp.NewModule(registrationCodeHandler)
+	invitationRepo := invitationrepo.NewRepo(db)
+	invitationService := appinvitation.NewService(invitationRepo, runtimeCfg)
+	invitationModule := invitationhttp.NewModule(invitationhttp.NewHandler(invitationService))
 	wechatRepo := wechatrepo.NewRepo(db)
 	wechatService := appwechat.NewService(wechatRepo)
 	wechatAdminService := appwechat.NewAdminService(wechatRepo)
@@ -368,6 +374,7 @@ func NewApp() (*App, error) {
 		Admin:            adminModule,
 		RegistrationCode: registrationCodeModule,
 		WeChat:           wechatModule,
+		Invitation:       invitationModule,
 		Announcement:     announcementModule,
 		PromptPreset:     promptPresetModule,
 		Skill:            skillModule,

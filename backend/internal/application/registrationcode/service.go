@@ -81,6 +81,9 @@ func (s *Service) List(ctx context.Context, page, pageSize int, status string) (
 
 func (s *Service) Delete(ctx context.Context, id uint) error { return s.repo.DeleteUnused(ctx, id) }
 
+// registrationCodePrefix 是注册码的固定前缀，用于与邀请码（INV-）区分。
+const registrationCodePrefix = "REG-"
+
 func generateCode() (string, error) {
 	const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 	buf := make([]byte, codeLength)
@@ -91,5 +94,5 @@ func generateCode() (string, error) {
 	for i := range buf {
 		buf[i] = alphabet[int(raw[i])%len(alphabet)]
 	}
-	return fmt.Sprintf("%s-%s-%s-%s", string(buf[:4]), string(buf[4:8]), string(buf[8:12]), string(buf[12:])), nil
+	return fmt.Sprintf("%s%s", registrationCodePrefix, string(buf)), nil
 }

@@ -30,6 +30,7 @@ import {
 } from "@/shared/components/settings-layout";
 import { AccountActiveSessionsSection } from "./account-active-sessions";
 import { AccountIdentitiesSection } from "./account-identities";
+import { AccountInvitationSection } from "./account-invitation";
 import { AccountOverviewSection } from "./account-overview";
 
 export function SettingsAccount() {
@@ -165,6 +166,8 @@ export function SettingsAccount() {
         onLogoutAll={() => void handleLogoutAll()}
         onOpenDeleteDialog={() => setDeleteDialogOpen(true)}
       />
+
+      <AccountInvitationSection />
 
       <SettingsSectionSeparator />
 

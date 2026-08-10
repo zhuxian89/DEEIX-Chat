@@ -60,6 +60,12 @@ func defaultSettings() []domainsettings.SystemSetting {
 		{Namespace: "billing", Key: "epay_pid", Value: "", ValueType: "string", Description: "易支付商户 ID"},
 		{Namespace: "billing", Key: "epay_key", Value: "", ValueType: "string", Description: "易支付商户密钥"},
 
+		// 邀请奖励配置
+		{Namespace: "invitation", Key: "enabled", Value: "true", ValueType: "bool", Description: "是否启用邀请码注册奖励；关闭时填邀请码不发奖、不校验"},
+		{Namespace: "invitation", Key: "invitee_reward_credit_usd", Value: "0.5", ValueType: "string", Description: "被邀请人注册奖励(美元)，0表示不发"},
+		{Namespace: "invitation", Key: "inviter_reward_credit_usd", Value: "0.5", ValueType: "string", Description: "邀请人拉新奖励(美元)，0表示不发"},
+		{Namespace: "invitation", Key: "code_length", Value: "7", ValueType: "int", Description: "邀请码随机部分长度(不含 INV- 前缀)"},
+
 		// 对话配置
 		{Namespace: "chat", Key: "max_context_messages", Value: "20", ValueType: "int", Description: "上下文消息数"},
 		{Namespace: "chat", Key: "context_max_turns", Value: "48", ValueType: "int", Description: "最大对话轮次"},
