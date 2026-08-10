@@ -32,7 +32,7 @@ type WeChatKeywordInvocationLog struct {
 	TemplateID         uint   `gorm:"not null;default:0;index:idx_wechat_invocation_logs_template;comment:妯℃澘ID"`
 	RegistrationCodeID uint   `gorm:"not null;default:0;index:idx_wechat_invocation_logs_code;comment:娉ㄥ唽鐮佹 ID"`
 	Result             string `gorm:"size:32;not null;index:idx_wechat_invocation_logs_result;comment:澶勭悊缁撴灉"`
-	ErrorCode          string `gorm:"size:64;not null;default:'';comment:閿欒鐮?`
+	ErrorCode          string `gorm:"size:64;not null;default:'';comment:error code"`
 	ErrorMessage       string `gorm:"type:text;not null;comment:閿欒鎽樿"`
 }
 
