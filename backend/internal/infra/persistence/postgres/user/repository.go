@@ -1286,6 +1286,20 @@ func (r *Repo) DeleteAccountHard(ctx context.Context, userID uint) error {
 				},
 			},
 			{
+				label: "registration_codes",
+				run: func(db *gorm.DB) error {
+					// 释放该用户用过的注册码：恢复成 active 可重用，清空使用者标记。
+					// 注册码是一次性凭证，但用户被删除后码不应被一个不存在的用户永久锁死。
+					return db.Unscoped().Model(&model.RegistrationCode{}).
+						Where("used_by_user_id = ?", userID).
+						Updates(map[string]interface{}{
+							"status":          domainregistrationcode.StatusActive,
+							"used_by_user_id": 0,
+							"used_at":         nil,
+						}).Error
+				},
+			},
+			{
 				label: "user",
 				run: func(db *gorm.DB) error {
 					return db.Unscoped().Where("id = ?", userID).Delete(&model.User{}).Error
