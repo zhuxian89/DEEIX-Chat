@@ -29,3 +29,21 @@ type InvitationRelationshipResponse struct {
 	InviterRewardedAt    string `json:"inviterRewardedAt"`
 	CreatedAt            string `json:"createdAt"`
 }
+
+// InvitedUserListDoc 被邀请用户分页响应文档。
+type InvitedUserListDoc struct {
+	ErrorMsg string `json:"errorMsg"`
+	Data     struct {
+		Total   int64               `json:"total"`
+		Results []InvitedUserResponse `json:"results"`
+	} `json:"data"`
+}
+
+// InvitationRelationshipListDoc 邀请关系分页响应文档。
+type InvitationRelationshipListDoc struct {
+	ErrorMsg string `json:"errorMsg"`
+	Data     struct {
+		Total   int64                        `json:"total"`
+		Results []InvitationRelationshipResponse `json:"results"`
+	} `json:"data"`
+}
