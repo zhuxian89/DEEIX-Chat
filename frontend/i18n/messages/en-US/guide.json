@@ -27,6 +27,7 @@
     "finishNavigation": "Finish onboarding navigation"
   },
   "bootstrapTitle": "Admin setup",
+  "passwordResetTitle": "Set a new password",
   "adminWelcomeTitle": "Welcome to DEEIX Chat Admin",
   "userWelcomeTitle": "Welcome to DEEIX Chat",
   "adminWelcomeDescription": "Finish admin account security first, then configure upstreams, platform models, billing, logs, identity providers, and system policies.",
@@ -39,6 +40,7 @@
   "personalizationTitle": "Personalization",
   "personalizationDescription": "Confirm your regional timezone and color mode.",
   "bootstrapReadyDescription": "Use the new administrator credentials to sign in again.",
+  "passwordResetReadyDescription": "Use your new password to sign in again.",
   "adminReadyDescription": "You can now enter the admin console.",
   "userReadyDescription": "You are ready to start.",
   "labels": {
@@ -58,6 +60,7 @@
     "adminUsername": "Set administrator username",
     "username": "Set username",
     "adminPassword": "Set administrator password",
+    "password": "Set a new password",
     "displayName": "Set display name",
     "otp": "6-digit code"
   },

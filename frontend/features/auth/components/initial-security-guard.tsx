@@ -47,6 +47,7 @@ import { useTheme, type ThemePreset } from "@/shared/components/theme-provider";
 import { createQRCodeDataURL } from "@/shared/lib/qr-code";
 import { detectCurrentTimeZone } from "@/shared/lib/time-zone";
 import { cn } from "@/lib/utils";
+import { getInitialSecurityCopy, isAdminRole } from "./initial-security-copy";
 
 const ADMIN_ONBOARDING_TIPS = [
   "adminTips.upstreams",
@@ -216,7 +217,7 @@ export function InitialSecurityGuard() {
     [t, twoFactorSetup?.otpauthURL],
   );
   const qrCodeUnavailable = Boolean(twoFactorSetup?.otpauthURL && !qrCodeDataURL);
-  const isAdminGuide = viewer?.role === "admin" || viewer?.role === "superadmin";
+  const isAdminGuide = isAdminRole(viewer?.role);
   const activeOnboardingTips = isAdminGuide ? ADMIN_ONBOARDING_TIPS : USER_ONBOARDING_TIPS;
 
   React.useEffect(() => {
@@ -283,19 +284,16 @@ export function InitialSecurityGuard() {
     setOtp("");
   }, [twoFactorSetup?.secret]);
 
-  const isBootstrapAdminSetup = Boolean(viewer?.mustResetPassword);
+  const mustResetPassword = Boolean(viewer?.mustResetPassword);
+  const initialSecurityCopy = getInitialSecurityCopy({ role: viewer?.role, mustResetPassword });
   const currentTimeZone = React.useMemo(() => detectCurrentTimeZone(), []);
   const welcomeTitle = isAdminGuide ? t("adminWelcomeTitle") : t("userWelcomeTitle");
   const welcomeDescription = isAdminGuide
     ? t("adminWelcomeDescription")
     : t("userWelcomeDescription");
-  const accountTitle = isBootstrapAdminSetup ? t("bootstrapTitle") : isAdminGuide ? t("adminAccountTitle") : t("userAccountTitle");
+  const accountTitle = t(initialSecurityCopy.accountTitleKey);
   const twoFactorTitle = isAdminGuide ? t("adminTwoFactorTitle") : t("userTwoFactorTitle");
-  const readyDescription = isBootstrapAdminSetup
-    ? t("bootstrapReadyDescription")
-    : isAdminGuide
-      ? t("adminReadyDescription")
-      : t("userReadyDescription");
+  const readyDescription = t(initialSecurityCopy.readyDescriptionKey);
 
   const submitAccountStep = React.useCallback(async () => {
     if (!viewer?.initialSecurityRequired || savingAccount) return;
@@ -661,17 +659,17 @@ export function InitialSecurityGuard() {
                         maxLength={USERNAME_MAX_LENGTH}
                         autoComplete="username"
                         aria-disabled={!viewer.initialUsernameRequired}
-                        placeholder={isBootstrapAdminSetup ? t("placeholders.adminUsername") : t("placeholders.username")}
+                        placeholder={t(`placeholders.${initialSecurityCopy.usernamePlaceholderKey}`)}
                       />
                     </label>
 
-                    {isBootstrapAdminSetup ? (
-                      <label className="block space-y-1.5" htmlFor="initial-admin-password">
+                    {mustResetPassword ? (
+                      <label className="block space-y-1.5" htmlFor="initial-password">
                         <span className="flex items-center text-xs font-medium">
                           {t("labels.password")}
                         </span>
                         <Input
-                          id="initial-admin-password"
+                          id="initial-password"
                           name="password"
                           type="password"
                           value={password}
@@ -679,7 +677,7 @@ export function InitialSecurityGuard() {
                           disabled={savingAccount || !viewer.mustResetPassword}
                           autoComplete="new-password"
                           minLength={PASSWORD_MIN_LENGTH}
-                          placeholder={t("placeholders.adminPassword")}
+                          placeholder={t(`placeholders.${initialSecurityCopy.passwordPlaceholderKey}`)}
                         />
                       </label>
                     ) : (

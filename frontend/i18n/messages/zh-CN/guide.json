@@ -27,6 +27,7 @@
     "finishNavigation": "完成引导步骤导航"
   },
   "bootstrapTitle": "初始化管理员账户",
+  "passwordResetTitle": "设置新密码",
   "adminWelcomeTitle": "欢迎进入 DEEIX Chat 管理端",
   "userWelcomeTitle": "欢迎使用 DEEIX Chat",
   "adminWelcomeDescription": "先完成管理账户安全设置，再进入后台配置上游、平台模型、计费、日志、身份源和系统策略。",
@@ -39,6 +40,7 @@
   "personalizationTitle": "个性化",
   "personalizationDescription": "确认地区时区和颜色模式。",
   "bootstrapReadyDescription": "完成后请使用新的管理员凭据重新登录。",
+  "passwordResetReadyDescription": "完成后请使用新密码重新登录。",
   "adminReadyDescription": "完成后即可进入后台管理系统配置。",
   "userReadyDescription": "完成后即可开始使用。",
   "labels": {
@@ -58,6 +60,7 @@
     "adminUsername": "设置管理员用户名",
     "username": "设置用户名",
     "adminPassword": "设置管理员密码",
+    "password": "设置新密码",
     "displayName": "设置昵称",
     "otp": "6 位验证码"
   },
