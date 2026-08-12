@@ -89,6 +89,10 @@ web_modules/
 /backend/config.yml
 !/config.example.yaml
 
+# Local WeChat draft workspace
+/wechat-draft/
+/scripts/wechat_*.py
+
 # parcel-bundler cache (https://parceljs.org/)
 .cache
 .parcel-cache

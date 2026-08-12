@@ -1,0 +1,15 @@
+---
+title: 文章标题
+author: 作者名
+digest: 文章摘要
+source_url: https://example.com/source
+cover: ./cover.jpg
+---
+
+# 文章标题
+
+这里写文章正文。脚本只创建公众号草稿，不会直接发布。
+
+本地图片使用相对路径，例如：
+
+![示例图片](./body-image.jpg)

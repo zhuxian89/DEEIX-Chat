@@ -1,0 +1,1150 @@
+{
+  ".codestable/attention.md": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T11:24:44.598571Z",
+      "updated_at": "2026-08-12T08:53:07.7257903Z",
+      "created_by": "agent"
+    }
+  ],
+  ".codestable/lessons/.gitkeep": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T11:24:45.4339803Z",
+      "updated_at": "2026-08-09T11:24:45.4339803Z",
+      "created_by": "agent"
+    }
+  ],
+  ".codestable/work/.gitkeep": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T11:24:44.4942357Z",
+      "updated_at": "2026-08-09T11:24:46.2181515Z",
+      "created_by": "agent"
+    }
+  ],
+  ".codestable/work/feat-invitation-reward.md": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T06:55:39.1344288Z",
+      "updated_at": "2026-08-10T12:50:31.1353894Z",
+      "created_by": "agent"
+    }
+  ],
+  ".codestable/work/feat-wechat-admin-management.md": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:04:21.6696719Z",
+      "updated_at": "2026-08-10T05:11:44.8231983Z",
+      "created_by": "agent"
+    }
+  ],
+  ".codestable/work/feat-wechat-registration-code.md": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:58:17.7302402Z",
+      "updated_at": "2026-08-10T02:00:03.5815282Z",
+      "created_by": "agent"
+    }
+  ],
+  ".gitignore": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:09:14.2954009Z",
+      "updated_at": "2026-08-12T05:09:16.088422Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786516028-f6ee249fb768",
+      "created_at": "2026-08-12T06:52:57.0341532Z",
+      "updated_at": "2026-08-12T08:18:44.3644132Z",
+      "created_by": "agent"
+    }
+  ],
+  "AGENTS.md": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:46:06.7492804Z",
+      "updated_at": "2026-08-10T00:46:06.7823989Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T06:23:13.7593463Z",
+      "updated_at": "2026-08-10T15:10:29.901236Z",
+      "created_by": "agent"
+    }
+  ],
+  "README.md": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:28:16.3434545Z",
+      "updated_at": "2026-08-10T01:06:45.6026417Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T01:19:07.3054329Z",
+      "updated_at": "2026-08-12T01:19:09.6948674Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/README.md": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:28:16.3232956Z",
+      "updated_at": "2026-08-10T01:06:44.9506721Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T01:19:08.2301787Z",
+      "updated_at": "2026-08-12T01:23:01.0141702Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/app/app.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:25:40.4941989Z",
+      "updated_at": "2026-08-10T03:35:55.9492126Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:49:28.5943853Z",
+      "updated_at": "2026-08-10T11:49:49.5926268Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/admin/errs.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T14:39:38.2457208Z",
+      "updated_at": "2026-08-10T15:04:23.9289109Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/admin/service.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T14:40:23.6897934Z",
+      "updated_at": "2026-08-10T15:04:26.2384281Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/auth/errs.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T14:39:38.9627228Z",
+      "updated_at": "2026-08-10T15:04:25.4850134Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/auth/provider.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:22:28.8300859Z",
+      "updated_at": "2026-08-09T14:49:24.2732266Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/auth/provider_bridge.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:23:28.3737432Z",
+      "updated_at": "2026-08-09T12:23:28.3959774Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/auth/provider_test.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T13:39:50.6182998Z",
+      "updated_at": "2026-08-09T13:39:51.6932583Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/auth/registration.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:21:52.7263324Z",
+      "updated_at": "2026-08-09T13:40:44.004249Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:43:05.1169129Z",
+      "updated_at": "2026-08-10T12:40:21.0367237Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/auth/service.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:21:26.6514134Z",
+      "updated_at": "2026-08-09T13:40:45.2510019Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:42:23.5211936Z",
+      "updated_at": "2026-08-10T15:04:26.2636529Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/invitation/service.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:39:21.3820262Z",
+      "updated_at": "2026-08-10T13:25:43.6775855Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/invitation/service_test.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T13:29:26.2541222Z",
+      "updated_at": "2026-08-10T13:29:26.2541222Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/registrationcode/service.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:19:51.3356165Z",
+      "updated_at": "2026-08-09T13:08:19.6034482Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:50:59.9495401Z",
+      "updated_at": "2026-08-10T13:05:14.2536236Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/settings/runtime_settings.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:38:28.0974788Z",
+      "updated_at": "2026-08-10T11:38:39.5545121Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/settings/seed.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:36:32.1645693Z",
+      "updated_at": "2026-08-10T12:49:39.2980823Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/wechat/admin.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:33:23.3192602Z",
+      "updated_at": "2026-08-10T04:58:46.8855369Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/wechat/service.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:26:10.0867271Z",
+      "updated_at": "2026-08-10T04:58:04.5650761Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T13:05:38.3462085Z",
+      "updated_at": "2026-08-12T01:19:09.117643Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786516028-f6ee249fb768",
+      "created_at": "2026-08-12T07:12:45.8562699Z",
+      "updated_at": "2026-08-12T08:02:07.426483Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/application/wechat/service_test.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:28:01.8988233Z",
+      "updated_at": "2026-08-10T00:28:01.9307674Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T01:18:07.8714637Z",
+      "updated_at": "2026-08-12T01:19:09.7950902Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786516028-f6ee249fb768",
+      "created_at": "2026-08-12T07:12:09.8648418Z",
+      "updated_at": "2026-08-12T08:02:08.3682023Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/domain/billing/types.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:35:36.1987998Z",
+      "updated_at": "2026-08-10T11:35:36.1987998Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/domain/invitation/invitation.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:33:36.9530366Z",
+      "updated_at": "2026-08-10T11:39:57.8018852Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/domain/registrationcode/registration_code.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:19:52.2395103Z",
+      "updated_at": "2026-08-09T13:29:43.6324342Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/domain/wechat/types.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:30:53.0339318Z",
+      "updated_at": "2026-08-10T03:46:20.6480531Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T01:15:16.193807Z",
+      "updated_at": "2026-08-12T01:17:22.5112598Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/config/config.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:26:32.3233922Z",
+      "updated_at": "2026-08-10T00:26:33.743522Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:38:07.1340329Z",
+      "updated_at": "2026-08-10T11:38:07.1340329Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/models/invitation.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:33:42.9196776Z",
+      "updated_at": "2026-08-10T15:04:41.704475Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/models/registration_code.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:19:52.8592044Z",
+      "updated_at": "2026-08-09T13:08:00.8475082Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/models/wechat_keyword.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:30:53.9357432Z",
+      "updated_at": "2026-08-10T05:16:09.7151651Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/models/wechat_registration_issuance.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:26:10.740604Z",
+      "updated_at": "2026-08-10T00:26:10.740604Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/billing/repository.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:35:42.6544757Z",
+      "updated_at": "2026-08-10T11:36:19.8092049Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/invitation/repository.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:35:24.1373217Z",
+      "updated_at": "2026-08-10T12:37:58.8699123Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/registrationcode/repository.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:19:53.5257637Z",
+      "updated_at": "2026-08-10T01:06:44.0454714Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/registrationcode/repository_test.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T01:11:24.5333428Z",
+      "updated_at": "2026-08-10T01:12:55.3545351Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:51:21.0845234Z",
+      "updated_at": "2026-08-10T11:51:21.0845234Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/user/repository.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T13:09:58.887821Z",
+      "updated_at": "2026-08-09T13:09:58.9154127Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:40:03.3745396Z",
+      "updated_at": "2026-08-11T06:07:54.0363869Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/user/repository_delete_code_release_test.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-11T04:46:31.0493102Z",
+      "updated_at": "2026-08-11T06:07:54.6813828Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/user/repository_invitation_postgres_integration_test.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-11T05:34:40.9421016Z",
+      "updated_at": "2026-08-11T05:35:06.7660135Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/user/repository_invitation_test.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:59:14.7841342Z",
+      "updated_at": "2026-08-10T15:05:07.4949006Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/user/repository_sqlite_test.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T13:17:37.4845909Z",
+      "updated_at": "2026-08-09T13:41:41.5794701Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/wechat/repository.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:26:11.4587436Z",
+      "updated_at": "2026-08-10T04:56:37.1548767Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T01:15:24.9928457Z",
+      "updated_at": "2026-08-12T01:17:23.3235063Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/postgres/wechat/repository_test.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T01:11:25.3441375Z",
+      "updated_at": "2026-08-10T01:12:55.419196Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T01:18:07.8248602Z",
+      "updated_at": "2026-08-12T01:18:08.7190482Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/infra/persistence/schema/schema.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:20:33.465571Z",
+      "updated_at": "2026-08-10T03:30:55.4760866Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:33:55.8891032Z",
+      "updated_at": "2026-08-12T01:19:10.5583052Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/repository/invitation.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:34:47.7723841Z",
+      "updated_at": "2026-08-10T11:35:06.3749725Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/repository/provider_auth_bridge.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:22:28.6557616Z",
+      "updated_at": "2026-08-09T12:22:29.6535451Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/repository/registrationcode.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:19:54.2535348Z",
+      "updated_at": "2026-08-09T13:11:26.7160208Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/repository/wechat.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:26:10.1162818Z",
+      "updated_at": "2026-08-10T04:55:25.4612589Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/shared/response/error_code.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T23:41:05.3813008Z",
+      "updated_at": "2026-08-09T23:41:06.1295327Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/admin/handler.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T14:41:08.101064Z",
+      "updated_at": "2026-08-10T15:04:27.0534193Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/admin/router.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T14:47:12.0958529Z",
+      "updated_at": "2026-08-10T15:04:28.510552Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/auth/dto.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:23:52.5280309Z",
+      "updated_at": "2026-08-09T12:26:20.0131644Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:43:39.0860286Z",
+      "updated_at": "2026-08-10T11:43:39.0860286Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/auth/handler.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:24:03.1743594Z",
+      "updated_at": "2026-08-09T14:49:05.0058263Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:43:49.6609716Z",
+      "updated_at": "2026-08-10T15:04:28.5833398Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/auth/router.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T14:47:11.3650644Z",
+      "updated_at": "2026-08-10T15:04:29.4159829Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/invitation/dto.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:48:05.3230144Z",
+      "updated_at": "2026-08-10T11:48:05.3230144Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/invitation/handler.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:48:19.1860015Z",
+      "updated_at": "2026-08-10T11:48:19.1860015Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/invitation/module.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:48:33.37739Z",
+      "updated_at": "2026-08-10T11:48:33.37739Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/invitation/router.go": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:48:28.6240028Z",
+      "updated_at": "2026-08-10T11:48:28.6240028Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/registrationcode/dto.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:24:57.2275045Z",
+      "updated_at": "2026-08-09T13:13:23.5075068Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/registrationcode/handler.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:24:58.372943Z",
+      "updated_at": "2026-08-09T23:45:17.8735845Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/registrationcode/module.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:24:57.26479Z",
+      "updated_at": "2026-08-09T12:24:59.4709373Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/registrationcode/router.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:24:58.418343Z",
+      "updated_at": "2026-08-09T13:08:38.6021672Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/server.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:26:04.1070803Z",
+      "updated_at": "2026-08-10T03:35:56.7128161Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:48:39.3026048Z",
+      "updated_at": "2026-08-10T11:49:09.6064177Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/wechat/admin.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:35:31.1886972Z",
+      "updated_at": "2026-08-10T03:47:42.5495696Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/wechat/module.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:26:13.1976265Z",
+      "updated_at": "2026-08-10T03:35:32.0966203Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786516028-f6ee249fb768",
+      "created_at": "2026-08-12T07:12:46.6347151Z",
+      "updated_at": "2026-08-12T08:02:09.1941493Z",
+      "created_by": "agent"
+    }
+  ],
+  "backend/internal/transport/http/wechat/module_test.go": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T00:28:03.7858611Z",
+      "updated_at": "2026-08-10T01:50:55.4830395Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786516028-f6ee249fb768",
+      "created_at": "2026-08-12T07:12:10.6859755Z",
+      "updated_at": "2026-08-12T08:03:00.2536719Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/app/(admin)/admin/registration-codes/page.tsx": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:31:08.7076521Z",
+      "updated_at": "2026-08-09T12:31:08.7076521Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/app/(admin)/admin/wechat/page.tsx": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:43:26.8899189Z",
+      "updated_at": "2026-08-10T03:43:26.8899189Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/app/(auth)/login/login-route.tsx": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T13:27:28.3663761Z",
+      "updated_at": "2026-08-10T13:27:28.3663761Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/admin/api/index.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:31:09.5088065Z",
+      "updated_at": "2026-08-10T03:39:13.5698665Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/admin/api/registration-codes.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:31:10.3521043Z",
+      "updated_at": "2026-08-09T13:09:06.7083963Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/admin/api/wechat.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:39:12.8198245Z",
+      "updated_at": "2026-08-10T04:53:22.8807272Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/admin/components/admin-sidebar.tsx": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:30:28.043959Z",
+      "updated_at": "2026-08-10T03:43:28.3780498Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/admin/components/sections/registration-codes/admin-registration-codes.tsx": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:31:11.1194487Z",
+      "updated_at": "2026-08-09T23:41:06.1586921Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/admin/components/sections/wechat/admin-wechat.tsx": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-10T03:43:26.8313773Z",
+      "updated_at": "2026-08-10T04:54:14.8019795Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T01:19:10.5294165Z",
+      "updated_at": "2026-08-12T01:19:11.2754333Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/admin/model/admin-sections.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:30:27.9955734Z",
+      "updated_at": "2026-08-10T03:43:29.2434179Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/components/auth-callback-page.tsx": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T14:49:06.8032837Z",
+      "updated_at": "2026-08-09T14:49:10.7233966Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/components/initial-security-copy.test.mjs": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T07:38:48.6649793Z",
+      "updated_at": "2026-08-12T07:42:59.1812448Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/components/initial-security-copy.test.ts": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T07:42:59.2189374Z",
+      "updated_at": "2026-08-12T08:31:38.1261374Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/components/initial-security-copy.ts": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T07:38:48.6318579Z",
+      "updated_at": "2026-08-12T07:38:49.4348524Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/components/initial-security-guard.test.tsx": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T08:31:39.2649531Z",
+      "updated_at": "2026-08-12T08:45:58.467348Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/components/initial-security-guard.tsx": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T07:38:50.2514057Z",
+      "updated_at": "2026-08-12T07:38:50.9514373Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/components/login-page.tsx": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:27:41.795412Z",
+      "updated_at": "2026-08-09T12:32:58.895979Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:53:10.5152203Z",
+      "updated_at": "2026-08-10T13:27:06.193087Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/hooks/use-auth-login-page.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:27:23.9145315Z",
+      "updated_at": "2026-08-09T14:52:47.8612316Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:52:19.8510659Z",
+      "updated_at": "2026-08-10T13:28:19.6618016Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/auth/model/login-page.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T13:55:42.0212889Z",
+      "updated_at": "2026-08-09T14:49:11.0316092Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/settings/components/sections/account/account-invitation.tsx": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:56:20.6333302Z",
+      "updated_at": "2026-08-10T11:56:20.6333302Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/settings/components/sections/account/settings-account.tsx": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:56:37.3897331Z",
+      "updated_at": "2026-08-10T11:56:42.4734221Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/features/settings/hooks/use-invitation-panel.ts": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:55:44.4668877Z",
+      "updated_at": "2026-08-10T11:55:55.7933024Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/en-US/admin-users.json": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:29:40.1060345Z",
+      "updated_at": "2026-08-10T03:43:30.1826592Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/en-US/errors.json": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T23:41:06.8673037Z",
+      "updated_at": "2026-08-09T23:41:06.8988302Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/en-US/guide.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T07:38:50.9934107Z",
+      "updated_at": "2026-08-12T07:38:51.7262067Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/en-US/login.json": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:28:37.1708686Z",
+      "updated_at": "2026-08-09T12:28:37.2047763Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:53:47.1607194Z",
+      "updated_at": "2026-08-10T11:53:47.1607194Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/en-US/settings.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:57:22.0262961Z",
+      "updated_at": "2026-08-10T11:57:22.0262961Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/zh-CN/admin-users.json": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:35:36.5948685Z",
+      "updated_at": "2026-08-10T03:43:30.8555392Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/zh-CN/errors.json": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T23:41:07.5970214Z",
+      "updated_at": "2026-08-09T23:41:07.6206139Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/zh-CN/guide.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T07:38:49.4135734Z",
+      "updated_at": "2026-08-12T07:38:51.7531568Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/zh-CN/login.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:53:33.562637Z",
+      "updated_at": "2026-08-10T11:53:33.562637Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/i18n/messages/zh-CN/settings.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:57:07.2649424Z",
+      "updated_at": "2026-08-10T11:57:07.2649424Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/package.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T08:31:40.2062938Z",
+      "updated_at": "2026-08-12T08:41:24.9937372Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/shared/api/auth.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:27:13.5673329Z",
+      "updated_at": "2026-08-09T14:49:12.5911853Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:51:58.5160661Z",
+      "updated_at": "2026-08-10T11:51:58.5160661Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/shared/api/auth.types.ts": [
+    {
+      "source_session": "1786274066-6f60aeba72e1",
+      "created_at": "2026-08-09T12:27:14.5847013Z",
+      "updated_at": "2026-08-09T12:27:14.611566Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/shared/api/invitation.ts": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:55:29.7994993Z",
+      "updated_at": "2026-08-10T11:55:29.7994993Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/shared/api/invitation.types.ts": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-10T11:54:28.7655694Z",
+      "updated_at": "2026-08-10T11:55:18.8247445Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/vitest.config.mts": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T08:43:29.9298218Z",
+      "updated_at": "2026-08-12T08:43:29.9534628Z",
+      "created_by": "agent"
+    }
+  ],
+  "frontend/vitest.config.ts": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T08:31:41.0117772Z",
+      "updated_at": "2026-08-12T08:43:30.6356849Z",
+      "created_by": "agent"
+    }
+  ],
+  "scripts/wechat-article.md.example": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T03:04:49.3935012Z",
+      "updated_at": "2026-08-12T08:53:08.3762878Z",
+      "created_by": "agent"
+    }
+  ],
+  "scripts/wechat_draft.py": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T03:04:50.1174453Z",
+      "updated_at": "2026-08-12T05:20:55.9183539Z",
+      "created_by": "agent"
+    }
+  ],
+  "scripts/wechat_menu.py": [
+    {
+      "source_session": "1786516028-f6ee249fb768",
+      "created_at": "2026-08-12T06:43:41.5066624Z",
+      "updated_at": "2026-08-12T06:53:38.8475286Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/README.md": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:09:16.1285996Z",
+      "updated_at": "2026-08-12T05:20:58.3841754Z",
+      "created_by": "agent"
+    },
+    {
+      "source_session": "1786516028-f6ee249fb768",
+      "created_at": "2026-08-12T06:44:29.5631389Z",
+      "updated_at": "2026-08-12T06:44:29.5912032Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/article.md": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:09:16.8331317Z",
+      "updated_at": "2026-08-12T05:20:57.5133049Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/articles/ai-free-welfare/article.md": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:37:03.775745Z",
+      "updated_at": "2026-08-12T06:09:21.3555163Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/articles/ai-free-welfare/images/.gitkeep": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T06:09:21.995874Z",
+      "updated_at": "2026-08-12T06:09:21.995874Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/articles/example/article.md": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:20:58.3515283Z",
+      "updated_at": "2026-08-12T05:20:58.3515283Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/articles/example/images/.gitkeep": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:20:59.0276369Z",
+      "updated_at": "2026-08-12T05:20:59.0276369Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/config.example.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:09:17.714863Z",
+      "updated_at": "2026-08-12T05:20:59.68376Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/config.json": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:09:18.444319Z",
+      "updated_at": "2026-08-12T05:21:00.4099701Z",
+      "created_by": "agent"
+    }
+  ],
+  "wechat-draft/images/.gitkeep": [
+    {
+      "source_session": "1786341372-93d0e77477aa",
+      "created_at": "2026-08-12T05:09:19.0888055Z",
+      "updated_at": "2026-08-12T05:21:01.0881907Z",
+      "created_by": "agent"
+    }
+  ]
+}

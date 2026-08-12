@@ -57,3 +57,25 @@ func TestModuleRegistersPublicCallbackPath(t *testing.T) {
 		t.Fatalf("status=%d body=%q", recorder.Code, recorder.Body.String())
 	}
 }
+
+func TestReceiveKeepsRegistrationTextKeyword(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.POST("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token").Receive)
+
+	body := `<xml><ToUserName>official-account</ToUserName><FromUserName>openid-text</FromUserName><CreateTime>1</CreateTime><MsgType>text</MsgType><Content>13004</Content></xml>`
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, signedRequest(http.MethodPost, "/wechat/callback", body))
+	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "ABCD-EFGH-IJKL-MNPQ") {
+		t.Fatalf("status=%d body=%q", recorder.Code, recorder.Body.String())
+	}
+}
+
+func signedRequest(method, path, body string) *http.Request {
+	values := url.Values{"timestamp": {"1"}, "nonce": {"2"}}
+	parts := []string{"token", values.Get("timestamp"), values.Get("nonce")}
+	sort.Strings(parts)
+	digest := sha1.Sum([]byte(strings.Join(parts, "")))
+	values.Set("signature", hex.EncodeToString(digest[:]))
+	return httptest.NewRequest(method, path+"?"+values.Encode(), strings.NewReader(body))
+}
