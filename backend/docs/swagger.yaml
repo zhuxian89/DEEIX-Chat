@@ -2689,6 +2689,9 @@ definitions:
       email:
         maxLength: 128
         type: string
+      invitationCode:
+        maxLength: 32
+        type: string
       password:
         maxLength: 128
         minLength: 8
@@ -2702,7 +2705,6 @@ definitions:
     required:
     - email
     - password
-    - registrationCode
     type: object
   EmailRegistrationStartRequest:
     properties:
@@ -3251,6 +3253,112 @@ definitions:
     required:
     - data
     - errorMsg
+    type: object
+  InvitationPanelResponse:
+    properties:
+      invitationCode:
+        type: string
+      inviteCount:
+        type: integer
+      inviteLink:
+        type: string
+    required:
+    - invitationCode
+    - inviteCount
+    - inviteLink
+    type: object
+  InvitationRelationshipListDoc:
+    properties:
+      data:
+        properties:
+          results:
+            items:
+              $ref: '#/definitions/InvitationRelationshipResponse'
+            type: array
+          total:
+            type: integer
+        required:
+        - results
+        - total
+        type: object
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  InvitationRelationshipResponse:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      invitationCode:
+        type: string
+      invitedUserId:
+        type: integer
+      inviteeRewardNanousd:
+        type: integer
+      inviteeRewardedAt:
+        type: string
+      inviterRewardNanousd:
+        type: integer
+      inviterRewardedAt:
+        type: string
+      inviterUserId:
+        type: integer
+    required:
+    - createdAt
+    - id
+    - invitationCode
+    - invitedUserId
+    - inviteeRewardNanousd
+    - inviteeRewardedAt
+    - inviterRewardNanousd
+    - inviterRewardedAt
+    - inviterUserId
+    type: object
+  InvitedUserListDoc:
+    properties:
+      data:
+        properties:
+          results:
+            items:
+              $ref: '#/definitions/InvitedUserResponse'
+            type: array
+          total:
+            type: integer
+        required:
+        - results
+        - total
+        type: object
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  InvitedUserResponse:
+    properties:
+      invitedAt:
+        type: string
+      invitedDisplayName:
+        type: string
+      invitedUserId:
+        type: integer
+      invitedUsername:
+        type: string
+      inviterRewardNanousd:
+        type: integer
+      relationshipId:
+        type: integer
+    required:
+    - invitedAt
+    - invitedDisplayName
+    - invitedUserId
+    - invitedUsername
+    - inviterRewardNanousd
+    - relationshipId
     type: object
   ListResponse:
     properties:
@@ -9422,6 +9530,37 @@ paths:
       summary: 管理员导出全量对话数据
       tags:
       - admin
+  /admin/invitations:
+    get:
+      parameters:
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 邀请人ID
+        in: query
+        name: inviter_user_id
+        type: integer
+      - description: 被邀请人ID
+        in: query
+        name: invited_user_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/InvitationRelationshipListDoc'
+      security:
+      - BearerAuth: []
+      summary: 管理员查询邀请关系
+      tags:
+      - admin-invitation
   /admin/llm/model-display-groups:
     get:
       description: 分页查询自定义展示分组；未绑定分组的模型继续按技术厂商展示
@@ -15171,6 +15310,43 @@ paths:
       summary: 开始删除账号验证
       tags:
       - auth
+  /me/invitation:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/InvitationPanelResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取我的邀请面板
+      tags:
+      - invitation
+  /me/invitations:
+    get:
+      parameters:
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/InvitedUserListDoc'
+      security:
+      - BearerAuth: []
+      summary: 获取我邀请的用户列表
+      tags:
+      - invitation
   /me/onboarding/complete:
     post:
       consumes:

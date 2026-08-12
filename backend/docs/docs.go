@@ -1605,6 +1605,56 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/invitations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin-invitation"
+                ],
+                "summary": "管理员查询邀请关系",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "邀请人ID",
+                        "name": "inviter_user_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "被邀请人ID",
+                        "name": "invited_user_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/InvitationRelationshipListDoc"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/llm/model-display-groups": {
             "get": {
                 "security": [
@@ -10658,6 +10708,68 @@ const docTemplate = `{
                 }
             }
         },
+        "/me/invitation": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invitation"
+                ],
+                "summary": "获取我的邀请面板",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/InvitationPanelResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/me/invitations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "invitation"
+                ],
+                "summary": "获取我邀请的用户列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/InvitedUserListDoc"
+                        }
+                    }
+                }
+            }
+        },
         "/me/onboarding/complete": {
             "post": {
                 "security": [
@@ -15829,8 +15941,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "email",
-                "password",
-                "registrationCode"
+                "password"
             ],
             "properties": {
                 "code": {
@@ -15839,6 +15950,10 @@ const docTemplate = `{
                 "email": {
                     "type": "string",
                     "maxLength": 128
+                },
+                "invitationCode": {
+                    "type": "string",
+                    "maxLength": 32
                 },
                 "password": {
                     "type": "string",
@@ -16638,6 +16753,159 @@ const docTemplate = `{
                 },
                 "errorMsg": {
                     "type": "string"
+                }
+            }
+        },
+        "InvitationPanelResponse": {
+            "type": "object",
+            "required": [
+                "invitationCode",
+                "inviteCount",
+                "inviteLink"
+            ],
+            "properties": {
+                "invitationCode": {
+                    "type": "string"
+                },
+                "inviteCount": {
+                    "type": "integer"
+                },
+                "inviteLink": {
+                    "type": "string"
+                }
+            }
+        },
+        "InvitationRelationshipListDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "required": [
+                        "results",
+                        "total"
+                    ],
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/InvitationRelationshipResponse"
+                            }
+                        },
+                        "total": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "InvitationRelationshipResponse": {
+            "type": "object",
+            "required": [
+                "createdAt",
+                "id",
+                "invitationCode",
+                "invitedUserId",
+                "inviteeRewardNanousd",
+                "inviteeRewardedAt",
+                "inviterRewardNanousd",
+                "inviterRewardedAt",
+                "inviterUserId"
+            ],
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "invitationCode": {
+                    "type": "string"
+                },
+                "invitedUserId": {
+                    "type": "integer"
+                },
+                "inviteeRewardNanousd": {
+                    "type": "integer"
+                },
+                "inviteeRewardedAt": {
+                    "type": "string"
+                },
+                "inviterRewardNanousd": {
+                    "type": "integer"
+                },
+                "inviterRewardedAt": {
+                    "type": "string"
+                },
+                "inviterUserId": {
+                    "type": "integer"
+                }
+            }
+        },
+        "InvitedUserListDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "type": "object",
+                    "required": [
+                        "results",
+                        "total"
+                    ],
+                    "properties": {
+                        "results": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/InvitedUserResponse"
+                            }
+                        },
+                        "total": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "InvitedUserResponse": {
+            "type": "object",
+            "required": [
+                "invitedAt",
+                "invitedDisplayName",
+                "invitedUserId",
+                "invitedUsername",
+                "inviterRewardNanousd",
+                "relationshipId"
+            ],
+            "properties": {
+                "invitedAt": {
+                    "type": "string"
+                },
+                "invitedDisplayName": {
+                    "type": "string"
+                },
+                "invitedUserId": {
+                    "type": "integer"
+                },
+                "invitedUsername": {
+                    "type": "string"
+                },
+                "inviterRewardNanousd": {
+                    "type": "integer"
+                },
+                "relationshipId": {
+                    "type": "integer"
                 }
             }
         },

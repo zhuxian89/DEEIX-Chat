@@ -1192,13 +1192,15 @@ export interface EmailRegistrationCompleteRequest {
   code?: string;
   /** @maxLength 128 */
   email: string;
+  /** @maxLength 32 */
+  invitationCode?: string;
   /**
    * @minLength 8
    * @maxLength 128
    */
   password: string;
   /** @maxLength 128 */
-  registrationCode: string;
+  registrationCode?: string;
   /** @maxLength 2048 */
   turnstileToken?: string;
 }
@@ -1441,6 +1443,49 @@ export interface ImportUpstreamModelsResponse {
 export interface ImportUpstreamModelsResponseDoc {
   data: ImportUpstreamModelsResponse;
   errorMsg: string;
+}
+
+export interface InvitationPanelResponse {
+  invitationCode: string;
+  inviteCount: number;
+  inviteLink: string;
+}
+
+export interface InvitationRelationshipListDoc {
+  data: {
+    results: InvitationRelationshipResponse[];
+    total: number;
+  };
+  errorMsg: string;
+}
+
+export interface InvitationRelationshipResponse {
+  createdAt: string;
+  id: number;
+  invitationCode: string;
+  invitedUserId: number;
+  inviteeRewardNanousd: number;
+  inviteeRewardedAt: string;
+  inviterRewardNanousd: number;
+  inviterRewardedAt: string;
+  inviterUserId: number;
+}
+
+export interface InvitedUserListDoc {
+  data: {
+    results: InvitedUserResponse[];
+    total: number;
+  };
+  errorMsg: string;
+}
+
+export interface InvitedUserResponse {
+  invitedAt: string;
+  invitedDisplayName: string;
+  invitedUserId: number;
+  invitedUsername: string;
+  inviterRewardNanousd: number;
+  relationshipId: number;
 }
 
 export interface ListResponse {
@@ -4308,6 +4353,31 @@ export namespace Admin {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = string;
+  }
+
+  /**
+   * No description
+   * @tags admin-invitation
+   * @name InvitationsList
+   * @summary 管理员查询邀请关系
+   * @request GET:/admin/invitations
+   * @secure
+   */
+  export namespace InvitationsList {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** 被邀请人ID */
+      invited_user_id?: number;
+      /** 邀请人ID */
+      inviter_user_id?: number;
+      /** 页码 */
+      page?: number;
+      /** 每页数量 */
+      page_size?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = InvitationRelationshipListDoc;
   }
 
   /**
@@ -7612,6 +7682,43 @@ export namespace Me {
     export type RequestBody = SecurityVerificationStartRequest;
     export type RequestHeaders = {};
     export type ResponseBody = EmailVerificationStartResponseDoc;
+  }
+
+  /**
+   * No description
+   * @tags invitation
+   * @name InvitationList
+   * @summary 获取我的邀请面板
+   * @request GET:/me/invitation
+   * @secure
+   */
+  export namespace InvitationList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = InvitationPanelResponse;
+  }
+
+  /**
+   * No description
+   * @tags invitation
+   * @name InvitationsList
+   * @summary 获取我邀请的用户列表
+   * @request GET:/me/invitations
+   * @secure
+   */
+  export namespace InvitationsList {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** 页码 */
+      page?: number;
+      /** 每页数量 */
+      page_size?: number;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = InvitedUserListDoc;
   }
 
   /**
