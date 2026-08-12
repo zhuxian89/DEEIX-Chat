@@ -69,4 +69,6 @@ type IssueResult struct {
 	Code               string
 	RegistrationCodeID uint
 	Created            bool
+	Used               bool
+	DeletedUser        bool
 }

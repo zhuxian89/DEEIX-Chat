@@ -339,7 +339,7 @@ Static configuration environment variables:
 | Security | `SSRF_ALLOWED_HOSTS` | Exact hostnames for deployment-level integrations or trusted private redirect targets, comma-separated. |
 | Security | `SSRF_ALLOWED_CIDRS` | Trusted deployment-level integration or private redirect CIDRs, comma-separated. |
 | Security | `TURNSTILE_SITEVERIFY_URL` | Cloudflare Turnstile siteverify endpoint. |
-| WeChat | `WECHAT_CALLBACK_TOKEN` | Official-account callback Token; callback path is `/api/v1/wechat/callback` and plaintext mode currently supports keyword `13003`. |
+| WeChat | `WECHAT_CALLBACK_TOKEN` | Official-account callback Token; callback path is `/api/v1/wechat/callback` and plaintext mode currently supports keyword `13004`. |
 | Database | `DATABASE_DRIVER` | `postgres` or `sqlite`. |
 | PostgreSQL | `POSTGRES_DSN` | PostgreSQL DSN. |
 | PostgreSQL | `POSTGRES_MAX_OPEN_CONNS` | Maximum open connections. |

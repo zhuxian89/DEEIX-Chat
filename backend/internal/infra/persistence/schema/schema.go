@@ -152,7 +152,7 @@ func seedWeChatDefaults(db *gorm.DB) error {
 	if err := db.Where("name = ?", template.Name).FirstOrCreate(&template).Error; err != nil {
 		return err
 	}
-	rule := model.WeChatKeywordRule{Keyword: "13003", Action: "issue_registration_code", TemplateID: template.ID, Enabled: true}
+	rule := model.WeChatKeywordRule{Keyword: "13004", Action: "issue_registration_code", TemplateID: template.ID, Enabled: true}
 	return db.Where("keyword = ?", rule.Keyword).FirstOrCreate(&rule).Error
 }
 

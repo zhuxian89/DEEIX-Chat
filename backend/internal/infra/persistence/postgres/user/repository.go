@@ -604,18 +604,24 @@ func createInvitationCodeForUserTx(tx *gorm.DB, userID uint, codeLength int) err
 			return err
 		}
 		item := model.InvitationCode{UserID: userID, Code: code}
-		if err := tx.Create(&item).Error; err != nil {
-			if dberror.IsUniqueConstraint(err) {
-				// 碰撞或该用户已有码：确认是否已是该用户的码，是则视为成功。
-				var existing model.InvitationCode
-				if findErr := tx.Where("user_id = ?", userID).First(&existing).Error; findErr == nil {
-					return nil
-				}
-				continue
-			}
-			return translateError(err)
+		result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&item)
+		if result.Error != nil {
+			return translateError(result.Error)
 		}
-		return nil
+		if result.RowsAffected > 0 {
+			return nil
+		}
+
+		// 冲突可能来自该用户已有邀请码，也可能来自随机码碰撞。
+		// ON CONFLICT DO NOTHING 不污染 PostgreSQL 事务，因此可以安全查询并继续重试。
+		var existing model.InvitationCode
+		findErr := tx.Where("user_id = ?", userID).First(&existing).Error
+		if findErr == nil {
+			return nil
+		}
+		if !dberror.IsRecordNotFound(findErr) {
+			return translateError(findErr)
+		}
 	}
 	return repository.ErrDuplicate
 }
@@ -639,7 +645,7 @@ func applyInvitationTx(tx *gorm.DB, invitedUserID uint, input domaininvitation.A
 		return translateError(err)
 	}
 	var inviter model.User
-	if err := tx.Where("id = ? AND status = ?", inviterCode.UserID, model.UserStatusActive).First(&inviter).Error; err != nil {
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND status = ?", inviterCode.UserID, model.UserStatusActive).First(&inviter).Error; err != nil {
 		if dberror.IsRecordNotFound(err) {
 			return nil // 停用或不存在的邀请人：邀请码失效，不发奖。
 		}
@@ -653,7 +659,10 @@ func applyInvitationTx(tx *gorm.DB, invitedUserID uint, input domaininvitation.A
 	if inviteeEmail == "" {
 		return nil
 	}
-	// 写邀请关系（invited_user_id 唯一）。已被邀请过则宽松放行，不重复发奖。
+	// 用 ON CONFLICT DO NOTHING 写邀请关系，避免 INSERT 撞唯一约束
+	// （invited_user_id / invitee_email）让 postgres 事务进入 aborted 状态
+	// （事务内 statement 失败后，即使 Go 层捕获，commit 仍会被拒 → 注册 400）。
+	// DoNothing 下：已存在（同 user 或同邮箱领过奖）则 RowsAffected==0，不写不发奖。
 	rel := model.InvitationRelationship{
 		InviterUserID:        inviterCode.UserID,
 		InvitedUserID:        invitedUserID,
@@ -662,11 +671,12 @@ func applyInvitationTx(tx *gorm.DB, invitedUserID uint, input domaininvitation.A
 		InviteeRewardNanousd: input.InviteeRewardNanousd,
 		InviterRewardNanousd: input.InviterRewardNanousd,
 	}
-	if err := tx.Create(&rel).Error; err != nil {
-		if dberror.IsUniqueConstraint(err) {
-			return nil // 该用户已被邀请过：宽松放行。
-		}
-		return translateError(err)
+	result := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&rel)
+	if result.Error != nil {
+		return translateError(result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return nil // 该用户或该邮箱已被邀请过：不重复发奖。
 	}
 	// 发被邀请人奖励。
 	if input.InviteeRewardNanousd > 0 {
@@ -1283,20 +1293,6 @@ func (r *Repo) DeleteAccountHard(ctx context.Context, userID uint) error {
 				label: "billing_accounts",
 				run: func(db *gorm.DB) error {
 					return db.Unscoped().Where("user_id = ?", userID).Delete(&model.BillingAccount{}).Error
-				},
-			},
-			{
-				label: "registration_codes",
-				run: func(db *gorm.DB) error {
-					// 释放该用户用过的注册码：恢复成 active 可重用，清空使用者标记。
-					// 注册码是一次性凭证，但用户被删除后码不应被一个不存在的用户永久锁死。
-					return db.Unscoped().Model(&model.RegistrationCode{}).
-						Where("used_by_user_id = ?", userID).
-						Updates(map[string]interface{}{
-							"status":          domainregistrationcode.StatusActive,
-							"used_by_user_id": 0,
-							"used_at":         nil,
-						}).Error
 				},
 			},
 			{

@@ -289,7 +289,7 @@ export function AdminWeChatPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>{ruleDraft?.id ? "编辑关键词规则" : "新增关键词规则"}</DialogTitle><DialogDescription>一次完成关键词、功能和回复模板绑定。</DialogDescription></DialogHeader>
           {ruleDraft ? <div className="space-y-4">
-            <label className="grid gap-1 text-sm"><span>关键词</span><Input value={ruleDraft.keyword} onChange={(event) => setRuleDraft({ ...ruleDraft, keyword: event.target.value })} placeholder="例如 13003" /></label>
+            <label className="grid gap-1 text-sm"><span>关键词</span><Input value={ruleDraft.keyword} onChange={(event) => setRuleDraft({ ...ruleDraft, keyword: event.target.value })} placeholder="例如 13004" /></label>
             <label className="grid gap-1 text-sm"><span>功能</span><select className="h-8 rounded-md border border-input/40 bg-transparent px-3 text-xs" value={ruleDraft.action} onChange={(event) => setRuleDraft({ ...ruleDraft, action: event.target.value })}>{actions.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
             <label className="grid gap-1 text-sm"><span>回复模板</span><select className="h-8 rounded-md border border-input/40 bg-transparent px-3 text-xs" value={ruleDraft.templateId} onChange={(event) => setRuleDraft({ ...ruleDraft, templateId: event.target.value })}><option value="">选择模板</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
           </div> : null}

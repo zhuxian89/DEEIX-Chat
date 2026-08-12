@@ -10,7 +10,12 @@ import (
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/repository"
 )
 
-const keyword = "13003"
+const keyword = "13004"
+
+const (
+	usedRegistrationCodeMessage = "\n该注册码已使用。"
+	deletedAccountMessage       = "账号已注销，请联系管理员获取新的注册码。"
+)
 
 type Service struct {
 	repo repository.WeChatRegistrationRepository
@@ -60,11 +65,22 @@ func (s *Service) HandleTextMessage(ctx context.Context, openID, content string)
 		if keywordValue != keyword {
 			return MessageResult{}, nil
 		}
-		code, err := s.IssueRegistrationCode(ctx, openID)
+		issued, err := s.issueDetailed(ctx, openID)
 		if err != nil {
 			return MessageResult{}, err
 		}
-		return MessageResult{Matched: true, Content: "你的专属注册码：" + code, Keyword: keyword, Action: domainwechat.ActionIssueRegistrationCode, Outcome: domainwechat.ResultIssued}, nil
+		if issued.DeletedUser {
+			return MessageResult{Matched: true, Content: deletedAccountMessage, Keyword: keyword, Action: domainwechat.ActionIssueRegistrationCode, Outcome: domainwechat.ResultReplayed}, nil
+		}
+		content := "你的专属注册码：" + issued.Code
+		if issued.Used {
+			content += usedRegistrationCodeMessage
+		}
+		outcome := domainwechat.ResultIssued
+		if issued.Used {
+			outcome = domainwechat.ResultReplayed
+		}
+		return MessageResult{Matched: true, Content: content, Keyword: keyword, Action: domainwechat.ActionIssueRegistrationCode, Outcome: outcome}, nil
 	}
 
 	rule, err := adminRepo.GetKeywordRule(ctx, keywordValue)
@@ -112,7 +128,14 @@ func (s *Service) issueConfiguredMessage(ctx context.Context, repo repository.We
 		}
 		result.RegistrationCodeID = issue.RegistrationCodeID
 		result.Outcome = log.Result
+		if issue.DeletedUser {
+			result.Content = deletedAccountMessage
+			return result, nil
+		}
 		result.Content = strings.ReplaceAll(templateContent, "{{CODE}}", issue.Code)
+		if issue.Used {
+			result.Content += usedRegistrationCodeMessage
+		}
 		return result, nil
 	}
 	return result, repository.ErrDuplicate

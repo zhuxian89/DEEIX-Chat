@@ -78,7 +78,19 @@ func issueRegistrationCodeTx(tx *gorm.DB, openID, code string) (domainwechat.Iss
 		if err := tx.First(&registration, existing.RegistrationCodeID).Error; err != nil {
 			return domainwechat.IssueResult{}, err
 		}
-		return domainwechat.IssueResult{Code: registration.Code, RegistrationCodeID: registration.ID, Created: false}, nil
+		result := domainwechat.IssueResult{Code: registration.Code, RegistrationCodeID: registration.ID, Created: false}
+		if registration.Status == domainregistrationcode.StatusUsed && registration.UsedByUserID != 0 {
+			result.Used = true
+			var usedBy model.User
+			if err := tx.Unscoped().Where("id = ?", registration.UsedByUserID).First(&usedBy).Error; err != nil {
+				if dberror.IsRecordNotFound(err) {
+					result.DeletedUser = true
+				} else {
+					return domainwechat.IssueResult{}, err
+				}
+			}
+		}
+		return result, nil
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return domainwechat.IssueResult{}, err
 	}
