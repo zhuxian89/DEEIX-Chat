@@ -31,6 +31,27 @@ type AssistantMessageCompletionUpdate struct {
 	Status           string
 	ErrorCode        string
 	ErrorMessage     string
+	KnowledgeSources []domainconversation.MessageKnowledgeSource
+}
+
+// ForkConversationMessage 描述 fork 时待创建的消息及其源消息关系。
+// Message 仅承载新消息字段；父子关系通过源消息 ID 在事务内重建。
+type ForkConversationMessage struct {
+	SourceMessageID       uint
+	SourceParentMessageID *uint
+	Message               domainconversation.Message
+}
+
+// CreateForkedConversationInput 描述一次原子 fork 写入。
+type CreateForkedConversationInput struct {
+	SourceConversationID uint
+	Conversation         *domainconversation.Conversation
+	Messages             []ForkConversationMessage
+}
+
+// ConversationForkRepository 封装新会话、消息链、附件引用和历史展示轨迹的原子复制能力。
+type ConversationForkRepository interface {
+	CreateForkedConversation(ctx context.Context, input CreateForkedConversationInput) error
 }
 
 // ConversationMetadataPatch 定义自动生成会话元数据的更新字段。
@@ -93,17 +114,14 @@ type MessageRepository interface {
 	InterruptPendingAssistantMessageByRunID(ctx context.Context, userID uint, runID string, errorCode string, errorMessage string) (bool, error)
 	UpdateAssistantMessageCompletion(ctx context.Context, messageID uint, update AssistantMessageCompletionUpdate) error
 	UpdateMessageBilling(ctx context.Context, messageID uint, billedCurrency string, billedNanousd int64, pricingSnapshot string) error
-	SumMessageTokens(ctx context.Context, conversationID uint) (int64, error)
 	ListMessages(ctx context.Context, conversationID uint, offset int, limit int) ([]domainconversation.Message, int64, error)
 	ListMessagesBeforeID(ctx context.Context, conversationID uint, beforeID uint, limit int) ([]domainconversation.Message, int64, error)
 	ListAllMessages(ctx context.Context, conversationID uint) ([]domainconversation.Message, error)
 	ListMessagesForShare(ctx context.Context, conversationID uint, publicIDs []string) ([]domainconversation.Message, error)
 	ListRecentMessages(ctx context.Context, conversationID uint, limit int) ([]domainconversation.Message, int64, error)
 	GetMessageByID(ctx context.Context, conversationID uint, messageID uint) (*domainconversation.Message, error)
-	GetLatestMessage(ctx context.Context, conversationID uint) (*domainconversation.Message, error)
 	ListMessageAncestors(ctx context.Context, conversationID uint, leafMessageID uint, maxDepth int) ([]domainconversation.Message, error)
 	ListLatestBranchPreviewMessages(ctx context.Context, conversationID uint, maxDepth int, limit int) ([]domainconversation.Message, error)
-	ListMessageAncestorsUntil(ctx context.Context, conversationID uint, leafMessageID uint, stopMessageID uint, maxDepth int) ([]domainconversation.Message, bool, error)
 }
 
 // MessageFeedbackRepository 封装消息反馈能力。
@@ -118,6 +136,10 @@ type MessageFeedbackRepository interface {
 type ConversationTraceRepository interface {
 	CreateAttachments(ctx context.Context, items []domainconversation.Attachment) error
 	CreateConversationRun(ctx context.Context, item *domainconversation.Run) error
+	// EnsureConversationRun inserts a mid-flight run row if absent (moderation / recovery).
+	EnsureConversationRun(ctx context.Context, item *domainconversation.Run) error
+	// UpsertConversationRun creates or updates the final run snapshot by run_id.
+	UpsertConversationRun(ctx context.Context, item *domainconversation.Run) error
 	UpsertConversationMessageTrace(ctx context.Context, item *domainconversation.MessageTrace) error
 	ListConversationMessageTracesByMessageIDs(ctx context.Context, messageIDs []uint) ([]domainconversation.MessageTrace, error)
 	UpsertConversationMessageTraceEvent(ctx context.Context, item *domainconversation.MessageTraceEventRow) error
@@ -126,6 +148,7 @@ type ConversationTraceRepository interface {
 	CreateConversationToolCalls(ctx context.Context, items []domainconversation.ToolCall) error
 	ListConversationRuns(ctx context.Context, userID uint, conversationID uint, offset int, limit int) ([]domainconversation.Run, int64, error)
 	ListConversationRunsByRunIDs(ctx context.Context, userID uint, conversationID uint, runIDs []string) ([]domainconversation.Run, error)
+	ListConversationRunStatusesByRunIDs(ctx context.Context, userID uint, runIDs []string) ([]domainconversation.RunStatus, error)
 	ListConversationEventLogs(ctx context.Context, filter ConversationEventLogListFilter, offset int, limit int) ([]domainconversation.EventLog, int64, error)
 	GetConversationEventLog(ctx context.Context, eventID uint) (*domainconversation.EventLog, error)
 }
@@ -165,10 +188,11 @@ func (scope HistoricalMessageScope) Valid() bool {
 
 // MessageChunkSearchInput 描述当前分支内的历史消息语义检索。
 type MessageChunkSearchInput struct {
-	Scope          HistoricalMessageScope
-	QueryEmbedding []float32
-	TopK           int
-	MinSimilarity  float64
+	Scope              HistoricalMessageScope
+	QueryEmbedding     []float32
+	EmbeddingSignature string
+	TopK               int
+	MinSimilarity      float64
 }
 
 // CompactRepository 封装上下文压缩快照能力。

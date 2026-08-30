@@ -122,22 +122,60 @@ export function AdminFilesSettingsPage() {
   const [embeddingStatus, setEmbeddingStatus] = React.useState<AdminEmbeddingIndexStatus | null>(null);
   const [embeddingStatusLoading, setEmbeddingStatusLoading] = React.useState(false);
   const [reindexing, setReindexing] = React.useState(false);
+  const embeddingRefreshTimerRef = React.useRef<number | null>(null);
+  const embeddingStatusRequestRef = React.useRef<AbortController | null>(null);
+  const embeddingStatusRequestVersionRef = React.useRef(0);
+
+  const cancelEmbeddingStatusRefresh = React.useCallback(() => {
+    if (embeddingRefreshTimerRef.current !== null) {
+      window.clearTimeout(embeddingRefreshTimerRef.current);
+      embeddingRefreshTimerRef.current = null;
+    }
+    embeddingStatusRequestVersionRef.current += 1;
+    embeddingStatusRequestRef.current?.abort();
+    embeddingStatusRequestRef.current = null;
+  }, []);
+
+  const clearEmbeddingStatus = React.useCallback(() => {
+    cancelEmbeddingStatusRefresh();
+    setEmbeddingStatus(null);
+    setEmbeddingStatusLoading(false);
+  }, [cancelEmbeddingStatusRefresh]);
+
+  React.useEffect(
+    () => cancelEmbeddingStatusRefresh,
+    [cancelEmbeddingStatusRefresh],
+  );
 
   const loadEmbeddingStatus = React.useCallback(async () => {
+    cancelEmbeddingStatusRefresh();
+    const requestVersion = embeddingStatusRequestVersionRef.current;
+    const requestController = new AbortController();
+    embeddingStatusRequestRef.current = requestController;
     setEmbeddingStatusLoading(true);
     try {
       const token = await resolveAccessToken();
-      if (!token) return;
-      const status = await getAdminEmbeddingStatus(token);
+      if (!token || requestController.signal.aborted) return;
+      const status = await getAdminEmbeddingStatus(token, requestController.signal);
+      if (embeddingStatusRequestVersionRef.current !== requestVersion) return;
       setEmbeddingStatus(status);
     } catch {
-      setEmbeddingStatus(null);
+      if (
+        !requestController.signal.aborted &&
+        embeddingStatusRequestVersionRef.current === requestVersion
+      ) setEmbeddingStatus(null);
     } finally {
-      setEmbeddingStatusLoading(false);
+      if (embeddingStatusRequestRef.current === requestController) {
+        embeddingStatusRequestRef.current = null;
+      }
+      if (embeddingStatusRequestVersionRef.current === requestVersion) {
+        setEmbeddingStatusLoading(false);
+      }
     }
-  }, []);
+  }, [cancelEmbeddingStatusRefresh]);
 
   const handleReindex = React.useCallback(async () => {
+    const refreshVersion = embeddingStatusRequestVersionRef.current;
     setReindexing(true);
     try {
       const token = await resolveAccessToken();
@@ -149,7 +187,14 @@ export function AdminFilesSettingsPage() {
       toast.success(t("toast.reindexSubmitted"), {
         description: t("toast.reindexSubmittedDescription", { count: result.submitted }),
       });
-      setTimeout(() => { void loadEmbeddingStatus(); }, 1500);
+      if (embeddingStatusRequestVersionRef.current !== refreshVersion) return;
+      if (embeddingRefreshTimerRef.current !== null) {
+        window.clearTimeout(embeddingRefreshTimerRef.current);
+      }
+      embeddingRefreshTimerRef.current = window.setTimeout(() => {
+        embeddingRefreshTimerRef.current = null;
+        void loadEmbeddingStatus();
+      }, 1500);
     } catch (error) {
       toast.error(t("toast.reindexFailed"), { description: resolveAdminErrorMessage(error, t("toast.unknownError")) });
     } finally {
@@ -216,14 +261,14 @@ export function AdminFilesSettingsPage() {
       if (flattened["file.embedding_enabled"] === EMBEDDING_MODES.ON) {
         void loadEmbeddingStatus();
       } else {
-        setEmbeddingStatus(null);
+        clearEmbeddingStatus();
       }
     } catch (error) {
       toast.error(t("toast.loadFailed"), { description: resolveAdminErrorMessage(error, t("toast.unknownError")) });
     } finally {
       setLoading(false);
     }
-  }, [loadEmbeddingStatus, syncServiceRuntimes, t]);
+  }, [clearEmbeddingStatus, loadEmbeddingStatus, syncServiceRuntimes, t]);
 
   React.useEffect(() => {
     void loadSettings();
@@ -243,6 +288,9 @@ export function AdminFilesSettingsPage() {
   }, [savedMap, settingsMap]);
 
   const handleFieldChange = React.useCallback((fieldID: string, value: string) => {
+    if (fieldID === "file.embedding_enabled" && value !== EMBEDDING_MODES.ON) {
+      clearEmbeddingStatus();
+    }
     setSettingsMap((prev) => {
       let next = { ...prev, [fieldID]: value };
       if (fieldID === "extract.engine" && value === EXTRACT_ENGINE_POLICIES.MINERU) {
@@ -250,6 +298,17 @@ export function AdminFilesSettingsPage() {
       }
       if (fieldID === "extract.mineru_file_types") {
         next["extract.mineru_file_types"] = normalizeMinerUFileTypes(value);
+      }
+      if (fieldID === "extract.ocr_engine" && value === OCR_ENGINES.MISTRAL) {
+        if (!(next["extract.mistral_ocr_base_url"] ?? "").trim()) {
+          next["extract.mistral_ocr_base_url"] = "https://api.mistral.ai/v1/ocr";
+        }
+        if (!(next["extract.mistral_ocr_model"] ?? "").trim()) {
+          next["extract.mistral_ocr_model"] = "mistral-ocr-latest";
+        }
+        if (!(next["extract.mistral_ocr_timeout_seconds"] ?? "").trim()) {
+          next["extract.mistral_ocr_timeout_seconds"] = "60";
+        }
       }
       if ((fieldID === "file.embedding_enabled" || fieldID === "file.embedding_host" || fieldID === "file.rag_model") && !isEmbeddingServiceConfigured(next)) {
         next = {
@@ -279,7 +338,7 @@ export function AdminFilesSettingsPage() {
       }
       return next;
     });
-  }, [t]);
+  }, [clearEmbeddingStatus, t]);
 
   const handleSaveAllowedMIMETypes = React.useCallback(
     async (nextValue: string) => {
@@ -372,6 +431,18 @@ export function AdminFilesSettingsPage() {
       }
       if (ocrEnabled && ocrEngine === OCR_ENGINES.ALIYUN && (!draftSettingsMap["extract.aliyun_ocr_access_key_id"]?.trim() || !settingHasValue(draftSettingsMap, configuredMap, "extract.aliyun_ocr_access_key_secret") || !draftSettingsMap["extract.aliyun_ocr_region"]?.trim())) {
         toast.error(t("toast.saveFailed"), { description: t("validation.aliyunOCRRequired") });
+        return;
+      }
+      if (ocrEnabled && ocrEngine === OCR_ENGINES.MISTRAL && !draftSettingsMap["extract.mistral_ocr_base_url"]?.trim()) {
+        toast.error(t("toast.saveFailed"), { description: t("validation.mistralOCRBaseURLRequired") });
+        return;
+      }
+      if (ocrEnabled && ocrEngine === OCR_ENGINES.MISTRAL && !settingHasValue(draftSettingsMap, configuredMap, "extract.mistral_ocr_auth_token")) {
+        toast.error(t("toast.saveFailed"), { description: t("validation.mistralOCRAPIKeyRequired") });
+        return;
+      }
+      if (ocrEnabled && ocrEngine === OCR_ENGINES.MISTRAL && !draftSettingsMap["extract.mistral_ocr_model"]?.trim()) {
+        toast.error(t("toast.saveFailed"), { description: t("validation.mistralOCRModelRequired") });
         return;
       }
       if (ocrEnabled && ocrEngine === OCR_ENGINES.LLM && !draftSettingsMap["extract.llm_ocr_base_url"]?.trim()) {
@@ -487,6 +558,12 @@ export function AdminFilesSettingsPage() {
                   { namespace: "extract", key: "aliyun_ocr_endpoint", value: nextSettingsMap["extract.aliyun_ocr_endpoint"] ?? "ocr-api.cn-hangzhou.aliyuncs.com" },
                   { namespace: "extract", key: "aliyun_ocr_timeout_seconds", value: nextSettingsMap["extract.aliyun_ocr_timeout_seconds"] ?? "60" },
                 ]
+            : ocrEngine === OCR_ENGINES.MISTRAL
+              ? [
+                  { namespace: "extract", key: "mistral_ocr_base_url", value: nextSettingsMap["extract.mistral_ocr_base_url"] ?? "https://api.mistral.ai/v1/ocr" },
+                  { namespace: "extract", key: "mistral_ocr_model", value: nextSettingsMap["extract.mistral_ocr_model"] ?? "mistral-ocr-latest" },
+                  { namespace: "extract", key: "mistral_ocr_timeout_seconds", value: nextSettingsMap["extract.mistral_ocr_timeout_seconds"] ?? "60" },
+                ]
             : ocrEngine === OCR_ENGINES.LLM
               ? [
                   { namespace: "extract", key: "llm_ocr_model", value: nextSettingsMap["extract.llm_ocr_model"] ?? "" },
@@ -524,19 +601,20 @@ export function AdminFilesSettingsPage() {
             description: t("toast.embeddingModelChangedDescription"),
             duration: 8000,
           });
+        } else {
+          toast.success(t("toast.groupUpdated", { group: t(`groups.${group.key}.title`) }));
+        }
+        if (
+          embeddingModelWillChange ||
+          group.fields.some((field) =>
+            field.namespace === "file" &&
+            (field.key === "embedding_enabled" || field.key === "rag_model" || field.key === "embedding_host")
+          )
+        ) {
           if (flattened["file.embedding_enabled"] === EMBEDDING_MODES.ON) {
             void loadEmbeddingStatus();
           } else {
-            setEmbeddingStatus(null);
-          }
-        } else {
-          toast.success(t("toast.groupUpdated", { group: t(`groups.${group.key}.title`) }));
-          if (group.fields.some((f) => f.namespace === "file" && (f.key === "embedding_enabled" || f.key === "rag_model" || f.key === "embedding_host"))) {
-            if (flattened["file.embedding_enabled"] === EMBEDDING_MODES.ON) {
-              void loadEmbeddingStatus();
-            } else {
-              setEmbeddingStatus(null);
-            }
+            clearEmbeddingStatus();
           }
         }
       } catch (error) {
@@ -545,7 +623,7 @@ export function AdminFilesSettingsPage() {
         setSaving(false);
       }
     },
-    [configuredMap, dirtyFieldIDs, loadEmbeddingStatus, savedMap, settingsMap, syncServiceRuntimes, t],
+    [clearEmbeddingStatus, configuredMap, dirtyFieldIDs, loadEmbeddingStatus, savedMap, settingsMap, syncServiceRuntimes, t],
   );
 
   const requestSaveGroup = React.useCallback((group: SettingsGroup) => {
@@ -671,20 +749,23 @@ export function AdminFilesSettingsPage() {
                 </SettingsFieldList>
 
                 {group.key === "embedding" && embeddingEnabled && (
-                  <div className="min-w-0 space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+                  <SettingsFieldInset className="min-w-0 space-y-3">
                     <div className="flex min-w-0 items-center justify-between gap-3">
                       <div className="min-w-0 space-y-0.5">
                         <p className="text-xs font-medium">{t("embeddingStatus.title")}</p>
                         {embeddingStatus?.modelSignature ? (
-                          <p className="min-w-0 break-all font-mono text-[11px] text-muted-foreground">{embeddingStatus.modelSignature}</p>
+                          <p className="min-w-0 truncate font-mono text-[10px] text-muted-foreground" title={embeddingStatus.modelSignature}>
+                            {embeddingStatus.modelSignature}
+                          </p>
                         ) : (
-                          <p className="text-[11px] text-muted-foreground">{t("embeddingStatus.noSignature")}</p>
+                          <p className="text-[10px] text-muted-foreground">{t("embeddingStatus.noSignature")}</p>
                         )}
                       </div>
                       <Button
                         type="button"
                         size="sm"
-                        variant="default"
+                        variant="outline"
+                        className="h-7 shrink-0 px-2 text-xs shadow-none"
                         disabled={reindexing || embeddingStatusLoading || loading || saving}
                         onClick={() => void handleReindex()}
                       >
@@ -692,24 +773,24 @@ export function AdminFilesSettingsPage() {
                       </Button>
                     </div>
                     {embeddingStatus ? (
-                      <div className="grid min-w-0 grid-cols-2 gap-2 text-center sm:grid-cols-4">
+                      <div className="grid min-w-0 grid-cols-2 overflow-hidden rounded-md bg-muted/30 text-center sm:grid-cols-4">
                         {[
                           { label: t("embeddingStatus.ready"), value: embeddingStatus.readyCount, color: "text-green-600 dark:text-green-400" },
                           { label: t("embeddingStatus.stale"), value: embeddingStatus.staleCount, color: embeddingStatus.staleCount > 0 ? "text-amber-600 dark:text-amber-400" : "text-muted-foreground" },
                           { label: t("embeddingStatus.pending"), value: embeddingStatus.pendingCount, color: "text-muted-foreground" },
                           { label: t("embeddingStatus.failed"), value: embeddingStatus.failedCount, color: embeddingStatus.failedCount > 0 ? "text-destructive" : "text-muted-foreground" },
                         ].map(({ label, value, color }) => (
-                          <div key={label} className="rounded-md bg-background/60 py-2 px-1 border border-border/40">
-                            <p className={cn("text-base font-semibold tabular-nums", color)}>{value}</p>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">{label}</p>
+                          <div key={label} className="px-3 py-2.5">
+                            <p className={cn("text-sm font-semibold tabular-nums", color)}>{value}</p>
+                            <p className="mt-0.5 text-[10px] text-muted-foreground">{label}</p>
                           </div>
                         ))}
                       </div>
                     ) : embeddingStatusLoading ? (
-                      <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4" aria-hidden="true">
+                      <div className="grid min-w-0 grid-cols-2 overflow-hidden rounded-md bg-muted/30 sm:grid-cols-4" aria-hidden="true">
                         {Array.from({ length: 4 }).map((_, index) => (
-                          <div key={`embedding-status-skeleton-${index}`} className="rounded-md border border-border/40 bg-background/60 px-2 py-2">
-                            <div className="mx-auto h-5 w-8 animate-pulse rounded-sm bg-muted/70" />
+                          <div key={`embedding-status-skeleton-${index}`} className="px-3 py-2.5">
+                            <div className="mx-auto h-4 w-8 animate-pulse rounded-sm bg-muted/70" />
                             <div className="mx-auto mt-1.5 h-2.5 w-10 animate-pulse rounded-sm bg-muted/60" />
                           </div>
                         ))}
@@ -724,7 +805,7 @@ export function AdminFilesSettingsPage() {
                         {t("embeddingStatus.needsReindex")}
                       </p>
                     )}
-                  </div>
+                  </SettingsFieldInset>
                 )}
               </SettingsSection>
             )}

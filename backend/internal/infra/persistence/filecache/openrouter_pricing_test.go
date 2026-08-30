@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -29,7 +30,8 @@ func TestOpenRouterPricingCacheStoreAndLoad(t *testing.T) {
 	if err != nil {
 		t.Fatalf("stat cache: %v", err)
 	}
-	if info.Mode().Perm() != 0o644 {
+	// Windows 不承载 POSIX umask 语义，普通文件 Stat 权限恒为 0666，跳过该断言。
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o644 {
 		t.Fatalf("cache permissions = %o, want 644", info.Mode().Perm())
 	}
 }

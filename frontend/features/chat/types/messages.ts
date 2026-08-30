@@ -46,6 +46,8 @@ export type ChatTraceBlock = {
   stage?: string;
   roundID?: string;
   parentEventID?: string;
+  startedAt?: string;
+  endedAt?: string;
   updatedAt?: string;
   payloadJson?: string;
 };
@@ -158,6 +160,7 @@ export type ChatAreaMessage = {
   reasoningTokens?: number;
   latencyMS?: number;
   billingCost?: ChatBillingCost;
+  knowledgeSources?: RAGCitation[];
   processTrace?: ChatMessageProcessTrace;
   inlineAlert?: ChatInlineAlert;
   compactDone?: { method: string; freed_tokens: number; summary_preview: string };

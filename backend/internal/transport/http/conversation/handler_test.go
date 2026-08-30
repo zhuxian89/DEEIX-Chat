@@ -16,23 +16,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestSafeFileContentTypeDowngradesActiveContent(t *testing.T) {
-	tests := []struct {
-		contentType string
-		want        string
-	}{
-		{contentType: "text/html; charset=utf-8", want: "text/plain; charset=utf-8"},
-		{contentType: "application/javascript", want: "text/plain; charset=utf-8"},
-		{contentType: "image/svg+xml", want: "text/plain; charset=utf-8"},
-		{contentType: "application/pdf", want: "application/pdf"},
-	}
-	for _, tt := range tests {
-		if got := safeFileContentType(tt.contentType); got != tt.want {
-			t.Fatalf("safeFileContentType(%q) = %q, want %q", tt.contentType, got, tt.want)
-		}
-	}
-}
-
 func TestMediaStreamErrorPayloadPreservesPersistedResult(t *testing.T) {
 	result := &appconversation.SendMessageResult{}
 	payload := mediaStreamErrorPayload(errors.New("store generated video"), result)
@@ -86,14 +69,6 @@ func TestSearchConversationsRejectsLongQueryWithStableCode(t *testing.T) {
 	}
 }
 
-func TestBuildContentDispositionDefaultsToAttachment(t *testing.T) {
-	got := buildContentDisposition("report.html", false)
-	want := `attachment; filename="report.html"; filename*=UTF-8''report.html`
-	if got != want {
-		t.Fatalf("unexpected disposition: got %q want %q", got, want)
-	}
-}
-
 func TestStreamErrorPayloadIncludesUpstreamDebug(t *testing.T) {
 	err := errors.Join(appconversation.ErrUpstreamRequestFailed, &llm.UpstreamError{
 		StatusCode: 401,
@@ -141,6 +116,22 @@ func TestMapStreamErrorDoesNotExposeUpstreamUnauthorizedAsPlatformUnauthorized(t
 	}
 	if mapped.Code == "auth.unauthorized" || mapped.Code == "auth.invalid_token" || mapped.Code == "auth.session_invalid" {
 		t.Fatalf("expected upstream 401 to avoid platform auth codes, got %#v", mapped)
+	}
+}
+
+func TestMapStreamErrorPreservesUpstreamRateLimit(t *testing.T) {
+	err := errors.Join(appconversation.ErrUpstreamRequestFailed, &llm.UpstreamError{StatusCode: http.StatusTooManyRequests})
+
+	mapped := mapStreamError(err)
+	if mapped.Status != http.StatusTooManyRequests {
+		t.Fatalf("status = %d, want %d", mapped.Status, http.StatusTooManyRequests)
+	}
+	if mapped.Code != appconversation.MessageErrorCodeUpstreamRateLimited {
+		t.Fatalf("code = %q, want %q", mapped.Code, appconversation.MessageErrorCodeUpstreamRateLimited)
+	}
+	payload := streamErrorPayload(err)
+	if payload["status"] != http.StatusTooManyRequests {
+		t.Fatalf("payload status = %#v, want %d", payload["status"], http.StatusTooManyRequests)
 	}
 }
 

@@ -8,24 +8,19 @@ const (
 )
 
 type openAIPromptCacheConfig struct {
-	Key       string
-	Options   map[string]interface{}
-	Retention string
-	Explicit  bool
+	Key      string
+	Options  map[string]interface{}
+	Explicit bool
 }
 
 func resolveOpenAIPromptCacheConfig(adapter string, input GenerateInput) openAIPromptCacheConfig {
 	config := openAIPromptCacheConfig{}
-	if !isOpenAITextAdapter(adapter) {
+	if input.Ephemeral || !isOpenAITextAdapter(adapter) {
 		return config
 	}
 	config.Key = strings.TrimSpace(input.PromptCacheKey)
 	config.Options = normalizedOpenAIPromptCacheOptions(input.Options)
-	config.Retention = normalizePromptCacheRetention(modelParamString(input.Options, "prompt_cache_retention"))
 	config.Explicit = strings.EqualFold(strings.TrimSpace(getString(config.Options["mode"])), openAIPromptCacheModeExplicit)
-	if config.Explicit {
-		config.Retention = ""
-	}
 	return config
 }
 
@@ -59,9 +54,6 @@ func applyOpenAIPromptCacheRequestFields(payload map[string]interface{}, config 
 	}
 	if len(config.Options) > 0 {
 		payload["prompt_cache_options"] = cloneMap(config.Options)
-	}
-	if config.Retention != "" {
-		payload["prompt_cache_retention"] = config.Retention
 	}
 }
 

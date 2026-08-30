@@ -22,7 +22,7 @@ func boolPtr(value bool) *bool {
 }
 
 func TestResolveProviderUserLoginAutoRegistersWhenProviderRegistrationEnabled(t *testing.T) {
-	repo := &providerLoginRepo{}
+	repo := &providerLoginRepo{registrationCodes: map[string]string{"WELCOME-1": "active"}}
 	service := newTestService(config.Config{JWTSecret: "test-secret"}, repo, nil)
 	provider := domainuser.IdentityProvider{
 		ID:                  10,
@@ -34,7 +34,7 @@ func TestResolveProviderUserLoginAutoRegistersWhenProviderRegistrationEnabled(t 
 		DefaultRole:         domainuser.RoleUser,
 	}
 
-	userItem, err := service.resolveProviderUser(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin)
+	userItem, err := service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin, "WELCOME-1")
 	if err != nil {
 		t.Fatalf("expected login to auto-register, got %v", err)
 	}
@@ -49,6 +49,140 @@ func TestResolveProviderUserLoginAutoRegistersWhenProviderRegistrationEnabled(t 
 	}
 	if repo.identities[0].ProviderSubject != "sub-1" || repo.identities[0].UserID != userItem.ID {
 		t.Fatalf("created identity does not match user: %#v", repo.identities[0])
+	}
+}
+
+func TestResolveProviderUserWithRegistrationCodeConsumesActiveCodeOnceOnProvision(t *testing.T) {
+	// OAuth bridge 开启：首次 OAuth 注册携带注册码，有效码恰好消费一次。
+	repo := &providerLoginRepo{registrationCodes: map[string]string{"WELCOME-1": "active"}}
+	service := newTestService(config.Config{JWTSecret: "test-secret"}, repo, nil)
+	provider := domainuser.IdentityProvider{
+		ID:                  10,
+		Type:                domainuser.IdentityProviderTypeOIDC,
+		Name:                "Acme SSO",
+		Slug:                "acme",
+		LoginEnabled:        true,
+		RegistrationEnabled: true,
+		DefaultRole:         domainuser.RoleUser,
+	}
+
+	userItem, err := service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin, "welcome-1")
+	if err != nil {
+		t.Fatalf("expected provision with valid code to succeed, got %v", err)
+	}
+	if userItem.ID == 0 {
+		t.Fatalf("expected created user id to be assigned")
+	}
+	if repo.registrationCodes["WELCOME-1"] != "used" {
+		t.Fatalf("expected code to be consumed exactly once, status=%q", repo.registrationCodes["WELCOME-1"])
+	}
+	if len(repo.registrationCodeConsumers) != 1 {
+		t.Fatalf("expected exactly one consumer, got %d", len(repo.registrationCodeConsumers))
+	}
+
+	// 第二次新用户注册复用同一码：不创建任何残行。
+	_, err = service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-2", "second@example.com", "Second User", "", true, `{"sub":"sub-2"}`, providerIntentLogin, "WELCOME-1")
+	if err == nil {
+		t.Fatalf("expected reused code to be rejected")
+	}
+	if !strings.Contains(err.Error(), "registration code is invalid or already used") {
+		t.Fatalf("expected friendly registration code error, got %v", err)
+	}
+	if len(repo.registrationCodeConsumers) != 1 || len(repo.identities) != 1 || repo.createUserCount != 1 {
+		t.Fatalf("expected no residual rows on rejected reuse: consumers=%d identities=%d users=%d", len(repo.registrationCodeConsumers), len(repo.identities), repo.createUserCount)
+	}
+}
+
+func TestResolveProviderUserWithRegistrationCodeRejectsInvalidCodeWithoutProvisioning(t *testing.T) {
+	// OAuth bridge 开启：无效码在创建 user/credential/identity 之前失败，不留下残缺账号。
+	repo := &providerLoginRepo{registrationCodes: map[string]string{"WELCOME-1": "active"}}
+	service := newTestService(config.Config{JWTSecret: "test-secret"}, repo, nil)
+	provider := domainuser.IdentityProvider{
+		ID:                  10,
+		Type:                domainuser.IdentityProviderTypeOIDC,
+		Name:                "Acme SSO",
+		Slug:                "acme",
+		LoginEnabled:        true,
+		RegistrationEnabled: true,
+		DefaultRole:         domainuser.RoleUser,
+	}
+
+	_, err := service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin, "NOT-A-CODE")
+	if err == nil {
+		t.Fatalf("expected invalid code to be rejected")
+	}
+	if !strings.Contains(err.Error(), "registration code is invalid or already used") {
+		t.Fatalf("expected friendly registration code error, got %v", err)
+	}
+	if repo.createUserCount != 0 || len(repo.identities) != 0 || len(repo.registrationCodeConsumers) != 0 {
+		t.Fatalf("expected no residual rows: users=%d identities=%d consumers=%d", repo.createUserCount, len(repo.identities), len(repo.registrationCodeConsumers))
+	}
+	if repo.registrationCodes["WELCOME-1"] != "active" {
+		t.Fatalf("expected untouched code to remain active, status=%q", repo.registrationCodes["WELCOME-1"])
+	}
+}
+
+func TestResolveProviderUserExistingIdentityLoginDoesNotConsumeRegistrationCode(t *testing.T) {
+	// OAuth bridge 开启与关闭两条路径的共有语义：已有第三方身份的老用户登录，
+	// 在身份命中分支提前返回，不创建新行、不消费任何注册码。
+	repo := &providerLoginRepo{
+		registrationCodes: map[string]string{"WELCOME-1": "active"},
+		nextUserID:        101,
+		usersByID:         map[uint]*domainuser.User{101: {ID: 101, Username: "acme-user", Status: domainuser.StatusActive, Role: domainuser.RoleUser}},
+		identities: []domainuser.UserIdentity{
+			{ID: 7, UserID: 101, ProviderID: 10, ProviderSubject: "sub-1"},
+		},
+	}
+	service := newTestService(config.Config{JWTSecret: "test-secret"}, repo, nil)
+	provider := domainuser.IdentityProvider{
+		ID:           10,
+		Type:         domainuser.IdentityProviderTypeOIDC,
+		Name:         "Acme SSO",
+		Slug:         "acme",
+		LoginEnabled: true,
+	}
+
+	userItem, err := service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-1", "existing@example.com", "Existing User", "", true, `{"sub":"sub-1"}`, providerIntentLogin, "WELCOME-1")
+	if err != nil {
+		t.Fatalf("expected existing identity login to succeed, got %v", err)
+	}
+	if userItem.ID != 101 {
+		t.Fatalf("expected existing user 101, got %d", userItem.ID)
+	}
+	if repo.createUserCount != 0 || len(repo.identities) != 1 {
+		t.Fatalf("expected no new rows on existing identity login, users=%d identities=%d", repo.createUserCount, len(repo.identities))
+	}
+	if repo.registrationCodes["WELCOME-1"] != "active" {
+		t.Fatalf("expected no code to be consumed for existing identity login, status=%q", repo.registrationCodes["WELCOME-1"])
+	}
+	if len(repo.registrationCodeConsumers) != 0 {
+		t.Fatalf("expected zero code consumers, got %d", len(repo.registrationCodeConsumers))
+	}
+}
+
+func TestResolveProviderUserWithRegistrationCodeMapsConsumeErrorToInvalidCode(t *testing.T) {
+	// 消费层并发冲突（ErrConflict）时对用户呈现统一错误，且不泄漏内部仓储错误。
+	repo := &providerLoginRepo{registrationCodeConsumeErr: repository.ErrConflict}
+	service := newTestService(config.Config{JWTSecret: "test-secret"}, repo, nil)
+	provider := domainuser.IdentityProvider{
+		ID:                  10,
+		Type:                domainuser.IdentityProviderTypeOIDC,
+		Name:                "Acme SSO",
+		Slug:                "acme",
+		LoginEnabled:        true,
+		RegistrationEnabled: true,
+		DefaultRole:         domainuser.RoleUser,
+	}
+
+	_, err := service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin, "WELCOME-1")
+	if err == nil {
+		t.Fatalf("expected consume conflict to surface as invalid code error")
+	}
+	if !strings.Contains(err.Error(), "registration code is invalid or already used") {
+		t.Fatalf("expected friendly registration code error, got %v", err)
+	}
+	if repo.createUserCount != 0 || len(repo.identities) != 0 {
+		t.Fatalf("expected no residual rows: users=%d identities=%d", repo.createUserCount, len(repo.identities))
 	}
 }
 
@@ -102,6 +236,7 @@ func TestNormalizeProviderInputValidatesLogoURL(t *testing.T) {
 		{name: "https url", logoURL: "https://example.com/logo.svg"},
 		{name: "http url", logoURL: "http://example.com/logo.svg"},
 		{name: "absolute path", logoURL: "/identity-providers/acme.svg"},
+		{name: "url credentials", logoURL: "https://user:password@example.com/logo.svg", wantErr: true},
 		{name: "protocol relative url", logoURL: "//example.com/logo.svg", wantErr: true},
 		{name: "data url", logoURL: "data:image/svg+xml,<svg/>", wantErr: true},
 		{name: "javascript url", logoURL: "javascript:alert(1)", wantErr: true},
@@ -263,7 +398,7 @@ func serverURLFromRequest(request *http.Request) string {
 }
 
 func TestResolveProviderUserAutoRegistrationAddsUsernameSuffixOnCollision(t *testing.T) {
-	repo := &providerLoginRepo{duplicateUsernameAttempts: 1}
+	repo := &providerLoginRepo{duplicateUsernameAttempts: 1, registrationCodes: map[string]string{"WELCOME-1": "active"}}
 	service := newTestService(config.Config{JWTSecret: "test-secret"}, repo, nil)
 	provider := domainuser.IdentityProvider{
 		ID:                  10,
@@ -275,7 +410,7 @@ func TestResolveProviderUserAutoRegistrationAddsUsernameSuffixOnCollision(t *tes
 		DefaultRole:         domainuser.RoleUser,
 	}
 
-	userItem, err := service.resolveProviderUser(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin)
+	userItem, err := service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin, "WELCOME-1")
 	if err != nil {
 		t.Fatalf("expected login to retry with suffixed username, got %v", err)
 	}
@@ -744,7 +879,7 @@ func TestResolveProviderUserRejectsInactiveAutoLinkUserWithoutBinding(t *testing
 }
 
 func TestResolveProviderUserReturnsIdentityCreateErrorWithoutCleanupCompensation(t *testing.T) {
-	repo := &providerLoginRepo{createIdentityErr: errors.New("duplicate identity")}
+	repo := &providerLoginRepo{createIdentityErr: errors.New("duplicate identity"), registrationCodes: map[string]string{"WELCOME-1": "active"}}
 	service := newTestService(config.Config{JWTSecret: "test-secret"}, repo, nil)
 	provider := domainuser.IdentityProvider{
 		ID:                  10,
@@ -756,7 +891,7 @@ func TestResolveProviderUserReturnsIdentityCreateErrorWithoutCleanupCompensation
 		DefaultRole:         domainuser.RoleUser,
 	}
 
-	_, err := service.resolveProviderUser(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin)
+	_, err := service.resolveProviderUserWithRegistrationCode(context.Background(), provider, "sub-1", "new@example.com", "New User", "", true, `{"sub":"sub-1"}`, providerIntentLogin, "WELCOME-1")
 	if err == nil || err.Error() != "duplicate identity" {
 		t.Fatalf("expected identity creation error, got %v", err)
 	}
@@ -833,21 +968,24 @@ func TestUnlinkCurrentUserIdentityAllowsOneOfMultiplePasswordlessLoginMethods(t 
 type providerLoginRepo struct {
 	repository.AuthRepository
 
-	nextUserID                uint
-	nextIdentityID            uint
-	createUserCount           int
-	updateIdentityLoginCount  int
-	deletedUserID             uint
-	deletedIdentityID         uint
-	createIdentityErr         error
-	duplicateUsernameAttempts int
-	createSessionCount        int
-	updateLastLoginUserID     uint
-	usersByID                 map[uint]*domainuser.User
-	usersByEmail              map[string]*domainuser.User
-	credentialsByUserID       map[uint]*domainuser.Credential
-	identities                []domainuser.UserIdentity
-	providersBySlug           map[string]*domainuser.IdentityProvider
+	nextUserID                 uint
+	nextIdentityID             uint
+	createUserCount            int
+	updateIdentityLoginCount   int
+	deletedUserID              uint
+	deletedIdentityID          uint
+	createIdentityErr          error
+	duplicateUsernameAttempts  int
+	createSessionCount         int
+	updateLastLoginUserID      uint
+	usersByID                  map[uint]*domainuser.User
+	usersByEmail               map[string]*domainuser.User
+	credentialsByUserID        map[uint]*domainuser.Credential
+	registrationCodes          map[string]string
+	registrationCodeConsumers  []string
+	registrationCodeConsumeErr error
+	identities                 []domainuser.UserIdentity
+	providersBySlug            map[string]*domainuser.IdentityProvider
 }
 
 func (r *providerLoginRepo) GetIdentityProviderBySlug(ctx context.Context, slug string) (*domainuser.IdentityProvider, error) {
@@ -958,7 +1096,24 @@ func (r *providerLoginRepo) CreateWithCredentialAndIdentityAndRegistrationCode(
 	registrationCode string,
 	verifiedAt time.Time,
 ) error {
-	return r.CreateWithCredentialAndIdentity(ctx, item, credential, identity, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew)
+	// 与 postgres 实现 consumeRegistrationCodeTx 同语义：仅 active 码可被条件更新消费一次，
+	// 空/未知/已用码在创建任何 user/credential/identity 之前失败，不产生残行。
+	if r.registrationCodeConsumeErr != nil {
+		return r.registrationCodeConsumeErr
+	}
+	trimmed := strings.ToUpper(strings.TrimSpace(registrationCode))
+	if trimmed == "" {
+		return repository.ErrInvalidInput
+	}
+	if r.registrationCodes == nil || r.registrationCodes[trimmed] != "active" {
+		return repository.ErrConflict
+	}
+	if err := r.CreateWithCredentialAndIdentity(ctx, item, credential, identity, subscriptionPlanID, subscriptionPriceID, subscriptionEndAt, autoRenew); err != nil {
+		return err
+	}
+	r.registrationCodes[trimmed] = "used"
+	r.registrationCodeConsumers = append(r.registrationCodeConsumers, item.Username)
+	return nil
 }
 
 func (r *providerLoginRepo) CreateUserIdentity(ctx context.Context, identity *domainuser.UserIdentity) (*domainuser.UserIdentity, error) {

@@ -8,9 +8,10 @@ import (
 
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/channel"
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/conversation"
-	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/llm"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/pkg/traceid"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/ports/llm"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/repository"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/background"
 	"go.uber.org/zap"
 )
 
@@ -34,6 +35,8 @@ type persistMessageGenerationInput struct {
 	PersistedToolCallKeys     map[string]struct{}
 	Route                     *channel.ResolvedRoute
 	ReuseUserMessage          bool
+	// SkipEmbed defers message embedding until the moderation barrier passes.
+	SkipEmbed bool
 }
 
 type persistInterruptedMessageGenerationInput struct {
@@ -54,8 +57,10 @@ type persistInterruptedMessageGenerationInput struct {
 	Route                  *channel.ResolvedRoute
 	EffectiveOptions       map[string]interface{}
 	ServerSideToolUsage    map[string]int64
-	StartedAt              time.Time
-	ReuseUserMessage       bool
+	// MCPToolUsage 聚合中断前成功的 MCP 调用；错误中断时也需带出已产生的上游费用。
+	MCPToolUsage     []MCPToolUsageItem
+	StartedAt        time.Time
+	ReuseUserMessage bool
 }
 
 type interruptedMessageGenerationMetrics struct {
@@ -103,11 +108,13 @@ func (s *Service) persistSuccessfulMessageGeneration(ctx context.Context, input 
 	}
 
 	if !input.ReuseUserMessage {
-		go func(msgID uint, inputTokens, cacheReadTokens, cacheWriteTokens int64) {
+		msgID := input.UserMessage.ID
+		inputTokens, cacheReadTokens, cacheWriteTokens := input.InputTokens, input.CacheReadTokens, input.CacheWriteTokens
+		background.Go(s.logger, "user_message_usage_update", func() {
 			bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
 			_ = s.repo.UpdateMessageUsage(bgCtx, msgID, inputTokens, 0, cacheReadTokens, cacheWriteTokens, 0)
-		}(input.UserMessage.ID, input.InputTokens, input.CacheReadTokens, input.CacheWriteTokens)
+		})
 	}
 
 	if err := s.repo.UpdateAssistantMessageCompletion(
@@ -116,6 +123,7 @@ func (s *Service) persistSuccessfulMessageGeneration(ctx context.Context, input 
 		repository.AssistantMessageCompletionUpdate{
 			Content:          input.AssistantText,
 			ReasoningContent: input.AssistantReasoningContent,
+			KnowledgeSources: input.AssistantMessage.KnowledgeSources,
 			InputTokens:      assistantCompletionInputTokens(input),
 			OutputTokens:     input.OutputTokens,
 			CacheReadTokens:  assistantCompletionCacheReadTokens(input),
@@ -208,6 +216,7 @@ func (s *Service) persistAssistantImagePayloadIfPresent(ctx context.Context, inp
 				ContentType:      contentType,
 				Content:          content,
 				ReasoningContent: input.AssistantReasoningContent,
+				KnowledgeSources: input.AssistantMessage.KnowledgeSources,
 				InputTokens:      input.InputTokens,
 				OutputTokens:     input.OutputTokens,
 				CacheReadTokens:  input.CacheReadTokens,
@@ -234,6 +243,7 @@ func (s *Service) persistAssistantImagePayloadIfPresent(ctx context.Context, inp
 				ContentType:      contentType,
 				Content:          content,
 				ReasoningContent: input.AssistantReasoningContent,
+				KnowledgeSources: input.AssistantMessage.KnowledgeSources,
 				OutputTokens:     input.OutputTokens,
 				ReasoningTokens:  input.ReasoningTokens,
 				LatencyMS:        input.AssistantLatency,
@@ -289,6 +299,9 @@ func (s *Service) finishSuccessfulMessageGeneration(ctx context.Context, input p
 	if normalizeBranchReason(input.SendInput.BranchReason) == "default" {
 		s.updateStatefulResponseAsync(input.SendInput.ConversationID, input.ResponseID, input.StatefulPromptFingerprint)
 	}
+	if input.SkipEmbed {
+		return nil
+	}
 	if input.ReuseUserMessage {
 		s.embedMessagePairAsync(input.SendInput, nil, input.AssistantMessage)
 	} else {
@@ -300,6 +313,8 @@ func (s *Service) finishSuccessfulMessageGeneration(ctx context.Context, input p
 
 // persistInterruptedMessageGeneration 在模型调用已经产生可见内容或工具轨迹后失败时，保留本轮 assistant 消息。
 // 显式取消由取消流程单独处理，避免把用户主动停止误标为异常中断。
+// Partial outputs from cancel/interrupt/upstream errors remain subject to the
+// moderation barrier after persistence.
 func (s *Service) persistInterruptedMessageGeneration(ctx context.Context, input persistInterruptedMessageGenerationInput) *SendMessageResult {
 	if !shouldPersistInterruptedMessageGeneration(input) {
 		return nil
@@ -347,6 +362,7 @@ func (s *Service) persistInterruptedMessageGeneration(ctx context.Context, input
 		repository.AssistantMessageCompletionUpdate{
 			Content:          input.AssistantText,
 			ReasoningContent: strings.TrimSpace(input.AssistantReasoningText),
+			KnowledgeSources: input.AssistantMessage.KnowledgeSources,
 			InputTokens:      interruptedCompletionInputTokens(input, metrics),
 			OutputTokens:     metrics.OutputTokens,
 			CacheReadTokens:  interruptedCompletionCacheReadTokens(input, metrics),
@@ -393,7 +409,7 @@ func shouldPersistInterruptedMessageGeneration(input persistInterruptedMessageGe
 	if input.Error == nil || input.UserMessage == nil || input.AssistantMessage == nil {
 		return false
 	}
-	hasRetainedToolTrace := len(input.ToolCallRows) > 0 || len(input.ServerSideToolUsage) > 0
+	hasRetainedToolTrace := len(input.ToolCallRows) > 0 || len(input.ServerSideToolUsage) > 0 || len(input.MCPToolUsage) > 0
 	hasObservedUsage := input.Usage.InputTokens > 0 ||
 		input.Usage.OutputTokens > 0 ||
 		input.Usage.CacheReadTokens > 0 ||
@@ -402,7 +418,11 @@ func shouldPersistInterruptedMessageGeneration(input persistInterruptedMessageGe
 	hasEstimatedCanceledInput := errors.Is(input.Error, ErrMessageGenerationCanceled) &&
 		input.UpstreamCallStarted &&
 		input.EstimatedInputTokens > 0
-	return strings.TrimSpace(input.AssistantText) != "" || hasRetainedToolTrace || hasObservedUsage || hasEstimatedCanceledInput
+	return strings.TrimSpace(input.AssistantText) != "" ||
+		strings.TrimSpace(input.AssistantReasoningText) != "" ||
+		hasRetainedToolTrace ||
+		hasObservedUsage ||
+		hasEstimatedCanceledInput
 }
 
 // resolveInterruptedMessageGenerationMetrics 统一处理中断消息的真实 usage 与估算兜底。
@@ -545,6 +565,7 @@ func buildInterruptedSendMessageResult(input persistInterruptedMessageGeneration
 		CacheWrite5mTokens:  input.Usage.CacheWrite5mTokens,
 		CacheWrite1hTokens:  input.Usage.CacheWrite1hTokens,
 		ServerSideToolUsage: input.ServerSideToolUsage,
+		MCPToolUsage:        input.MCPToolUsage,
 		LatencyMS:           metrics.LatencyMS,
 		StartedAt:           input.StartedAt,
 	}
@@ -618,11 +639,11 @@ func (s *Service) updateStatefulResponseAsync(conversationID uint, responseID st
 	if fingerprint == "" {
 		return
 	}
-	go func() {
+	background.Go(s.logger, "stateful_response_update", func() {
 		bgCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		_ = s.repo.UpdateConversationStatefulResponse(bgCtx, conversationID, respID, fingerprint)
-	}()
+	})
 }
 
 func (s *Service) embedMessagePairAsync(input SendMessageInput, userMessage *model.Message, assistantMessage *model.Message) {
@@ -630,9 +651,9 @@ func (s *Service) embedMessagePairAsync(input SendMessageInput, userMessage *mod
 	if !cfg.EmbeddingEnabled || !cfg.MessageEmbeddingEnabled {
 		return
 	}
-	go func() {
+	background.Go(s.logger, "message_pair_embedding", func() {
 		asyncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 		s.embedMessagePair(asyncCtx, input.ConversationID, input.UserID, userMessage, assistantMessage)
-	}()
+	})
 }

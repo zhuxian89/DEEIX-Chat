@@ -4,10 +4,9 @@ import { toast } from "sonner";
 
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
 import {
-  listAdminLLMModelUpstreamSources,
   listAdminLLMModels,
+  setAdminLLMModelProtocols,
   setAdminLLMModelsDisplayGroup,
-  upsertAdminLLMUpstreamModel,
   updateAdminLLMModel,
 } from "@/features/admin/api";
 import type {
@@ -23,6 +22,12 @@ import {
   displayToKindsJson,
   type ModelSortValue,
 } from "@/features/admin/types/llm";
+import {
+  isValidModelContextWindow,
+  modelContextWindowOverride,
+  modelMaxOutputTokensOverride,
+  setModelContextWindowInCapabilities,
+} from "@/features/admin/model/model-context-window";
 import { resolveAdminErrorMessage } from "@/features/admin/utils/admin-error";
 import { resolveKindsDisplayForProtocols } from "@/features/admin/utils/llm-display";
 import {
@@ -62,6 +67,8 @@ type UseAdminModelsState = {
   setBatchVendor: (value: string) => void;
   batchDisplayGroupID: string;
   setBatchDisplayGroupID: (value: string) => void;
+  batchContextWindow: string;
+  setBatchContextWindow: (value: string) => void;
   batchStatus: AdminLLMStatus | "";
   setBatchStatus: (value: AdminLLMStatus | "") => void;
   editTarget: AdminLLMModelDTO | null;
@@ -79,6 +86,7 @@ type UseAdminModelsState = {
   handleBulkApplyProtocol: () => Promise<void>;
   handleBulkApplyVendor: () => Promise<void>;
   handleBulkApplyDisplayGroup: () => Promise<void>;
+  handleBulkApplyContextWindow: () => Promise<void>;
   handleBulkApplyStatus: () => Promise<void>;
   handleSourceAvailabilityChange: (modelID: number, previousAvailable: boolean, nextAvailable: boolean) => void;
   handleSourceDeleteChange: (modelID: number, source: AdminLLMModelUpstreamSourceDTO, deleted: boolean) => void;
@@ -111,6 +119,7 @@ export function useAdminModels(): UseAdminModelsState {
   const [batchProtocol, setBatchProtocol] = React.useState<AdminLLMAdapter | "">("");
   const [batchVendor, setBatchVendor] = React.useState("");
   const [batchDisplayGroupID, setBatchDisplayGroupID] = React.useState("");
+  const [batchContextWindow, setBatchContextWindow] = React.useState("");
   const [batchStatus, setBatchStatus] = React.useState<AdminLLMStatus | "">("");
   const [, startTableTransition] = React.useTransition();
   const requestSeqRef = React.useRef(0);
@@ -436,6 +445,64 @@ export function useAdminModels(): UseAdminModelsState {
     }
   }, [batchApplying, batchDisplayGroupID, loadModels, page, pageSize, selectedModels, t]);
 
+  const handleBulkApplyContextWindow = React.useCallback(async () => {
+    const nextContextWindow = Number(batchContextWindow.trim());
+    if (!selectedModels.length || !batchContextWindow.trim() || batchApplying) {
+      return;
+    }
+    if (!isValidModelContextWindow(nextContextWindow)) {
+      toast.error(t("bulkContextWindowInvalid"));
+      return;
+    }
+
+    const capabilitiesByID = new Map<number, string>();
+    const targets: AdminLLMModelDTO[] = [];
+    for (const item of selectedModels) {
+      if (modelContextWindowOverride(item.capabilitiesJSON) === nextContextWindow) {
+        continue;
+      }
+      const maxOutputTokens = modelMaxOutputTokensOverride(item.capabilitiesJSON);
+      if (maxOutputTokens !== null && maxOutputTokens >= nextContextWindow) {
+        toast.error(t("bulkContextWindowOutputConflict", {
+          max: maxOutputTokens,
+          name: item.platformModelName,
+        }));
+        return;
+      }
+      const capabilitiesJSON = setModelContextWindowInCapabilities(
+        item.capabilitiesJSON,
+        nextContextWindow,
+      );
+      if (capabilitiesJSON === null) {
+        toast.error(t("bulkContextWindowInvalidCapabilities", { name: item.platformModelName }));
+        return;
+      }
+      capabilitiesByID.set(item.id, capabilitiesJSON);
+      targets.push(item);
+    }
+
+    if (!targets.length) {
+      toast.info(t("bulkContextWindowAlreadyApplied"));
+      return;
+    }
+
+    await runBulkModelUpdates({
+      targets,
+      optimisticPatch: (item) => ({
+        ...item,
+        capabilitiesJSON: capabilitiesByID.get(item.id) ?? item.capabilitiesJSON,
+        contextWindow: nextContextWindow,
+      }),
+      successMessage: t("bulkContextWindowUpdated", { count: targets.length }),
+      partialFailureMessage: t("bulkContextWindowPartialFailed"),
+      failureMessage: t("bulkContextWindowFailed"),
+      runItem: (token, item) => updateAdminLLMModel(token, item.id, {
+        capabilitiesJSON: capabilitiesByID.get(item.id) ?? item.capabilitiesJSON,
+      }),
+      onSuccess: () => setBatchContextWindow(""),
+    });
+  }, [batchApplying, batchContextWindow, runBulkModelUpdates, selectedModels, t]);
+
   const handleBulkApplyStatus = React.useCallback(async () => {
     const nextStatus = batchStatus;
     if (!selectedModels.length || !nextStatus || batchApplying) {
@@ -471,79 +538,22 @@ export function useAdminModels(): UseAdminModelsState {
       return;
     }
 
-    const token = await resolveAccessToken();
-    if (!token) {
-      toast.error(t("sessionExpired"), { description: t("signInAgain") });
-      return;
-    }
-
-    const rollbackModels = targets.map((item) => items.find((current) => current.id === item.id) ?? item);
-    const targetIDs = new Set(targets.map((item) => item.id));
     const nextProtocolsJSON = JSON.stringify([nextProtocol]);
     const nextKindsJSON = displayToKindsJson(resolveKindsDisplayForProtocols([nextProtocol]));
-    setBatchApplying(true);
-    setItems((current) =>
-      current.map((item) => (targetIDs.has(item.id) ? { ...item, protocolsJSON: nextProtocolsJSON, kindsJSON: nextKindsJSON } : item)),
-    );
-    try {
-      const results = await runSettledBulkItems({
-        items: targets,
-        title: t("bulkProtocolUpdated", { count: targets.length }),
-        runItem: async (model) => {
-          const sources = await listAdminLLMModelUpstreamSources(token, model.id, { page: 1, pageSize: 2000 });
-          if (sources.results.length === 0) {
-            throw new Error("model upstream sources not found");
-          }
-          for (const source of sources.results) {
-            await upsertAdminLLMUpstreamModel(token, source.upstreamID, {
-              routeID: source.id,
-              platformModelName: model.platformModelName,
-              upstreamModelName: source.upstreamModelName,
-              protocol: nextProtocol,
-              kindsJSON: nextKindsJSON,
-              status: source.status,
-              priority: source.priority,
-              weight: source.weight,
-            });
-          }
-          return { ...model, kindsJSON: nextKindsJSON, protocolsJSON: nextProtocolsJSON };
-        },
-      });
-      const failedModels = results.filter((result) => result.status === "rejected").map((result) => result.item);
-      const successModels = results.filter((result) => result.status === "fulfilled").map((result) => result.item);
-      const successResponses = results
-        .filter((result): result is Extract<typeof result, { status: "fulfilled" }> => result.status === "fulfilled")
-        .map((result) => result.value);
-      setItems((current) =>
-        successResponses.reduce((next, model) => replaceByID(next, model.id, (item) => item.id, model), current),
-      );
-      if (failedModels.length > 0) {
-        const failedIDs = new Set(failedModels.map((item) => item.id));
-        setItems((current) =>
-          rollbackModels.reduce(
-            (next, model) => (failedIDs.has(model.id) ? replaceByID(next, model.id, (item) => item.id, model) : next),
-            current,
-          ),
-        );
-        setSelectedModelIDs(new Set(failedModels.map((item) => item.id)));
-        toast.error(t("bulkProtocolPartialFailed"), {
-          description: t("bulkPartialDescription", { success: successModels.length, failed: failedModels.length }),
-        });
-        return;
-      }
-
-      toast.success(t("bulkProtocolUpdated", { count: targets.length }));
-      setSelectedModelIDs(new Set());
-      setBatchProtocol("");
-    } catch (error) {
-      setItems((current) =>
-        rollbackModels.reduce((next, model) => replaceByID(next, model.id, (item) => item.id, model), current),
-      );
-      toast.error(t("bulkProtocolFailed"), { description: resolveAdminErrorMessage(error) });
-    } finally {
-      setBatchApplying(false);
-    }
-  }, [batchApplying, batchProtocol, items, selectedModels, t]);
+    await runBulkModelUpdates({
+      targets,
+      optimisticPatch: (item) => ({ ...item, protocolsJSON: nextProtocolsJSON, kindsJSON: nextKindsJSON }),
+      successMessage: t("bulkProtocolUpdated", { count: targets.length }),
+      partialFailureMessage: t("bulkProtocolPartialFailed"),
+      failureMessage: t("bulkProtocolFailed"),
+      runItem: (token, item) =>
+        setAdminLLMModelProtocols(token, item.id, {
+          protocols: [nextProtocol],
+          kindsJSON: nextKindsJSON,
+        }),
+      onSuccess: () => setBatchProtocol(""),
+    });
+  }, [batchApplying, batchProtocol, runBulkModelUpdates, selectedModels, t]);
 
   const handleRequestBulkDelete = React.useCallback(() => {
     if (selectedModels.length === 0) {
@@ -621,6 +631,8 @@ export function useAdminModels(): UseAdminModelsState {
     setBatchVendor,
     batchDisplayGroupID,
     setBatchDisplayGroupID,
+    batchContextWindow,
+    setBatchContextWindow,
     batchStatus,
     setBatchStatus,
     editTarget,
@@ -638,6 +650,7 @@ export function useAdminModels(): UseAdminModelsState {
     handleBulkApplyProtocol,
     handleBulkApplyVendor,
     handleBulkApplyDisplayGroup,
+    handleBulkApplyContextWindow,
     handleBulkApplyStatus,
     handleSourceAvailabilityChange,
     handleSourceDeleteChange,

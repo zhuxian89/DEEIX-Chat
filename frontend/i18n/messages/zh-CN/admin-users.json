@@ -7,7 +7,7 @@
     "models": "模型",
     "groups": "权限组",
     "toolSettings": "工具",
-    "billing": "Billing",
+    "billing": "计费",
     "registrationCodes": "注册码",
     "wechat": "微信公众号",
     "announcements": "公告",
@@ -15,7 +15,9 @@
     "loginSettings": "登录认证",
     "conversationSettings": "会话配置",
     "chatFiles": "文件与检索",
-    "about": "关于"
+    "knowledgeBases": "知识库",
+    "about": "关于",
+    "contentModeration": "内容审核"
   },
   "aboutPage": {
     "title": "关于",

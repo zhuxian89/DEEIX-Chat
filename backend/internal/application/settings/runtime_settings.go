@@ -136,12 +136,12 @@ func (r *RuntimeSettings) applyItem(cfg *config.Config, item domainsettings.Syst
 		cfg.MaxContextMessages = toInt(item.Value, cfg.MaxContextMessages)
 	case "chat:context_max_turns":
 		cfg.ContextMaxTurns = toInt(item.Value, cfg.ContextMaxTurns)
-	case "chat:context_max_input_tokens":
-		cfg.ContextMaxInputTokens = toInt(item.Value, cfg.ContextMaxInputTokens)
 	case "chat:context_compact_enabled":
 		cfg.ContextCompactEnabled = toBool(item.Value, cfg.ContextCompactEnabled)
-	case "chat:context_compact_trigger_tokens":
-		cfg.ContextCompactTrigger = toInt(item.Value, cfg.ContextCompactTrigger)
+	case "chat:context_window_fallback_tokens":
+		cfg.ContextWindowFallbackTokens = toInt(item.Value, cfg.ContextWindowFallbackTokens)
+	case "chat:context_compact_trigger_percent":
+		cfg.ContextCompactTriggerPercent = toInt(item.Value, cfg.ContextCompactTriggerPercent)
 	case "chat:context_compact_preserve_recent_turns":
 		cfg.ContextCompactPreserve = toInt(item.Value, cfg.ContextCompactPreserve)
 	case "chat:conversation_default_model":
@@ -260,6 +260,14 @@ func (r *RuntimeSettings) applyItem(cfg *config.Config, item domainsettings.Syst
 		cfg.ExtractMinerUTimeoutSeconds = toInt(item.Value, cfg.ExtractMinerUTimeoutSeconds)
 	case "extract:mineru_auth_token":
 		cfg.ExtractMinerUAuthToken = item.Value
+	case "extract:mistral_ocr_base_url":
+		cfg.ExtractMistralOCRBaseURL = item.Value
+	case "extract:mistral_ocr_auth_token":
+		cfg.ExtractMistralOCRAuthToken = item.Value
+	case "extract:mistral_ocr_model":
+		cfg.ExtractMistralOCRModel = item.Value
+	case "extract:mistral_ocr_timeout_seconds":
+		cfg.ExtractMistralOCRTimeoutSeconds = toInt(item.Value, cfg.ExtractMistralOCRTimeoutSeconds)
 	case "extract:llm_ocr_base_url":
 		cfg.ExtractLLMOCRBaseURL = item.Value
 	case "extract:llm_ocr_model":
@@ -412,6 +420,14 @@ func (r *RuntimeSettings) normalizeConfig(cfg *config.Config) {
 	}
 	if cfg.InvitationCodeLength < domaininvitation.DefaultCodeLength {
 		cfg.InvitationCodeLength = domaininvitation.DefaultCodeLength
+	}
+	if cfg.ContextWindowFallbackTokens < config.MinContextWindowFallbackTokens || cfg.ContextWindowFallbackTokens > config.MaxContextWindowFallbackTokens {
+		cfg.ContextWindowFallbackTokens = config.DefaultContextWindowFallbackTokens
+	}
+	if cfg.ContextCompactTriggerPercent < 0 ||
+		cfg.ContextCompactTriggerPercent > config.MaxContextCompactTriggerPercent ||
+		(cfg.ContextCompactTriggerPercent > 0 && cfg.ContextCompactTriggerPercent < config.MinContextCompactTriggerPercent) {
+		cfg.ContextCompactTriggerPercent = config.DefaultContextCompactTriggerPercent
 	}
 	if cfg.MCPMaxSelectedToolsPerMessage <= 0 {
 		cfg.MCPMaxSelectedToolsPerMessage = config.DefaultMCPMaxSelectedToolsPerMessage

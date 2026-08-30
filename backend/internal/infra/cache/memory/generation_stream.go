@@ -11,20 +11,24 @@ import (
 
 type generationStream struct {
 	ownerID         uint
+	conversationID  string
 	ownerExpiresAt  time.Time
 	activeExpiresAt time.Time
 	cancelExpiresAt time.Time
 	eventsExpiresAt time.Time
 	seq             int64
 	events          []repository.GenerationStreamMessage
+	textContent     strings.Builder
+	textSeq         int64
 	notify          chan struct{}
 }
 
-func (c *Cache) RegisterGenerationStream(ctx context.Context, runID string, userID uint, ttl time.Duration) error {
+func (c *Cache) RegisterGenerationStream(ctx context.Context, runID string, userID uint, conversationPublicID string, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	stream := c.ensureStreamLocked(runID)
 	stream.ownerID = userID
+	stream.conversationID = strings.TrimSpace(conversationPublicID)
 	stream.ownerExpiresAt = ttlFromNow(ttl)
 	stream.cancelExpiresAt = time.Time{}
 	c.maybeSweepLocked(time.Now())
@@ -42,22 +46,43 @@ func (c *Cache) GetGenerationStreamOwner(ctx context.Context, runID string) (uin
 	return stream.ownerID, true, nil
 }
 
-func (c *Cache) TouchGenerationStreamActive(ctx context.Context, runID string, ttl time.Duration) error {
+func (c *Cache) TouchGenerationStreamActive(ctx context.Context, runID string, userID uint, ttl time.Duration) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	stream := c.ensureStreamLocked(runID)
+	if stream.ownerID != userID {
+		return nil
+	}
 	stream.activeExpiresAt = ttlFromNow(ttl)
 	c.maybeSweepLocked(time.Now())
 	return nil
 }
 
-func (c *Cache) ClearGenerationStreamActive(ctx context.Context, runID string) error {
+func (c *Cache) ClearGenerationStreamActive(ctx context.Context, runID string, userID uint) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if stream := c.streams[strings.TrimSpace(runID)]; stream != nil {
+	if stream := c.streams[strings.TrimSpace(runID)]; stream != nil && stream.ownerID == userID {
 		stream.activeExpiresAt = time.Time{}
 	}
 	return nil
+}
+
+func (c *Cache) ListActiveGenerationStreams(ctx context.Context, userID uint) ([]repository.ActiveGenerationStream, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	now := time.Now()
+	c.maybeSweepLocked(now)
+	items := make([]repository.ActiveGenerationStream, 0)
+	for runID, stream := range c.streams {
+		if stream.ownerID != userID || stream.activeExpired(now) || strings.TrimSpace(stream.conversationID) == "" {
+			continue
+		}
+		items = append(items, repository.ActiveGenerationStream{
+			RunID:                runID,
+			ConversationPublicID: stream.conversationID,
+		})
+	}
+	return items, nil
 }
 
 func (c *Cache) IsGenerationStreamActive(ctx context.Context, runID string) (bool, error) {
@@ -86,7 +111,7 @@ func (c *Cache) IsGenerationStreamCanceled(ctx context.Context, runID string) (b
 	return stream != nil && !stream.cancelExpired(now), nil
 }
 
-func (c *Cache) AppendGenerationStreamEvent(ctx context.Context, runID string, payloadJSON string, maxEvents int64, ttl time.Duration) (repository.GenerationStreamMessage, error) {
+func (c *Cache) AppendGenerationStreamEvent(ctx context.Context, runID string, input repository.GenerationStreamAppend, maxEvents int64, ttl time.Duration) (repository.GenerationStreamMessage, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	stream := c.ensureStreamLocked(runID)
@@ -94,9 +119,13 @@ func (c *Cache) AppendGenerationStreamEvent(ctx context.Context, runID string, p
 	record := repository.GenerationStreamMessage{
 		ID:          strconv.FormatInt(stream.seq, 10),
 		Seq:         stream.seq,
-		PayloadJSON: payloadJSON,
+		PayloadJSON: input.PayloadJSON,
 	}
 	stream.events = append(stream.events, record)
+	if input.TextDelta != "" {
+		_, _ = stream.textContent.WriteString(input.TextDelta)
+		stream.textSeq = stream.seq
+	}
 	if maxEvents <= 0 {
 		maxEvents = 1024
 	}
@@ -105,8 +134,23 @@ func (c *Cache) AppendGenerationStreamEvent(ctx context.Context, runID string, p
 	}
 	stream.eventsExpiresAt = ttlFromNow(ttl)
 	stream.notifyLocked()
+	c.notifyGenerationStreamsLocked()
 	c.maybeSweepLocked(time.Now())
 	return record, nil
+}
+
+func (c *Cache) GetGenerationStreamTextSnapshot(ctx context.Context, runID string) (repository.GenerationStreamTextSnapshot, bool, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	stream := c.streams[strings.TrimSpace(runID)]
+	now := time.Now()
+	if stream == nil || stream.eventsExpired(now) || stream.textSeq <= 0 {
+		return repository.GenerationStreamTextSnapshot{}, false, nil
+	}
+	return repository.GenerationStreamTextSnapshot{
+		Seq:     stream.textSeq,
+		Content: stream.textContent.String(),
+	}, true, nil
 }
 
 func (c *Cache) ListGenerationStreamEvents(ctx context.Context, runID string, limit int64) ([]repository.GenerationStreamMessage, error) {
@@ -137,8 +181,16 @@ func (c *Cache) ReadGenerationStreamEvents(ctx context.Context, runID string, af
 		stream := c.streams[strings.TrimSpace(runID)]
 		now := time.Now()
 		if stream == nil || stream.eventsExpired(now) {
+			notify := c.streamNotify
 			c.mu.Unlock()
-			return nil, nil
+			select {
+			case <-ctx.Done():
+				return nil, nil
+			case <-time.After(time.Until(deadline)):
+				return nil, nil
+			case <-notify:
+				continue
+			}
 		}
 		records := generationEventsAfter(stream.events, afterSeq, limit)
 		if len(records) > 0 {
@@ -155,6 +207,26 @@ func (c *Cache) ReadGenerationStreamEvents(ctx context.Context, runID string, af
 		case <-notify:
 		}
 	}
+}
+
+func (c *Cache) notifyGenerationStreamsLocked() {
+	close(c.streamNotify)
+	c.streamNotify = make(chan struct{})
+}
+
+func (c *Cache) ResetGenerationStreamEvents(ctx context.Context, runID string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	stream := c.streams[strings.TrimSpace(runID)]
+	if stream == nil {
+		return nil
+	}
+	stream.events = nil
+	stream.textContent.Reset()
+	stream.textSeq = 0
+	// Keep seq monotonic so any in-flight afterSeq cursors stay valid.
+	stream.notifyLocked()
+	return nil
 }
 
 func (c *Cache) ExpireGenerationStream(ctx context.Context, runID string, ttl time.Duration) error {

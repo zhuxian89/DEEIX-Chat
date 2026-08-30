@@ -121,7 +121,7 @@ export function useLoginPage({ nextPath, invite }: UseLoginPageInput) {
       .then((token) => {
         if (mounted && token) router.replace(resolvedNextPath);
       })
-      .catch(() => undefined);
+      .catch((): undefined => undefined);
     return () => {
       mounted = false;
     };
@@ -151,7 +151,7 @@ export function useLoginPage({ nextPath, invite }: UseLoginPageInput) {
         setSettings(pageSettings);
         setOptions(loginOptions);
       })
-      .catch(() => undefined)
+      .catch((): undefined => undefined)
       .finally(() => {
         if (!cancelled) {
           setConfigReady(true);

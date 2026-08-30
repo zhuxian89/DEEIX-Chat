@@ -33,9 +33,121 @@ const (
 	fileProcessingDLQName    = "file_processing_v1_dlq"
 	fileProcessingGroupName  = "file_processing_workers"
 	fileProcessingMinIdle    = 45 * time.Second
+	fileProcessingDLQMaxLen  = 10_000
 
 	generationStreamKeyPrefix = "conversation:generation:"
+	generationStreamIndexTTL  = 2 * time.Hour
 )
+
+// appendGenerationStreamEventScript keeps the event sequence, bounded replay
+// window, and cumulative visible-text checkpoint consistent in one Redis
+// round trip. Key TTLs are initialized only when a value is first created;
+// FinishMessageGeneration shortens them to the post-run retention window.
+var appendGenerationStreamEventScript = redis.NewScript(`
+local events_missing = redis.call("EXISTS", KEYS[2]) == 0
+local has_text_delta = ARGV[4] ~= ""
+local text_missing = false
+if has_text_delta then
+	text_missing = redis.call("EXISTS", KEYS[3]) == 0
+end
+local seq = redis.call("INCR", KEYS[1])
+if has_text_delta then
+	redis.call("APPEND", KEYS[3], ARGV[4])
+	redis.call("SET", KEYS[4], tostring(seq), "KEEPTTL")
+end
+local id = redis.call(
+	"XADD",
+	KEYS[2],
+	"MAXLEN", "~", ARGV[2],
+	"*",
+	"seq", tostring(seq),
+	"payload", ARGV[1]
+)
+
+if seq == 1 then
+	redis.call("PEXPIRE", KEYS[1], ARGV[3])
+end
+if events_missing then
+	redis.call("PEXPIRE", KEYS[2], ARGV[3])
+end
+if has_text_delta and text_missing then
+	redis.call("PEXPIRE", KEYS[3], ARGV[3])
+	redis.call("PEXPIRE", KEYS[4], ARGV[3])
+end
+
+return {id, tostring(seq)}
+`)
+
+var renewFileProcessingLeaseScript = redis.NewScript(`
+local pending = redis.call("XPENDING", KEYS[1], ARGV[1], ARGV[3], ARGV[3], 1)
+if #pending == 0 or pending[1][2] ~= ARGV[2] then
+	return 0
+end
+redis.call("XCLAIM", KEYS[1], ARGV[1], ARGV[2], 0, ARGV[3], "JUSTID")
+return 1
+`)
+
+var settleFileProcessingMessageScript = redis.NewScript(`
+local pending = redis.call("XPENDING", KEYS[1], ARGV[1], ARGV[3], ARGV[3], 1)
+if #pending == 0 or pending[1][2] ~= ARGV[2] then
+	return 0
+end
+redis.call("XACK", KEYS[1], ARGV[1], ARGV[3])
+redis.call("XDEL", KEYS[1], ARGV[3])
+return 1
+`)
+
+var requeueFileProcessingMessageScript = redis.NewScript(`
+local pending = redis.call("XPENDING", KEYS[1], ARGV[1], ARGV[3], ARGV[3], 1)
+if #pending == 0 or pending[1][2] ~= ARGV[2] then
+	return 0
+end
+redis.call(
+	"XADD", KEYS[1], "*",
+	"user_id", ARGV[4],
+	"file_id", ARGV[5],
+	"retry", ARGV[6],
+	"last_error", ARGV[7]
+)
+redis.call("XACK", KEYS[1], ARGV[1], ARGV[3])
+redis.call("XDEL", KEYS[1], ARGV[3])
+return 1
+`)
+
+var deadLetterFileProcessingMessageScript = redis.NewScript(`
+local pending = redis.call("XPENDING", KEYS[1], ARGV[1], ARGV[3], ARGV[3], 1)
+if #pending == 0 or pending[1][2] ~= ARGV[2] then
+	return 0
+end
+redis.call(
+	"XADD", KEYS[2], "MAXLEN", ARGV[8], "*",
+	"user_id", ARGV[4],
+	"file_id", ARGV[5],
+	"retry", ARGV[6],
+	"last_error", ARGV[7]
+)
+redis.call("XACK", KEYS[1], ARGV[1], ARGV[3])
+redis.call("XDEL", KEYS[1], ARGV[3])
+return 1
+`)
+
+var touchGenerationStreamActiveScript = redis.NewScript(`
+if redis.call("GET", KEYS[1]) ~= ARGV[1] then
+	return 0
+end
+redis.call("SET", KEYS[2], "1", "PX", ARGV[2])
+redis.call("ZADD", KEYS[3], ARGV[3], ARGV[4])
+redis.call("PEXPIRE", KEYS[3], ARGV[5])
+return 1
+`)
+
+var clearGenerationStreamActiveScript = redis.NewScript(`
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+	redis.call("DEL", KEYS[2])
+end
+redis.call("ZREM", KEYS[3], ARGV[2])
+return 1
+`)
 
 // conversationCache 实现 repository.ConversationCacheRepository。
 type conversationCache struct {
@@ -128,11 +240,7 @@ func (c *conversationCache) ClaimTimedOutFileProcessingMessages(ctx context.Cont
 		}
 		return nil, err
 	}
-	messages := make([]repository.FileProcessingMessage, 0, len(claimed))
-	for _, msg := range claimed {
-		messages = append(messages, parseFileProcessingMessage(msg))
-	}
-	return messages, nil
+	return c.decodeFileProcessingMessages(ctx, consumerName, claimed, true)
 }
 
 // ReadFileProcessingMessages 阻塞读取未处理消息（最多 1 条，5s 超时）。
@@ -155,56 +263,185 @@ func (c *conversationCache) ReadFileProcessingMessages(ctx context.Context, cons
 	}
 	messages := make([]repository.FileProcessingMessage, 0)
 	for _, stream := range streams {
-		for _, msg := range stream.Messages {
-			messages = append(messages, parseFileProcessingMessage(msg))
+		parsed, parseErr := c.decodeFileProcessingMessages(ctx, consumerName, stream.Messages, false)
+		if parseErr != nil {
+			return nil, parseErr
 		}
+		messages = append(messages, parsed...)
 	}
 	return messages, nil
 }
 
-func parseFileProcessingMessage(msg redis.XMessage) repository.FileProcessingMessage {
+func (c *conversationCache) decodeFileProcessingMessages(
+	ctx context.Context,
+	consumerName string,
+	messages []redis.XMessage,
+	reclaimed bool,
+) ([]repository.FileProcessingMessage, error) {
+	parsedMessages := make([]repository.FileProcessingMessage, 0, len(messages))
+	for _, msg := range messages {
+		parsed, err := parseFileProcessingMessage(msg)
+		if err != nil {
+			quarantined, quarantineErr := c.deadLetterInvalidFileProcessingMessage(ctx, consumerName, msg, err)
+			if quarantineErr != nil {
+				return nil, fmt.Errorf("dead-letter invalid file processing message %q: %w", msg.ID, quarantineErr)
+			}
+			if !quarantined {
+				return nil, fmt.Errorf("dead-letter invalid file processing message %q: message ownership lost", msg.ID)
+			}
+			continue
+		}
+		parsed.Reclaimed = reclaimed
+		parsedMessages = append(parsedMessages, parsed)
+	}
+	return parsedMessages, nil
+}
+
+func parseFileProcessingMessage(msg redis.XMessage) (repository.FileProcessingMessage, error) {
+	userID, err := strconv.ParseUint(strings.TrimSpace(getStringVal(msg.Values["user_id"])), 10, strconv.IntSize)
+	if err != nil || userID == 0 {
+		if err == nil {
+			err = errors.New("must be greater than zero")
+		}
+		return repository.FileProcessingMessage{}, fmt.Errorf("invalid user_id: %w", err)
+	}
+
+	retry, err := strconv.Atoi(strings.TrimSpace(getStringVal(msg.Values["retry"])))
+	if err != nil || retry < 0 {
+		if err == nil {
+			err = errors.New("must not be negative")
+		}
+		return repository.FileProcessingMessage{}, fmt.Errorf("invalid retry: %w", err)
+	}
+
+	lastError := ""
+	if rawLastError, ok := msg.Values["last_error"]; ok {
+		lastError = getStringVal(rawLastError)
+	}
+
 	return repository.FileProcessingMessage{
 		ID:        msg.ID,
-		UserID:    uint(getInt64Val(msg.Values["user_id"])),
+		UserID:    uint(userID),
 		FileID:    strings.TrimSpace(getStringVal(msg.Values["file_id"])),
-		Retry:     int(getInt64Val(msg.Values["retry"])),
-		LastError: getStringVal(msg.Values["last_error"]),
-	}
+		Retry:     retry,
+		LastError: lastError,
+	}, nil
 }
 
-// AckFileProcessingMessage 确认消息已处理。
-func (c *conversationCache) AckFileProcessingMessage(ctx context.Context, messageID string) error {
-	if c.client == nil {
-		return nil
+func (c *conversationCache) deadLetterInvalidFileProcessingMessage(
+	ctx context.Context,
+	consumerName string,
+	message redis.XMessage,
+	parseErr error,
+) (bool, error) {
+	lastError := "invalid queue message: " + parseErr.Error()
+	if rawLastError, ok := message.Values["last_error"]; ok {
+		if previousError := strings.TrimSpace(getStringVal(rawLastError)); previousError != "" {
+			lastError += "; previous error: " + previousError
+		}
 	}
-	_, err := c.client.XAck(ctx, fileProcessingStreamName, fileProcessingGroupName, messageID).Result()
-	return err
+
+	return fileProcessingScriptResult(deadLetterFileProcessingMessageScript.Run(
+		ctx,
+		c.client,
+		[]string{fileProcessingStreamName, fileProcessingDLQName},
+		fileProcessingGroupName,
+		consumerName,
+		message.ID,
+		getStringVal(message.Values["user_id"]),
+		getStringVal(message.Values["file_id"]),
+		getStringVal(message.Values["retry"]),
+		truncateStr(lastError, 255),
+		fileProcessingDLQMaxLen,
+	).Result())
 }
 
-// DeleteFileProcessingMessage 从 Stream 中删除消息。
-func (c *conversationCache) DeleteFileProcessingMessage(ctx context.Context, messageID string) error {
-	if c.client == nil {
-		return nil
+// RenewFileProcessingMessageLease 刷新执行中消息的空闲时间，避免长任务被其他 worker 重复认领。
+func (c *conversationCache) RenewFileProcessingMessageLease(ctx context.Context, consumerName, messageID string) (bool, error) {
+	if c.client == nil || strings.TrimSpace(consumerName) == "" || strings.TrimSpace(messageID) == "" {
+		return true, nil
 	}
-	_, err := c.client.XDel(ctx, fileProcessingStreamName, messageID).Result()
-	return err
+	return fileProcessingScriptResult(renewFileProcessingLeaseScript.Run(
+		ctx,
+		c.client,
+		[]string{fileProcessingStreamName},
+		fileProcessingGroupName,
+		consumerName,
+		messageID,
+	).Result())
 }
 
-// SendFileProcessingToDLQ 将超过重试次数的消息写入死信队列。
-func (c *conversationCache) SendFileProcessingToDLQ(ctx context.Context, userID uint, fileID string, retry int, lastError string) error {
+func (c *conversationCache) SettleFileProcessingMessage(ctx context.Context, consumerName, messageID string) (bool, error) {
 	if c.client == nil {
-		return nil
+		return true, nil
 	}
-	_, err := c.client.XAdd(ctx, &redis.XAddArgs{
-		Stream: fileProcessingDLQName,
-		Values: map[string]interface{}{
-			"user_id":    userID,
-			"file_id":    fileID,
-			"retry":      retry,
-			"last_error": truncateStr(lastError, 255),
-		},
-	}).Result()
-	return err
+	return fileProcessingScriptResult(settleFileProcessingMessageScript.Run(
+		ctx,
+		c.client,
+		[]string{fileProcessingStreamName},
+		fileProcessingGroupName,
+		consumerName,
+		messageID,
+	).Result())
+}
+
+func (c *conversationCache) RequeueFileProcessingMessage(
+	ctx context.Context,
+	consumerName string,
+	message repository.FileProcessingMessage,
+	retry int,
+	lastError string,
+) (bool, error) {
+	if c.client == nil {
+		return true, nil
+	}
+	return fileProcessingScriptResult(requeueFileProcessingMessageScript.Run(
+		ctx,
+		c.client,
+		[]string{fileProcessingStreamName},
+		fileProcessingGroupName,
+		consumerName,
+		message.ID,
+		message.UserID,
+		message.FileID,
+		retry,
+		truncateStr(lastError, 255),
+	).Result())
+}
+
+func (c *conversationCache) DeadLetterFileProcessingMessage(
+	ctx context.Context,
+	consumerName string,
+	message repository.FileProcessingMessage,
+	lastError string,
+) (bool, error) {
+	if c.client == nil {
+		return true, nil
+	}
+	return fileProcessingScriptResult(deadLetterFileProcessingMessageScript.Run(
+		ctx,
+		c.client,
+		[]string{fileProcessingStreamName, fileProcessingDLQName},
+		fileProcessingGroupName,
+		consumerName,
+		message.ID,
+		message.UserID,
+		message.FileID,
+		message.Retry,
+		truncateStr(lastError, 255),
+		fileProcessingDLQMaxLen,
+	).Result())
+}
+
+func fileProcessingScriptResult(result interface{}, err error) (bool, error) {
+	if errors.Is(err, redis.Nil) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	value, ok := result.(int64)
+	return ok && value == 1, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -263,8 +500,9 @@ func (c *conversationCache) SetRAGCache(ctx context.Context, key string, chunks 
 // 生成流恢复
 // ---------------------------------------------------------------------------
 
-// RegisterGenerationStream 记录 run 归属用户，并清除上一轮取消标记。
-func (c *conversationCache) RegisterGenerationStream(ctx context.Context, runID string, userID uint, ttl time.Duration) error {
+// RegisterGenerationStream records the run owner and conversation without mixing
+// ephemeral execution state into persisted conversation records.
+func (c *conversationCache) RegisterGenerationStream(ctx context.Context, runID string, userID uint, conversationPublicID string, ttl time.Duration) error {
 	if c.client == nil {
 		return nil
 	}
@@ -274,6 +512,7 @@ func (c *conversationCache) RegisterGenerationStream(ctx context.Context, runID 
 	}
 	pipe := c.client.Pipeline()
 	pipe.Set(ctx, generationStreamOwnerKey(runID), strconv.FormatUint(uint64(userID), 10), ttl)
+	pipe.Set(ctx, generationStreamConversationKey(runID), strings.TrimSpace(conversationPublicID), ttl)
 	pipe.Del(ctx, generationStreamCancelKey(runID))
 	_, err := pipe.Exec(ctx)
 	return err
@@ -299,7 +538,7 @@ func (c *conversationCache) GetGenerationStreamOwner(ctx context.Context, runID 
 }
 
 // TouchGenerationStreamActive 刷新 run 的活跃租约。
-func (c *conversationCache) TouchGenerationStreamActive(ctx context.Context, runID string, ttl time.Duration) error {
+func (c *conversationCache) TouchGenerationStreamActive(ctx context.Context, runID string, userID uint, ttl time.Duration) error {
 	if c.client == nil || ttl <= 0 {
 		return nil
 	}
@@ -307,11 +546,19 @@ func (c *conversationCache) TouchGenerationStreamActive(ctx context.Context, run
 	if runID == "" {
 		return nil
 	}
-	return c.client.Set(ctx, generationStreamActiveKey(runID), "1", ttl).Err()
+	if userID == 0 {
+		return nil
+	}
+	owner := strconv.FormatUint(uint64(userID), 10)
+	return touchGenerationStreamActiveScript.Run(ctx, c.client, []string{
+		generationStreamOwnerKey(runID),
+		generationStreamActiveKey(runID),
+		generationStreamActiveIndexKey(userID),
+	}, owner, ttl.Milliseconds(), time.Now().Add(ttl).UnixMilli(), runID, generationStreamIndexTTL.Milliseconds()).Err()
 }
 
 // ClearGenerationStreamActive 清理 run 的活跃租约。
-func (c *conversationCache) ClearGenerationStreamActive(ctx context.Context, runID string) error {
+func (c *conversationCache) ClearGenerationStreamActive(ctx context.Context, runID string, userID uint) error {
 	if c.client == nil {
 		return nil
 	}
@@ -319,7 +566,15 @@ func (c *conversationCache) ClearGenerationStreamActive(ctx context.Context, run
 	if runID == "" {
 		return nil
 	}
-	return c.client.Del(ctx, generationStreamActiveKey(runID)).Err()
+	if userID == 0 {
+		return nil
+	}
+	owner := strconv.FormatUint(uint64(userID), 10)
+	return clearGenerationStreamActiveScript.Run(ctx, c.client, []string{
+		generationStreamOwnerKey(runID),
+		generationStreamActiveKey(runID),
+		generationStreamActiveIndexKey(userID),
+	}, owner, runID).Err()
 }
 
 // IsGenerationStreamActive 查询 run 是否仍有活跃生成租约。
@@ -336,6 +591,58 @@ func (c *conversationCache) IsGenerationStreamActive(ctx context.Context, runID 
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// ListActiveGenerationStreams returns the user's active runs from a compact
+// Redis index. Expired leases and entries reassigned to another user are
+// removed opportunistically.
+func (c *conversationCache) ListActiveGenerationStreams(ctx context.Context, userID uint) ([]repository.ActiveGenerationStream, error) {
+	if c.client == nil || userID == 0 {
+		return []repository.ActiveGenerationStream{}, nil
+	}
+	indexKey := generationStreamActiveIndexKey(userID)
+	now := time.Now().UnixMilli()
+	pipe := c.client.Pipeline()
+	pipe.ZRemRangeByScore(ctx, indexKey, "-inf", strconv.FormatInt(now, 10))
+	activeCmd := pipe.ZRangeByScore(ctx, indexKey, &redis.ZRangeBy{
+		Min: strconv.FormatInt(now+1, 10),
+		Max: "+inf",
+	})
+	if _, err := pipe.Exec(ctx); err != nil {
+		return nil, err
+	}
+	runIDs := activeCmd.Val()
+	if len(runIDs) == 0 {
+		return []repository.ActiveGenerationStream{}, nil
+	}
+	keys := make([]string, 0, len(runIDs)*2)
+	for _, runID := range runIDs {
+		keys = append(keys, generationStreamOwnerKey(runID), generationStreamConversationKey(runID))
+	}
+	metadata, err := c.client.MGet(ctx, keys...).Result()
+	if err != nil {
+		return nil, err
+	}
+	items := make([]repository.ActiveGenerationStream, 0, len(runIDs))
+	staleRunIDs := make([]interface{}, 0)
+	wantedOwner := strconv.FormatUint(uint64(userID), 10)
+	for index, runID := range runIDs {
+		owner, _ := metadata[index*2].(string)
+		conversationPublicID, _ := metadata[index*2+1].(string)
+		conversationPublicID = strings.TrimSpace(conversationPublicID)
+		if strings.TrimSpace(owner) != wantedOwner || conversationPublicID == "" {
+			staleRunIDs = append(staleRunIDs, runID)
+			continue
+		}
+		items = append(items, repository.ActiveGenerationStream{
+			RunID:                runID,
+			ConversationPublicID: conversationPublicID,
+		})
+	}
+	if len(staleRunIDs) > 0 {
+		_ = c.client.ZRem(ctx, indexKey, staleRunIDs...).Err()
+	}
+	return items, nil
 }
 
 // RequestGenerationStreamCancel 标记 run 已被用户显式取消。
@@ -358,31 +665,70 @@ func (c *conversationCache) IsGenerationStreamCanceled(ctx context.Context, runI
 	return count > 0, nil
 }
 
-// AppendGenerationStreamEvent 追加生成流事件，使用独立 seq 保持前端游标稳定。
-func (c *conversationCache) AppendGenerationStreamEvent(ctx context.Context, runID string, payloadJSON string, maxEvents int64, ttl time.Duration) (repository.GenerationStreamMessage, error) {
+// AppendGenerationStreamEvent 原子追加生成事件，并同步维护可见文本快照。
+func (c *conversationCache) AppendGenerationStreamEvent(ctx context.Context, runID string, input repository.GenerationStreamAppend, maxEvents int64, ttl time.Duration) (repository.GenerationStreamMessage, error) {
 	if c.client == nil {
 		return repository.GenerationStreamMessage{}, nil
 	}
 	if maxEvents <= 0 {
 		maxEvents = 1024
 	}
-	seq, err := c.client.Incr(ctx, generationStreamSeqKey(runID)).Result()
-	if err != nil {
-		return repository.GenerationStreamMessage{}, err
+	if ttl <= 0 {
+		ttl = time.Minute
 	}
-	id, err := c.client.XAdd(ctx, &redis.XAddArgs{
-		Stream:       generationStreamEventsKey(runID),
-		MaxLenApprox: maxEvents,
-		Values: map[string]interface{}{
-			"seq":     seq,
-			"payload": payloadJSON,
+	result, err := appendGenerationStreamEventScript.Run(
+		ctx,
+		c.client,
+		[]string{
+			generationStreamSeqKey(runID),
+			generationStreamEventsKey(runID),
+			generationStreamTextKey(runID),
+			generationStreamTextSeqKey(runID),
 		},
-	}).Result()
+		input.PayloadJSON,
+		maxEvents,
+		ttl.Milliseconds(),
+		input.TextDelta,
+	).Result()
 	if err != nil {
 		return repository.GenerationStreamMessage{}, err
 	}
-	_ = c.ExpireGenerationStream(ctx, runID, ttl)
-	return repository.GenerationStreamMessage{ID: id, Seq: seq, PayloadJSON: payloadJSON}, nil
+	values, ok := result.([]interface{})
+	if !ok || len(values) != 2 {
+		return repository.GenerationStreamMessage{}, errors.New("invalid generation stream append result")
+	}
+	id := strings.TrimSpace(getStringVal(values[0]))
+	seq := getInt64Val(values[1])
+	if id == "" || seq <= 0 {
+		return repository.GenerationStreamMessage{}, errors.New("invalid generation stream append metadata")
+	}
+	return repository.GenerationStreamMessage{ID: id, Seq: seq, PayloadJSON: input.PayloadJSON}, nil
+}
+
+// GetGenerationStreamTextSnapshot 原子读取完整可见文本及其最后事件序号。
+func (c *conversationCache) GetGenerationStreamTextSnapshot(ctx context.Context, runID string) (repository.GenerationStreamTextSnapshot, bool, error) {
+	if c.client == nil {
+		return repository.GenerationStreamTextSnapshot{}, false, nil
+	}
+	values, err := c.client.MGet(
+		ctx,
+		generationStreamTextKey(runID),
+		generationStreamTextSeqKey(runID),
+	).Result()
+	if err != nil {
+		return repository.GenerationStreamTextSnapshot{}, false, err
+	}
+	if len(values) != 2 || values[0] == nil || values[1] == nil {
+		return repository.GenerationStreamTextSnapshot{}, false, nil
+	}
+	seq := getInt64Val(values[1])
+	if seq <= 0 {
+		return repository.GenerationStreamTextSnapshot{}, false, nil
+	}
+	return repository.GenerationStreamTextSnapshot{
+		Seq:     seq,
+		Content: getStringVal(values[0]),
+	}, true, nil
 }
 
 // ListGenerationStreamEvents 返回当前保留窗口内的生成流事件。
@@ -438,6 +784,24 @@ func (c *conversationCache) ReadGenerationStreamEvents(ctx context.Context, runI
 	return results, nil
 }
 
+// ResetGenerationStreamEvents 清空恢复流事件，阻止撤回内容在重连时被回放。
+func (c *conversationCache) ResetGenerationStreamEvents(ctx context.Context, runID string) error {
+	if c.client == nil {
+		return nil
+	}
+	runID = strings.TrimSpace(runID)
+	if runID == "" {
+		return nil
+	}
+	// Keep seq key so subsequent appends stay monotonic for reconnect cursors.
+	return c.client.Del(
+		ctx,
+		generationStreamEventsKey(runID),
+		generationStreamTextKey(runID),
+		generationStreamTextSeqKey(runID),
+	).Err()
+}
+
 // ExpireGenerationStream 设置生成流相关键的过期时间。
 func (c *conversationCache) ExpireGenerationStream(ctx context.Context, runID string, ttl time.Duration) error {
 	if c.client == nil || ttl <= 0 {
@@ -446,7 +810,10 @@ func (c *conversationCache) ExpireGenerationStream(ctx context.Context, runID st
 	pipe := c.client.Pipeline()
 	pipe.Expire(ctx, generationStreamEventsKey(runID), ttl)
 	pipe.Expire(ctx, generationStreamSeqKey(runID), ttl)
+	pipe.Expire(ctx, generationStreamTextKey(runID), ttl)
+	pipe.Expire(ctx, generationStreamTextSeqKey(runID), ttl)
 	pipe.Expire(ctx, generationStreamOwnerKey(runID), ttl)
+	pipe.Expire(ctx, generationStreamConversationKey(runID), ttl)
 	pipe.Expire(ctx, generationStreamCancelKey(runID), ttl)
 	_, err := pipe.Exec(ctx)
 	return err
@@ -480,8 +847,24 @@ func generationStreamSeqKey(runID string) string {
 	return generationStreamKeyPrefix + strings.TrimSpace(runID) + ":seq"
 }
 
+func generationStreamTextKey(runID string) string {
+	return generationStreamKeyPrefix + strings.TrimSpace(runID) + ":text"
+}
+
+func generationStreamTextSeqKey(runID string) string {
+	return generationStreamKeyPrefix + strings.TrimSpace(runID) + ":text_seq"
+}
+
 func generationStreamOwnerKey(runID string) string {
 	return generationStreamKeyPrefix + strings.TrimSpace(runID) + ":owner"
+}
+
+func generationStreamConversationKey(runID string) string {
+	return generationStreamKeyPrefix + strings.TrimSpace(runID) + ":conversation"
+}
+
+func generationStreamActiveIndexKey(userID uint) string {
+	return generationStreamKeyPrefix + "user:" + strconv.FormatUint(uint64(userID), 10) + ":active"
 }
 
 func generationStreamActiveKey(runID string) string {

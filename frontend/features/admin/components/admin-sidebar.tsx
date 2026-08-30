@@ -16,6 +16,7 @@ import {
 } from "@/features/admin/model/update-check";
 import { cn } from "@/lib/utils";
 import packageMeta from "@/package.json";
+import { useAuthSession } from "@/shared/auth/auth-session-context";
 
 const ADMIN_SECTION_LABEL_KEYS: Record<AdminSection, string> = {
   statistics: "sections.statistics",
@@ -29,9 +30,11 @@ const ADMIN_SECTION_LABEL_KEYS: Record<AdminSection, string> = {
   wechat: "sections.wechat",
   announcements: "sections.announcements",
   logs: "sections.logs",
+  "content-moderation": "sections.contentModeration",
   "login-settings": "sections.loginSettings",
   "conversation-settings": "sections.conversationSettings",
   "chat-files": "sections.chatFiles",
+  "knowledge-bases": "sections.knowledgeBases",
   about: "sections.about",
 };
 
@@ -52,6 +55,7 @@ export function AdminSidebar({
 }) {
   const t = useTranslations("adminUsers");
   const tAbout = useTranslations("adminUsers.aboutPage");
+  const { user } = useAuthSession();
   const pathname = usePathname();
   const activeSection = resolveActiveSectionFromPath(pathname, basePath);
   const activeLinkRef = React.useRef<HTMLAnchorElement | null>(null);
@@ -61,6 +65,12 @@ export function AdminSidebar({
     getServerLatestReleaseSnapshot,
   );
   const updateRelease = resolveAvailableRelease(packageMeta.version, cachedLatestRelease);
+  const visibleSections = React.useMemo(
+    () => user?.role === "superadmin"
+      ? ADMIN_SECTIONS
+      : ADMIN_SECTIONS.filter((item) => item.id !== "content-moderation"),
+    [user?.role],
+  );
   const sectionLabel = React.useCallback(
     (id: AdminSection, fallback: string) => {
       return t(ADMIN_SECTION_LABEL_KEYS[id]) || fallback;
@@ -86,7 +96,7 @@ export function AdminSidebar({
           aria-label={t("adminTitle")}
           className="flex gap-1.5 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [-ms-overflow-style:none] xl:grid xl:gap-1 xl:overflow-visible xl:pb-0 [&::-webkit-scrollbar]:hidden"
         >
-          {ADMIN_SECTIONS.map((item) => {
+          {visibleSections.map((item) => {
             const active = item.id === activeSection;
 
             return (

@@ -535,6 +535,7 @@ func (s *Service) cloneSharedMessage(
 		Status:           status,
 		ErrorCode:        source.ErrorCode,
 		ErrorMessage:     source.ErrorMessage,
+		KnowledgeSources: append([]model.MessageKnowledgeSource(nil), source.KnowledgeSources...),
 	}
 	if message.Role == "" {
 		message.Role = "assistant"
@@ -847,14 +848,14 @@ func isFileNotFoundError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, repository.ErrNotFound) || strings.Contains(strings.ToLower(err.Error()), "file not found")
+	return errors.Is(err, repository.ErrNotFound) || errors.Is(err, ErrFileNotFound)
 }
 
 func isStorageQuotaExceededError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return errors.Is(err, ErrStorageQuotaExceeded) || strings.Contains(strings.ToLower(err.Error()), "storage quota exceeded")
+	return errors.Is(err, ErrStorageQuotaExceeded)
 }
 
 func (s *Service) resolveShareMessageIDs(ctx context.Context, conversationID uint, defaultPublicIDs []string) ([]string, []string, error) {

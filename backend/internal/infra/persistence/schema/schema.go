@@ -6,6 +6,7 @@ import (
 	domainchannel "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/channel"
 	domaininvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/invitation"
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/models"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/channelconfig"
 	"gorm.io/gorm"
 )
 
@@ -30,6 +31,7 @@ func Models() []interface{} {
 		&model.LLMUpstreamModel{},
 		&model.LLMModelVendor{},
 		&model.LLMModelDisplayGroup{},
+		&model.LLMModelIconAsset{},
 		&model.LLMPlatformModel{},
 		&model.LLMPlatformModelRoute{},
 		&model.MCPServer{},
@@ -43,6 +45,8 @@ func Models() []interface{} {
 		&model.FileObject{},
 		&model.UserStorageQuota{},
 		&model.ConversationRun{},
+		&model.ContentModerationEvent{},
+		&model.ContentModerationDailyStat{},
 		&model.ChatRunEvent{},
 		&model.ChatContextRecord{},
 		&model.UserMemory{},
@@ -63,8 +67,11 @@ func Models() []interface{} {
 		&model.AnnouncementUserState{},
 		&model.PromptPreset{},
 		&model.Skill{},
+		&model.KnowledgeBase{},
+		&model.KnowledgeBaseFile{},
 		&model.ConversationProjectMCPTool{},
 		&model.ConversationProjectSkill{},
+		&model.ConversationProjectKnowledgeBase{},
 		&model.SystemSetting{},
 		&model.UserSetting{},
 		&model.FileChunk{},
@@ -130,6 +137,9 @@ func Migrate(db *gorm.DB) error {
 	if err := db.AutoMigrate(Models()...); err != nil {
 		return err
 	}
+	if err := invalidateUnsignedFileEmbeddings(db); err != nil {
+		return err
+	}
 	if err := backfillContextArtifactMessageIDs(db); err != nil {
 		return err
 	}
@@ -154,6 +164,21 @@ func seedWeChatDefaults(db *gorm.DB) error {
 	}
 	rule := model.WeChatKeywordRule{Keyword: "13004", Action: "issue_registration_code", TemplateID: template.ID, Enabled: true}
 	return db.Where("keyword = ?", rule.Keyword).FirstOrCreate(&rule).Error
+}
+
+// invalidateUnsignedFileEmbeddings makes legacy vectors enter the existing reindex flow.
+// Message and memory vectors without a signature stay hidden until naturally regenerated.
+func invalidateUnsignedFileEmbeddings(db *gorm.DB) error {
+	return db.Exec(`
+		UPDATE file_objects
+		SET embed_status = 'stale'
+		WHERE embed_status = 'ready'
+		  AND EXISTS (
+			SELECT 1
+			FROM file_chunks
+			WHERE file_chunks.file_obj_id = file_objects.id
+			  AND file_chunks.embedding_signature = ''
+		  )`).Error
 }
 
 // backfillContextArtifactMessageIDs 将旧证据统一迁移到产生该证据的助手运行节点。
@@ -295,6 +320,10 @@ func dropColumns(db *gorm.DB, table interface{}, columns []string) error {
 
 // SeedLLMSettings inserts default LLM runtime settings if they do not exist.
 func SeedLLMSettings(db *gorm.DB) error {
+	breakerDefaultsJSON, err := channelconfig.MarshalBreakerDefaults(domainchannel.DefaultBreakerDefaults())
+	if err != nil {
+		return err
+	}
 	settings := []model.SystemSetting{
 		{
 			Namespace:   "llm",
@@ -305,8 +334,8 @@ func SeedLLMSettings(db *gorm.DB) error {
 		},
 		{
 			Namespace:   "llm",
-			Key:         "circuit_breaker.defaults",
-			Value:       `{"model_failure_threshold":5,"model_duration_min":15,"model_window_min":3,"upstream_failure_threshold":20,"upstream_model_threshold":3,"upstream_threshold_logic":"or","upstream_duration_min":30,"upstream_window_min":5}`,
+			Key:         channelconfig.BreakerDefaultsKey,
+			Value:       breakerDefaultsJSON,
 			ValueType:   "json",
 			Description: "熔断默认参数",
 		},

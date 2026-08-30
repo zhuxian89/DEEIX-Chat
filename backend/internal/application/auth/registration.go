@@ -1038,9 +1038,12 @@ func (s *Service) createWithCredentialUsingAvailableUsernameAndRegistrationCode(
 	return ErrUsernameTaken
 }
 
-// RegisterWithEmailAndInvitationCode 执行邮箱注册，同时处理注册码（可选）与邀请码奖励。
+// RegisterWithEmailAndInvitationCode 执行邮箱注册，同时校验注册码并处理邀请码奖励。
 // 邀请码宽松放行：无效/关闭/重复均不阻断注册。
 func (s *Service) RegisterWithEmailAndInvitationCode(ctx context.Context, email string, password string, code string, registrationCode string, invitationCode string, turnstileToken string, remoteIP string, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
+	if strings.TrimSpace(registrationCode) == "" {
+		return nil, fmt.Errorf("registration code is invalid or already used")
+	}
 	prepared, err := s.prepareEmailRegistration(ctx, email, password, code, turnstileToken, remoteIP)
 	if err != nil {
 		return nil, err

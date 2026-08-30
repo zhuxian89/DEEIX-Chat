@@ -54,6 +54,17 @@ func upstreamConfigErrorMessage(err error) string {
 	}
 }
 
+func modelIconErrorMessage(err error) string {
+	switch {
+	case errors.Is(err, appchannel.ErrInvalidModelIconReference):
+		return "invalid model icon"
+	case errors.Is(err, appchannel.ErrModelIconAssetNotFound):
+		return "model icon asset not found"
+	default:
+		return ""
+	}
+}
+
 // ---------------------------------------------------------------------------
 // 用户侧模型目录
 // ---------------------------------------------------------------------------
@@ -305,6 +316,7 @@ func (h *Handler) BatchDeleteUpstreams(c *gin.Context) {
 // @Success 200 {object} response.SuccessDoc
 // @Failure 400 {object} ErrorDoc
 // @Failure 404 {object} ErrorDoc
+// @Failure 409 {object} ErrorDoc
 // @Failure 500 {object} ErrorDoc
 // @Router /admin/llm/upstreams/{id}/circuit/open [post]
 func (h *Handler) OpenUpstreamCircuit(c *gin.Context) {
@@ -315,6 +327,10 @@ func (h *Handler) OpenUpstreamCircuit(c *gin.Context) {
 	}
 
 	if err = h.service.OpenUpstreamCircuit(c.Request.Context(), upstreamID); err != nil {
+		if errors.Is(err, appchannel.ErrCircuitBreakerDisabled) {
+			response.Error(c, http.StatusConflict, "circuit breaker is disabled")
+			return
+		}
 		if errors.Is(err, appchannel.ErrUpstreamNotFound) {
 			response.Error(c, http.StatusNotFound, "upstream not found")
 			return
@@ -439,10 +455,10 @@ func (h *Handler) UpsertUpstreamModel(c *gin.Context) {
 	}
 
 	item, err := h.service.UpsertUpstreamModel(c.Request.Context(), upstreamID, appchannel.UpsertUpstreamModelInput{
-		RouteID:            req.RouteID,
+		RouteIDs:           req.RouteIDs,
 		PlatformModelName:  req.PlatformModelName,
 		UpstreamModelName:  req.UpstreamModelName,
-		Protocol:           req.Protocol,
+		Protocols:          *req.Protocols,
 		KindsJSON:          req.KindsJSON,
 		Status:             req.Status,
 		Priority:           req.Priority,
@@ -461,6 +477,8 @@ func (h *Handler) UpsertUpstreamModel(c *gin.Context) {
 			response.Error(c, http.StatusNotFound, "model not found")
 		case errors.Is(err, appchannel.ErrUpstreamModelConflict):
 			response.Error(c, http.StatusConflict, "target model already bound on this upstream")
+		case errors.Is(err, appchannel.ErrUpstreamModelBindingChanged):
+			response.ErrorWithCode(c, http.StatusConflict, "llm.upstream_model_binding_changed", "upstream model binding changed; reload and retry")
 		case errors.Is(err, appchannel.ErrInvalidJSONConfig):
 			response.Error(c, http.StatusBadRequest, "invalid json config")
 		case errors.Is(err, appchannel.ErrInvalidAdapter):
@@ -630,6 +648,7 @@ func (h *Handler) BatchDeleteUpstreamModels(c *gin.Context) {
 // @Success 200 {object} response.SuccessDoc
 // @Failure 400 {object} ErrorDoc
 // @Failure 404 {object} ErrorDoc
+// @Failure 409 {object} ErrorDoc
 // @Failure 500 {object} ErrorDoc
 // @Router /admin/llm/upstreams/{id}/models/{route_id}/circuit/open [post]
 func (h *Handler) OpenUpstreamModelCircuit(c *gin.Context) {
@@ -645,6 +664,10 @@ func (h *Handler) OpenUpstreamModelCircuit(c *gin.Context) {
 	}
 
 	if err = h.service.OpenUpstreamModelCircuit(c.Request.Context(), upstreamID, routeID); err != nil {
+		if errors.Is(err, appchannel.ErrCircuitBreakerDisabled) {
+			response.Error(c, http.StatusConflict, "circuit breaker is disabled")
+			return
+		}
 		if errors.Is(err, appchannel.ErrUpstreamModelNotFound) {
 			response.Error(c, http.StatusNotFound, "upstream model not found")
 			return
@@ -748,7 +771,7 @@ func (h *Handler) TestUpstreamModelRoute(c *gin.Context) {
 
 // ListRemoteModels godoc
 // @Summary 管理员预览上游远程模型
-// @Description 调用上游 models 接口，仅返回可导入预览，不直接落库
+// @Description 调用上游 models 接口，返回可导入模型与目录变更预览，不直接落库
 // @Tags llm
 // @Accept json
 // @Produce json
@@ -786,15 +809,18 @@ func (h *Handler) ListRemoteModels(c *gin.Context) {
 
 // SyncUpstreamModels godoc
 // @Summary 管理员同步上游模型目录
-// @Description 调用上游 models 接口写入上游真实模型清单，不自动绑定平台模型
+// @Description 调用上游 models 接口获取完整目录，原子更新远端管理模型可用状态，不删除平台模型或路由配置
 // @Tags llm
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param id path int true "上游ID"
+// @Param allow_empty query bool false "确认允许空模型目录对账"
+// @Param expected_snapshot query string false "用户确认的远端目录快照标识"
 // @Success 200 {object} SyncUpstreamModelsResponseDoc
 // @Failure 400 {object} ErrorDoc
 // @Failure 404 {object} ErrorDoc
+// @Failure 409 {object} ErrorDoc
 // @Failure 502 {object} ErrorDoc
 // @Failure 500 {object} ErrorDoc
 // @Router /admin/llm/upstreams/{id}/models/sync [post]
@@ -805,7 +831,10 @@ func (h *Handler) SyncUpstreamModels(c *gin.Context) {
 		return
 	}
 
-	data, err := h.service.SyncUpstreamModels(c.Request.Context(), upstreamID)
+	data, err := h.service.SyncUpstreamModels(c.Request.Context(), upstreamID, appchannel.SyncUpstreamModelsInput{
+		AllowEmpty:       c.Query("allow_empty") == "true",
+		ExpectedSnapshot: c.Query("expected_snapshot"),
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, appchannel.ErrUpstreamNotFound):
@@ -814,6 +843,10 @@ func (h *Handler) SyncUpstreamModels(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "no active api key")
 		case errors.Is(err, appchannel.ErrRemoteModelsUnavailable):
 			response.Error(c, http.StatusBadGateway, "remote models unavailable")
+		case errors.Is(err, appchannel.ErrEmptyRemoteModels):
+			response.ErrorWithCode(c, http.StatusConflict, "llm.remote_models_empty_confirmation_required", "remote models snapshot is empty")
+		case errors.Is(err, appchannel.ErrRemoteModelsSnapshotChanged):
+			response.ErrorWithCode(c, http.StatusConflict, "llm.remote_models_snapshot_changed", "remote models snapshot changed")
 		default:
 			response.Error(c, http.StatusInternalServerError, "sync upstream models failed")
 		}
@@ -988,6 +1021,8 @@ func (h *Handler) CreateModel(c *gin.Context) {
 			response.Error(c, http.StatusConflict, "platform model name already exists")
 		case errors.Is(err, appchannel.ErrInvalidJSONConfig):
 			response.Error(c, http.StatusBadRequest, "invalid json config")
+		case errors.Is(err, appchannel.ErrInvalidModelCapsConfig):
+			response.Error(c, http.StatusBadRequest, "invalid model capability limits")
 		case errors.Is(err, appchannel.ErrInvalidKinds):
 			response.Error(c, http.StatusBadRequest, "invalid kinds")
 		case errors.Is(err, appchannel.ErrInvalidModelAccessScope):
@@ -1002,6 +1037,8 @@ func (h *Handler) CreateModel(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "model vendor not found")
 		case errors.Is(err, appchannel.ErrModelDisplayGroupNotFound):
 			response.Error(c, http.StatusBadRequest, "model display group not found")
+		case modelIconErrorMessage(err) != "":
+			response.Error(c, http.StatusBadRequest, modelIconErrorMessage(err))
 		default:
 			response.Error(c, http.StatusInternalServerError, "create model failed")
 		}
@@ -1059,6 +1096,8 @@ func (h *Handler) UpdateModel(c *gin.Context) {
 			response.Error(c, http.StatusNotFound, "model not found")
 		case errors.Is(err, appchannel.ErrInvalidJSONConfig):
 			response.Error(c, http.StatusBadRequest, "invalid json config")
+		case errors.Is(err, appchannel.ErrInvalidModelCapsConfig):
+			response.Error(c, http.StatusBadRequest, "invalid model capability limits")
 		case errors.Is(err, appchannel.ErrInvalidKinds):
 			response.Error(c, http.StatusBadRequest, "invalid kinds")
 		case errors.Is(err, appchannel.ErrInvalidModelAccessScope):
@@ -1073,8 +1112,68 @@ func (h *Handler) UpdateModel(c *gin.Context) {
 			response.Error(c, http.StatusBadRequest, "model vendor not found")
 		case errors.Is(err, appchannel.ErrModelDisplayGroupNotFound):
 			response.Error(c, http.StatusBadRequest, "model display group not found")
+		case modelIconErrorMessage(err) != "":
+			response.Error(c, http.StatusBadRequest, modelIconErrorMessage(err))
 		default:
 			response.Error(c, http.StatusInternalServerError, "update model failed")
+		}
+		return
+	}
+	response.Success(c, ModelDataResponse{Model: toModelResponse(*item)})
+}
+
+// SetModelProtocols godoc
+// @Summary 管理员替换模型全部来源的协议集合
+// @Description 在单个数据库事务中更新平台模型能力类型，并将该模型全部上游绑定替换为指定的完整协议集合
+// @Tags llm
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path int true "模型ID"
+// @Param body body SetModelProtocolsRequest true "完整协议集合与模型能力类型"
+// @Success 200 {object} SetModelProtocolsResponseDoc
+// @Failure 400 {object} ErrorDoc
+// @Failure 404 {object} ErrorDoc
+// @Failure 409 {object} ErrorDoc
+// @Failure 500 {object} ErrorDoc
+// @Router /admin/llm/models/{id}/protocols [patch]
+func (h *Handler) SetModelProtocols(c *gin.Context) {
+	modelID, err := uintParam(c, "id")
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "invalid model id")
+		return
+	}
+
+	var req SetModelProtocolsRequest
+	if err = c.ShouldBindJSON(&req); err != nil {
+		response.InvalidRequestBody(c, err)
+		return
+	}
+
+	item, err := h.service.SetModelProtocols(c.Request.Context(), modelID, appchannel.SetModelProtocolsInput{
+		Protocols: req.Protocols,
+		KindsJSON: req.KindsJSON,
+	})
+	if err != nil {
+		switch {
+		case errors.Is(err, appchannel.ErrModelNotFound):
+			response.Error(c, http.StatusNotFound, "model not found")
+		case errors.Is(err, appchannel.ErrUpstreamModelNotFound):
+			response.Error(c, http.StatusNotFound, "model upstream sources not found")
+		case errors.Is(err, appchannel.ErrUpstreamModelConflict):
+			response.ErrorWithCode(c, http.StatusConflict, "llm.upstream_model_conflict", "model upstream source conflict")
+		case errors.Is(err, appchannel.ErrUpstreamModelBindingChanged):
+			response.ErrorWithCode(c, http.StatusConflict, "llm.upstream_model_binding_changed", "upstream model binding changed; reload and retry")
+		case errors.Is(err, appchannel.ErrInvalidAdapter):
+			response.Error(c, http.StatusBadRequest, "invalid adapter")
+		case errors.Is(err, appchannel.ErrInvalidRouteProtocolCombination):
+			response.Error(c, http.StatusBadRequest, "invalid route protocol combination")
+		case errors.Is(err, appchannel.ErrInvalidKinds):
+			response.Error(c, http.StatusBadRequest, "invalid kinds")
+		case errors.Is(err, appchannel.ErrProtocolRequired):
+			response.Error(c, http.StatusBadRequest, "protocol required")
+		default:
+			response.Error(c, http.StatusInternalServerError, "set model protocols failed")
 		}
 		return
 	}

@@ -10,16 +10,24 @@ import (
 	"sort"
 	"strings"
 
+	appchannel "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/channel"
 	appstorage "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/objectstorage"
 	domainconversation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/conversation"
 	domainmemory "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/memory"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
-	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/llm"
-	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/objectstore"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/pkg/conv"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/ports/llm"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/ports/objectstore"
 )
 
-const MessageErrorCodeMediaImageStreamUnsupported = "media.image_stream_unsupported"
+const (
+	MessageErrorCodeMediaImageStreamUnsupported   = "media.image_stream_unsupported"
+	MessageErrorCodeKnowledgeBaseInvalidReference = "knowledge_base.invalid_reference"
+	MessageErrorCodeKnowledgeBaseUnavailable      = "knowledge_base.unavailable"
+	MessageErrorCodeKnowledgeBaseNotReady         = "knowledge_base.not_ready"
+	MessageErrorCodeUpstreamRateLimited           = "upstream.rate_limited"
+	messageErrorCodeInternal                      = "internal.error"
+)
 
 const (
 	maxConversationImageContextCount = 10
@@ -138,11 +146,11 @@ func firstNonEmptyString(values ...string) string {
 
 func buildContextPolicyJSON(cfg config.Config) string {
 	policy := map[string]interface{}{
-		"max_turns":                     cfg.ContextMaxTurns,
-		"max_input_tokens":              cfg.ContextMaxInputTokens,
-		"compact_enabled":               cfg.ContextCompactEnabled,
-		"compact_trigger_tokens":        cfg.ContextCompactTrigger,
-		"compact_preserve_recent_turns": cfg.ContextCompactPreserve,
+		"max_turns":                      cfg.ContextMaxTurns,
+		"compact_enabled":                cfg.ContextCompactEnabled,
+		"context_window_fallback_tokens": cfg.ContextWindowFallbackTokens,
+		"compact_trigger_percent":        cfg.ContextCompactTriggerPercent,
+		"compact_preserve_recent_turns":  cfg.ContextCompactPreserve,
 	}
 	raw, err := json.Marshal(policy)
 	if err != nil {
@@ -189,6 +197,8 @@ func classifyRunErrorCode(err error) string {
 		return MessageErrorCodeMediaImageStreamUnsupported
 	}
 	switch {
+	case IsUpstreamRateLimitError(err):
+		return MessageErrorCodeUpstreamRateLimited
 	case errors.Is(err, ErrConversationNotFound):
 		return "conversation_not_found"
 	case errors.Is(err, ErrInvalidFileReference):
@@ -199,6 +209,12 @@ func classifyRunErrorCode(err error) string {
 		return "storage_quota_exceeded"
 	case errors.Is(err, ErrFileTooLarge):
 		return "file_too_large"
+	case errors.Is(err, ErrInvalidKnowledgeBaseReference):
+		return MessageErrorCodeKnowledgeBaseInvalidReference
+	case errors.Is(err, ErrKnowledgeBaseUnavailable):
+		return MessageErrorCodeKnowledgeBaseUnavailable
+	case errors.Is(err, ErrKnowledgeBaseNotReady):
+		return MessageErrorCodeKnowledgeBaseNotReady
 	case errors.Is(err, ErrModelRouteNotConfigured):
 		return "model_route_not_configured"
 	case errors.Is(err, ErrUpstreamEmptyResponse):
@@ -228,8 +244,20 @@ func classifyRunErrorCode(err error) string {
 	case errors.Is(err, ErrUpstreamRequestFailed):
 		return "upstream_request_failed"
 	default:
-		return "internal_error"
+		return messageErrorCodeInternal
 	}
+}
+
+// IsUpstreamRateLimitError 判断错误是否来自真实上游 429 或本地路由级退避。
+func IsUpstreamRateLimitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, appchannel.ErrAllRoutesRateLimited) {
+		return true
+	}
+	var upstreamErr *llm.UpstreamError
+	return errors.As(err, &upstreamErr) && upstreamErr.StatusCode == 429
 }
 
 func messageErrorSummary(err error) string {
@@ -482,6 +510,21 @@ func wrapUpstreamRequestError(cause error) error {
 	return fmt.Errorf("%w: %w", ErrUpstreamRequestFailed, cause)
 }
 
+func mapRouteResolutionError(err error) error {
+	switch {
+	case err == nil:
+		return nil
+	case errors.Is(err, appchannel.ErrModelAccessDenied):
+		return ErrModelAccessDenied
+	case errors.Is(err, appchannel.ErrRouteNotFound), errors.Is(err, appchannel.ErrModelNotFound):
+		return ErrModelRouteNotConfigured
+	case errors.Is(err, appchannel.ErrAllRoutesUnavailable), errors.Is(err, appchannel.ErrAllRoutesRateLimited):
+		return wrapUpstreamRequestError(err)
+	default:
+		return err
+	}
+}
+
 // MessageErrorSummary 返回适合边界层展示的错误摘要。
 func MessageErrorSummary(err error) string {
 	return messageErrorSummary(err)
@@ -491,6 +534,9 @@ func MessageErrorSummary(err error) string {
 func MessageErrorCode(err error) string {
 	if err == nil {
 		return ""
+	}
+	if IsUpstreamRateLimitError(err) {
+		return MessageErrorCodeUpstreamRateLimited
 	}
 	if errors.Is(err, ErrGeneratedMediaArtifactUnavailable) {
 		return MessageErrorCodeMediaArtifactUnavailable
@@ -699,6 +745,7 @@ type userContextInput struct {
 	Attachments         []AttachmentInput
 	ImageAnalyses       []imageAttachmentAnalysis
 	RAGChunks           []domainconversation.RAGChunk
+	RAGNotice           string
 	HistoricalArtifacts []domainconversation.ContextArtifact
 	CurrentArtifacts    []domainconversation.ContextArtifact
 	Snapshot            *snapshotContext
@@ -955,6 +1002,7 @@ func injectUserContext(
 	if len(input.Attachments) == 0 &&
 		len(input.ImageAnalyses) == 0 &&
 		len(input.RAGChunks) == 0 &&
+		strings.TrimSpace(input.RAGNotice) == "" &&
 		len(input.HistoricalArtifacts) == 0 &&
 		input.Snapshot == nil &&
 		len(input.Memory) == 0 &&
@@ -1079,13 +1127,14 @@ func formatAttachmentFileContext(fileName string, text string) string {
 }
 
 type userContextXML struct {
-	summary  string
-	memory   []string
-	files    []string
-	images   []string
-	evidence []string
-	rag      []string
-	recall   []string
+	summary   string
+	memory    []string
+	files     []string
+	images    []string
+	evidence  []string
+	rag       []string
+	ragNotice string
+	recall    []string
 }
 
 func (x userContextXML) empty() bool {
@@ -1095,17 +1144,19 @@ func (x userContextXML) empty() bool {
 		len(x.images) == 0 &&
 		len(x.evidence) == 0 &&
 		len(x.rag) == 0 &&
+		strings.TrimSpace(x.ragNotice) == "" &&
 		len(x.recall) == 0
 }
 
 func buildUserContextXML(input userContextInput) userContextXML {
 	return userContextXML{
-		summary:  formatSnapshotContext(input.Snapshot),
-		memory:   formatMemoryContext(input.Memory),
-		images:   formatImageAnalysisContext(input.ImageAnalyses),
-		evidence: formatHistoricalEvidenceContext(input.HistoricalArtifacts),
-		rag:      formatRAGFileContext(input.RAGChunks),
-		recall:   formatRecallContext(input.RecallChunks),
+		summary:   formatSnapshotContext(input.Snapshot),
+		memory:    formatMemoryContext(input.Memory),
+		images:    formatImageAnalysisContext(input.ImageAnalyses),
+		evidence:  formatHistoricalEvidenceContext(input.HistoricalArtifacts),
+		rag:       formatRAGFileContext(input.RAGChunks),
+		ragNotice: strings.TrimSpace(input.RAGNotice),
+		recall:    formatRecallContext(input.RecallChunks),
 	}
 }
 
@@ -1260,6 +1311,11 @@ func buildUserContextPrompt(userRequest string, contextXML userContextXML) strin
 		builder.WriteString(strings.Join(contextXML.rag, "\n"))
 		builder.WriteString("\n</rag>")
 	}
+	if strings.TrimSpace(contextXML.ragNotice) != "" {
+		builder.WriteString("\n<rag_status>")
+		builder.WriteString(xmlEscapeText(contextXML.ragNotice))
+		builder.WriteString("</rag_status>")
+	}
 	if len(contextXML.recall) > 0 {
 		builder.WriteString("\n<recall>\n")
 		builder.WriteString(strings.Join(contextXML.recall, "\n"))
@@ -1369,11 +1425,11 @@ func (s *Service) selectRelevantUserMemories(ctx context.Context, userID uint, q
 	}
 	searchCtx, cancel := context.WithTimeout(ctx, semanticRecallDeadline)
 	defer cancel()
-	embeddings, err := s.embeddingSvc.EmbedTexts(searchCtx, []string{query})
+	embeddings, embeddingSignature, err := s.embeddingSvc.EmbedTextsWithSignature(searchCtx, []string{query})
 	if err != nil || len(embeddings) == 0 {
 		return fallback
 	}
-	matches, err := s.memoryRecorder.SearchUserMemoriesByEmbedding(searchCtx, userID, embeddings[0], topK, 0.7)
+	matches, err := s.memoryRecorder.SearchUserMemoriesByEmbedding(searchCtx, userID, embeddings[0], embeddingSignature, topK, 0.7)
 	if err != nil || len(matches) == 0 {
 		return fallback
 	}

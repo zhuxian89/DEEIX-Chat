@@ -290,6 +290,26 @@ func TestRegisterWithEmailDoesNotRequireTurnstileWhenEmailVerificationEnabled(t 
 	}
 }
 
+func TestRegisterWithEmailAndInvitationCodeRequiresRegistrationCode(t *testing.T) {
+	service := newTestService(config.Config{}, nil, nil)
+
+	_, err := service.RegisterWithEmailAndInvitationCode(
+		context.Background(),
+		"user@example.com",
+		"securepass1",
+		"",
+		"",
+		"",
+		"",
+		"127.0.0.1",
+		"",
+		requestmeta.SessionAuditContext{},
+	)
+	if err == nil || err.Error() != "registration code is invalid or already used" {
+		t.Fatalf("expected registration code error, got %v", err)
+	}
+}
+
 func TestResolveSecurityVerificationMethod(t *testing.T) {
 	now := time.Now()
 	cases := []struct {

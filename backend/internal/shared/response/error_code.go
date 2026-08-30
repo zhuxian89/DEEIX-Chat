@@ -34,6 +34,7 @@ const (
 	CodeFileNotReady             = "file.not_ready"
 	CodeFileTypeBlocked          = "file.type_blocked"
 	CodeUpstreamUnavailable      = "upstream.unavailable"
+	CodeUpstreamRateLimited      = "upstream.rate_limited"
 	CodeServiceUnavailable       = "service.unavailable"
 	CodeInternal                 = "internal.error"
 )
@@ -77,6 +78,7 @@ var exactErrorSpecs = map[string]errorSpec{
 	"email already exists":                                                  {Code: "auth.email_already_exists", Message: "email already exists"},
 	"registration code is invalid or already used":                          {Code: "auth.registration_code_invalid", Message: "registration code is invalid or already used"},
 	"user email is invalid":                                                 {Code: "auth.invalid_email", Message: "invalid email"},
+	"verification method is unavailable":                                    {Code: "auth.verification_method_unavailable", Message: "verification method is unavailable"},
 	"admin email is invalid":                                                {Code: "auth.invalid_email", Message: "invalid email"},
 	"invalid email":                                                         {Code: "auth.invalid_email", Message: "invalid email"},
 	"user email is not verified":                                            {Code: "auth.email_not_verified", Message: "email is not verified"},
@@ -143,6 +145,7 @@ var exactErrorSpecs = map[string]errorSpec{
 
 	"invalid conversation title":                              {Code: "conversation.invalid_title", Message: "invalid conversation title"},
 	"conversation has no titleable content":                   {Code: "conversation.no_titleable_content", Message: "conversation has no titleable content"},
+	"conversation project limit exceeded":                     {Code: "conversation.project_limit_exceeded", Message: "conversation project limit exceeded"},
 	"invalid conversation share":                              {Code: "conversation_share.invalid", Message: "invalid conversation share"},
 	"conversation share schema outdated":                      {Code: "conversation_share.schema_outdated", Message: "conversation share schema is outdated"},
 	"conversation share schema is outdated, rebuild database": {Code: "conversation_share.schema_outdated", Message: "conversation share schema is outdated"},
@@ -209,6 +212,7 @@ var exactErrorSpecs = map[string]errorSpec{
 	"invalid adapter":                             {Code: "llm.invalid_adapter", Message: "invalid adapter"},
 	"invalid compatible":                          {Code: "llm.invalid_compatible", Message: "invalid compatible"},
 	"invalid json config":                         {Code: "config.invalid_json", Message: "invalid json config"},
+	"invalid model capability limits":             {Code: "llm.invalid_model_capabilities", Message: "invalid model capability limits"},
 	"invalid headers config":                      {Code: "llm.invalid_headers_config", Message: "invalid headers json config"},
 	"invalid headers json config":                 {Code: "llm.invalid_headers_config", Message: "invalid headers json config"},
 	"invalid api keys config":                     {Code: "llm.invalid_api_keys_config", Message: "invalid api keys config"},
@@ -225,6 +229,14 @@ var exactErrorSpecs = map[string]errorSpec{
 	"upstream source unavailable":                 {Code: "llm.upstream_source_unavailable", Message: "upstream source unavailable"},
 	"route not found":                             {Code: "route.not_found", Message: "route not found"},
 	"api_keys is required":                        {Code: "llm.api_keys_required", Message: "api_keys is required"},
+	"invalid model icon":                          {Code: "llm.model_icon_invalid", Message: "invalid model icon"},
+	"invalid model icon file":                     {Code: "llm.model_icon_file_invalid", Message: "invalid model icon file"},
+	"model icon file too large":                   {Code: "llm.model_icon_file_too_large", Message: "model icon file too large"},
+	"model icon asset not found":                  {Code: "llm.model_icon_asset_not_found", Message: "model icon asset not found"},
+	"model icon asset is in use":                  {Code: "llm.model_icon_asset_in_use", Message: "model icon asset is in use"},
+	"built-in model vendor cannot be deleted":     {Code: "llm.model_vendor_builtin", Message: "built-in model vendor cannot be deleted"},
+	"model vendor is in use":                      {Code: "llm.model_vendor_in_use", Message: "model vendor is in use"},
+	"circuit breaker is disabled":                 {Code: "llm.circuit_breaker_disabled", Message: "circuit breaker is disabled"},
 
 	"usage balance is insufficient":                                {Code: CodeBillingInsufficientFunds, Message: "insufficient balance"},
 	"usage concurrency limit exceeded":                             {Code: "billing.concurrency_limit_exceeded", Message: "too many concurrent paid requests"},
@@ -247,6 +259,7 @@ var exactErrorSpecs = map[string]errorSpec{
 	"redemption user limit exceeded":                               {Code: "billing.redemption_user_limit_exceeded", Message: "redemption user limit exceeded"},
 	"payment is required":                                          {Code: CodeBillingPaymentRequired, Message: "payment is required"},
 	"payment provider is unavailable":                              {Code: "payment.provider_unavailable", Message: "payment provider is unavailable"},
+	"epay gateway url is invalid":                                  {Code: "payment.epay_gateway_invalid", Message: "epay gateway url is invalid"},
 	"create checkout failed":                                       {Code: "payment.checkout_failed", Message: "create checkout failed"},
 	"provider mismatch":                                            {Code: "payment.notification_mismatch", Message: "payment notification does not match the order"},
 	"checkout id mismatch":                                         {Code: "payment.notification_mismatch", Message: "payment notification does not match the order"},
@@ -259,6 +272,7 @@ var exactErrorSpecs = map[string]errorSpec{
 	"stripe webhook is not configured":                             {Code: "payment.webhook_not_configured", Message: "stripe webhook is not configured"},
 	"read webhook body failed":                                     {Code: "payment.invalid_webhook_body", Message: "invalid webhook body"},
 	"webhook body too large":                                       {Code: "payment.webhook_body_too_large", Message: "webhook body too large"},
+	"temporary chat context is too large":                          {Code: "temporary_chat.context_too_large", Message: "temporary chat context is too large"},
 	"invalid stripe signature":                                     {Code: "payment.invalid_signature", Message: "invalid stripe signature"},
 	"invalid stripe event":                                         {Code: "payment.invalid_event", Message: "invalid stripe event"},
 	"missing order_no":                                             {Code: "payment.order_no_required", Message: "order_no is required"},
@@ -277,6 +291,8 @@ var exactErrorSpecs = map[string]errorSpec{
 	"mineru runtime service unavailable":    {Code: "runtime.mineru_unavailable", Message: "mineru runtime service unavailable"},
 
 	"memory_key is required":          {Code: "memory.key_required", Message: "memory_key is required"},
+	"user memory limit exceeded":      {Code: "memory.limit_exceeded", Message: "user memory limit exceeded"},
+	"mcp server limit exceeded":       {Code: "mcp.server_limit_exceeded", Message: "mcp server limit exceeded"},
 	"invalid mcp server id":           {Code: "mcp.server.invalid_id", Message: "invalid mcp server id"},
 	"invalid mcp tool id":             {Code: "mcp.tool.invalid_id", Message: "invalid mcp tool id"},
 	"invalid mcp server name":         {Code: "mcp.invalid_server_name", Message: "invalid mcp server name"},
@@ -292,6 +308,14 @@ var exactErrorSpecs = map[string]errorSpec{
 	"rate limit exceeded":              {Code: CodeRateLimitExceeded, Message: "rate limit exceeded"},
 	"too many refresh attempts":        {Code: "rate_limit.refresh_exceeded", Message: "too many refresh attempts"},
 	"too many authentication attempts": {Code: "rate_limit.authentication_exceeded", Message: "too many authentication attempts"},
+
+	"content moderation event not found":                                     {Code: "content_moderation.event_not_found", Message: "content moderation event not found"},
+	"content moderation service config and policy are required when enabled": {Code: "content_moderation.config_required", Message: "content moderation service config and policy are required when enabled"},
+	"invalid content moderation config":                                      {Code: "content_moderation.invalid_config", Message: "invalid content moderation config"},
+	"invalid content moderation base url":                                    {Code: "content_moderation.invalid_config", Message: "invalid content moderation base url"},
+	"invalid content moderation model":                                       {Code: "content_moderation.invalid_config", Message: "invalid content moderation model"},
+	"content moderation probe failed":                                        {Code: "content_moderation.probe_failed", Message: "content moderation probe failed"},
+	"content blocked by moderation":                                          {Code: "content_moderation.blocked", Message: "content blocked by moderation"},
 
 	"deleting this identity provider would remove the only login method for some users": {Code: "identity_provider.delete_conflict", Message: "deleting this identity provider would remove the only login method for some users"},
 }
@@ -371,37 +395,13 @@ func InferErrorCode(status int, msg string) string {
 	}
 }
 
-// PublicErrorMessage normalizes legacy handler messages into a safe API fallback.
-// It intentionally preserves client-side validation context while hiding 5xx
-// internals behind requestId + server logs.
+// PublicErrorMessage 返回可对外展示的错误文案：命中白名单则用规范文本，否则用该状态码的通用文案。
 func PublicErrorMessage(status int, code string, msg string) string {
 	msg = strings.TrimSpace(msg)
 	if spec, ok := resolveErrorSpec(status, msg); ok {
 		return spec.Message
 	}
-	if msg == "" {
-		msg = fallbackMessage(status, code)
-	}
-
-	switch {
-	case status >= http.StatusInternalServerError:
-		return fallbackMessage(status, code)
-	case status == http.StatusBadGateway:
-		return fallbackMessage(status, code)
-	case status == http.StatusServiceUnavailable:
-		return fallbackMessage(status, code)
-	}
-
-	switch code {
-	case CodeAuthUnauthorized:
-		return "unauthorized"
-	case CodeAuthForbidden:
-		return "forbidden"
-	case CodeRateLimitExceeded:
-		return "rate limit exceeded"
-	default:
-		return msg
-	}
+	return fallbackMessage(status, code)
 }
 
 func fallbackMessage(status int, code string) string {
@@ -457,6 +457,8 @@ func fallbackMessage(status int, code string) string {
 		return "file type is not allowed"
 	case CodeUpstreamUnavailable:
 		return "upstream service unavailable"
+	case CodeUpstreamRateLimited:
+		return "upstream rate limited"
 	case CodeServiceUnavailable:
 		return "service unavailable"
 	}
@@ -582,9 +584,13 @@ var fallbackMessages = map[string]string{
 	"llm.model_access_denied":                           "you do not have access to this model",
 	"llm.remote_models_unavailable":                     "remote models unavailable",
 	"llm.no_active_api_key":                             "no active api key",
+	"llm.model_vendor_builtin":                          "built-in model vendor cannot be deleted",
+	"llm.model_vendor_in_use":                           "model vendor is in use",
+	"llm.circuit_breaker_disabled":                      "circuit breaker is disabled",
 	"llm.invalid_adapter":                               "invalid adapter",
 	"llm.invalid_compatible":                            "invalid compatible",
 	"llm.invalid_platform_model_name":                   "invalid platform model name",
+	"llm.invalid_model_capabilities":                    "invalid model capability limits",
 	"llm.invalid_route_protocol_combination":            "invalid route protocol combination",
 	"llm.system_prompt_too_long":                        "system prompt too long",
 	"llm.platform_model_name_required":                  "platform model name is required",
@@ -607,6 +613,7 @@ var fallbackMessages = map[string]string{
 	"billing.redemption_code_exhausted":                 "redemption code exhausted",
 	"billing.redemption_user_limit_exceeded":            "redemption user limit exceeded",
 	"payment.provider_unavailable":                      "payment provider is unavailable",
+	"payment.epay_gateway_invalid":                      "epay gateway url is invalid",
 	"payment.checkout_failed":                           "create checkout failed",
 	"payment.notification_mismatch":                     "payment notification does not match the order",
 	"payment.epay_type_unsupported":                     "epay payment type is not supported",
@@ -618,6 +625,7 @@ var fallbackMessages = map[string]string{
 	"payment.invalid_signature":                         "invalid stripe signature",
 	"payment.invalid_event":                             "invalid stripe event",
 	"payment.order_no_required":                         "order_no is required",
+	"temporary_chat.context_too_large":                  "temporary chat context is too large",
 	"settings.invalid_namespace":                        "invalid namespace",
 	"settings.invalid_key":                              "invalid setting key",
 	"settings.not_found":                                "setting not found",
@@ -654,7 +662,7 @@ func resolveErrorSpec(status int, msg string) (errorSpec, bool) {
 			return errorSpec{Code: "settings.invalid_key", Message: detail}, true
 		case strings.Contains(detail, "smtp"):
 			return errorSpec{Code: "settings.smtp_invalid", Message: detail}, true
-		case strings.Contains(detail, "payment_providers"):
+		case strings.Contains(detail, "payment_providers") || strings.Contains(detail, "billing:epay_"):
 			return errorSpec{Code: "settings.billing_payment_invalid", Message: detail}, true
 		case strings.Contains(detail, "model_option_"):
 			return errorSpec{Code: "settings.model_option_policy_invalid", Message: detail}, true

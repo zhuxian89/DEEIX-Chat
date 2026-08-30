@@ -1,11 +1,17 @@
 package conversation
 
 import (
+	"strings"
+
 	appcompact "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/compact"
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/conversation"
-	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/llm"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/ports/llm"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/repository"
 )
+
+func stringsEqualFold(a, b string) bool {
+	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+}
 
 type promptScope struct {
 	FullBranchMessages []model.Message
@@ -44,6 +50,30 @@ func (s promptScope) activeMessages() []model.Message {
 	return s.FullBranchMessages
 }
 
+// estimatePromptScopeTokens mirrors the exact rolling-snapshot scope that is
+// eligible for the next upstream request. Keeping this estimate beside
+// buildPromptScope prevents the hard-budget preflight from double-counting
+// covered history or overlooking the summary and image-token reserve.
+func estimatePromptScopeTokens(
+	messages []model.Message,
+	snapshot *model.ContextSnapshot,
+	policy contextCompactionPolicy,
+	includeReasoningContent bool,
+) int64 {
+	scope := buildPromptScope(messages, snapshot, policy)
+	activeMessages := scope.activeMessages()
+	imageTokenReserve := conversationImageTokenReserveByMessage(activeMessages)
+	var total int64
+	for index, message := range activeMessages {
+		total += estimateDomainMessageTokens(message, includeReasoningContent)
+		total += imageTokenReserve[index]
+	}
+	if scope.Snapshot != nil {
+		total += estimateTokens(scope.Snapshot.SummaryText)
+	}
+	return total
+}
+
 func (s promptScope) historicalMessageScope(conversationID uint, userID uint, currentMessageID uint) repository.HistoricalMessageScope {
 	if conversationID == 0 || userID == 0 || currentMessageID == 0 {
 		return repository.HistoricalMessageScope{}
@@ -73,6 +103,9 @@ func historyMessagesFromDomain(messages []model.Message, options historyMessageO
 	historyMsgs := make([]llm.Message, 0, len(messages))
 	for _, item := range messages {
 		if item.Role != "user" && item.Role != "assistant" && item.Role != "system" {
+			continue
+		}
+		if stringsEqualFold(item.Status, "blocked") {
 			continue
 		}
 		message := llm.Message{

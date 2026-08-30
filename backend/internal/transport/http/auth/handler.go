@@ -5,11 +5,11 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"time"
 
 	appauth "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/auth"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/user"
+	domainknowledgebase "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/knowledgebase"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/response"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
@@ -1447,6 +1447,7 @@ func (h *Handler) StartAccountDeleteVerification(c *gin.Context) {
 // @Success 200 {object} DeleteAccountResponseDoc
 // @Failure 401 {object} ErrorDoc
 // @Failure 403 {object} ErrorDoc
+// @Failure 409 {object} ErrorDoc
 // @Failure 500 {object} ErrorDoc
 // @Router /me [delete]
 func (h *Handler) DeleteMe(c *gin.Context) {
@@ -1477,7 +1478,13 @@ func (h *Handler) DeleteMe(c *gin.Context) {
 			response.ErrorFrom(c, http.StatusBadRequest, err)
 			return
 		}
-		if strings.Contains(err.Error(), "verification") || strings.Contains(err.Error(), "email") {
+		if errors.Is(err, domainknowledgebase.ErrBuiltinFileOwnerDeleteBlocked) {
+			response.ErrorWithCode(c, http.StatusConflict, "knowledge_base.owner_file_reference", "account owns files referenced by builtin knowledge bases")
+			return
+		}
+		if errors.Is(err, appauth.ErrSecurityVerificationMethodUnavailable) ||
+			errors.Is(err, appauth.ErrSecurityVerificationEmailInvalid) ||
+			errors.Is(err, appauth.ErrSecurityVerificationCodeInvalid) {
 			response.ErrorFrom(c, http.StatusBadRequest, err)
 			return
 		}
