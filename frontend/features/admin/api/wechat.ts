@@ -56,6 +56,10 @@ export type WeChatSummary = {
   failureCount: number;
 };
 
+export type WeChatSettings = {
+  adminContact: string;
+};
+
 export type WeChatBuildInfo = {
   product: string;
   version: string;
@@ -81,6 +85,14 @@ export function listAdminWeChatActions(accessToken: string) {
 
 export function getAdminWeChatSummary(accessToken: string) {
   return authedRequest<WeChatSummary>("/api/v1/admin/wechat/summary", { accessToken }, true);
+}
+
+export function getAdminWeChatSettings(accessToken: string) {
+  return authedRequest<WeChatSettings>("/api/v1/admin/wechat/settings", { accessToken }, true);
+}
+
+export function updateAdminWeChatSettings(accessToken: string, body: WeChatSettings) {
+  return authedRequest<{ saved: boolean }>("/api/v1/admin/wechat/settings", { method: "PATCH", accessToken, body }, true);
 }
 
 export function listAdminWeChatRules(accessToken: string, page = 1, pageSize = 100) {

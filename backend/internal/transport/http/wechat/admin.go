@@ -34,6 +34,14 @@ type replyTemplateRequest struct {
 	Enabled      *bool  `json:"enabled"`
 }
 
+type settingsRequest struct {
+	AdminContact string `json:"adminContact" binding:"required,max=128"`
+}
+
+type settingsResponse struct {
+	AdminContact string `json:"adminContact"`
+}
+
 type actionResponse struct {
 	Key   string `json:"key"`
 	Label string `json:"label"`
@@ -108,6 +116,28 @@ func (h *AdminHandler) Summary(c *gin.Context) {
 		return
 	}
 	response.Success(c, summaryResponse{IssuanceCount: stats.IssuanceCount, SuccessCount: stats.SuccessCount, FailureCount: stats.FailureCount})
+}
+
+func (h *AdminHandler) Settings(c *gin.Context) {
+	settings, err := h.service.GetSettings(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "load WeChat settings failed")
+		return
+	}
+	response.Success(c, settingsResponse{AdminContact: settings.AdminContact})
+}
+
+func (h *AdminHandler) UpdateSettings(c *gin.Context) {
+	var req settingsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.InvalidRequestBody(c, err)
+		return
+	}
+	if err := h.service.SaveSettings(c.Request.Context(), domainwechat.Settings{AdminContact: req.AdminContact}); err != nil {
+		writeAdminError(c, err, "update WeChat settings failed")
+		return
+	}
+	response.Success(c, gin.H{"saved": true})
 }
 
 func (h *AdminHandler) ListRules(c *gin.Context) {

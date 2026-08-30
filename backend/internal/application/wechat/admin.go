@@ -123,6 +123,22 @@ func (s *AdminService) Stats(ctx context.Context) (domainwechat.Stats, error) {
 	return s.repo.Stats(ctx)
 }
 
+func (s *AdminService) GetSettings(ctx context.Context) (domainwechat.Settings, error) {
+	contact, err := s.repo.GetAdminContact(ctx)
+	if err != nil {
+		return domainwechat.Settings{}, err
+	}
+	return domainwechat.Settings{AdminContact: contact}, nil
+}
+
+func (s *AdminService) SaveSettings(ctx context.Context, settings domainwechat.Settings) error {
+	settings.AdminContact = strings.TrimSpace(settings.AdminContact)
+	if settings.AdminContact == "" || len(settings.AdminContact) > 128 {
+		return repository.ErrInvalidInput
+	}
+	return s.repo.SetAdminContact(ctx, settings.AdminContact)
+}
+
 func normalizePage(page, pageSize int) (int, int) {
 	if page < 1 {
 		page = 1

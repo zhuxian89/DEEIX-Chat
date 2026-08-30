@@ -69,7 +69,7 @@ func TestHandleTextMessageUsesFixedMessagesForUsedCodeStates(t *testing.T) {
 		content string
 	}{
 		{name: "existing user", result: domainwechat.IssueResult{Code: "REG-USED", Used: true}, content: "你的专属注册码：REG-USED\n该注册码已使用。"},
-		{name: "deleted user", result: domainwechat.IssueResult{Code: "REG-DELETED", Used: true, DeletedUser: true}, content: "账号已注销，请联系管理员获取新的注册码。"},
+		{name: "deleted user", result: domainwechat.IssueResult{Code: "REG-DELETED", Used: true, DeletedUser: true}, content: "该微信曾注册的账号已被注销，无法自动领取新注册码。\n如需重新注册，请添加管理员微信：zhuxian1005，并说明“申请新注册码”。"},
 		{name: "never registered", result: domainwechat.IssueResult{Code: "REG-NEW", Created: true}, content: "你的专属注册码：REG-NEW"},
 	}
 	for _, tt := range tests {
@@ -82,5 +82,13 @@ func TestHandleTextMessageUsesFixedMessagesForUsedCodeStates(t *testing.T) {
 				t.Fatalf("content = %q, want %q", result.Content, tt.content)
 			}
 		})
+	}
+}
+
+func TestDeletedAccountMessageUsesConfiguredContact(t *testing.T) {
+	got := deletedAccountMessage(" custom-admin ")
+	want := "该微信曾注册的账号已被注销，无法自动领取新注册码。\n如需重新注册，请添加管理员微信：custom-admin，并说明“申请新注册码”。"
+	if got != want {
+		t.Fatalf("message = %q, want %q", got, want)
 	}
 }

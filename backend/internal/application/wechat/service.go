@@ -12,10 +12,7 @@ import (
 
 const keyword = "13004"
 
-const (
-	usedRegistrationCodeMessage = "\n该注册码已使用。"
-	deletedAccountMessage       = "账号已注销，请联系管理员获取新的注册码。"
-)
+const usedRegistrationCodeMessage = "\n该注册码已使用。"
 
 type Service struct {
 	repo repository.WeChatRegistrationRepository
@@ -70,7 +67,7 @@ func (s *Service) HandleTextMessage(ctx context.Context, openID, content string)
 			return MessageResult{}, err
 		}
 		if issued.DeletedUser {
-			return MessageResult{Matched: true, Content: deletedAccountMessage, Keyword: keyword, Action: domainwechat.ActionIssueRegistrationCode, Outcome: domainwechat.ResultReplayed}, nil
+			return MessageResult{Matched: true, Content: deletedAccountMessage(domainwechat.DefaultAdminContact), Keyword: keyword, Action: domainwechat.ActionIssueRegistrationCode, Outcome: domainwechat.ResultReplayed}, nil
 		}
 		content := "你的专属注册码：" + issued.Code
 		if issued.Used {
@@ -129,7 +126,11 @@ func (s *Service) issueConfiguredMessage(ctx context.Context, repo repository.We
 		result.RegistrationCodeID = issue.RegistrationCodeID
 		result.Outcome = log.Result
 		if issue.DeletedUser {
-			result.Content = deletedAccountMessage
+			contact, err := repo.GetAdminContact(ctx)
+			if err != nil {
+				return result, err
+			}
+			result.Content = deletedAccountMessage(contact)
 			return result, nil
 		}
 		result.Content = strings.ReplaceAll(templateContent, "{{CODE}}", issue.Code)
@@ -174,6 +175,14 @@ func (s *Service) logFailure(ctx context.Context, repo repository.WeChatAdminRep
 		return err
 	}
 	return repository.ErrInvalidInput
+}
+
+func deletedAccountMessage(contact string) string {
+	contact = strings.TrimSpace(contact)
+	if contact == "" {
+		contact = domainwechat.DefaultAdminContact
+	}
+	return "该微信曾注册的账号已被注销，无法自动领取新注册码。\n如需重新注册，请添加管理员微信：" + contact + "，并说明“申请新注册码”。"
 }
 
 // generateCode 复用 registrationcode 包的统一生成函数，保证注册码格式单一来源（REG- 前缀）。

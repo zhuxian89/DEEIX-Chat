@@ -49,6 +49,8 @@ func (m *Module) RegisterAdminRoutes(adminGroup *gin.RouterGroup) {
 	}
 	adminGroup.GET("/wechat/actions", m.AdminHandler.Actions)
 	adminGroup.GET("/wechat/summary", m.AdminHandler.Summary)
+	adminGroup.GET("/wechat/settings", m.AdminHandler.Settings)
+	adminGroup.PATCH("/wechat/settings", m.AdminHandler.UpdateSettings)
 	adminGroup.GET("/wechat/rules", m.AdminHandler.ListRules)
 	adminGroup.POST("/wechat/rules", m.AdminHandler.CreateRule)
 	adminGroup.PATCH("/wechat/rules/:id", m.AdminHandler.UpdateRule)

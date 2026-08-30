@@ -9,7 +9,12 @@ const (
 	ResultReplayed              = "replayed"
 	ResultHandled               = "handled"
 	ResultFailed                = "failed"
+	DefaultAdminContact         = "zhuxian1005"
 )
+
+type Settings struct {
+	AdminContact string
+}
 
 type ReplyTemplate struct {
 	ID           uint

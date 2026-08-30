@@ -32,4 +32,6 @@ type WeChatAdminRepository interface {
 	ListInvocationLogs(ctx context.Context, offset, limit int, result, action, query string) ([]domainwechat.InvocationLog, int64, error)
 	CreateInvocationLog(ctx context.Context, item *domainwechat.InvocationLog) error
 	Stats(ctx context.Context) (domainwechat.Stats, error)
+	GetAdminContact(ctx context.Context) (string, error)
+	SetAdminContact(ctx context.Context, contact string) error
 }

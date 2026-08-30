@@ -14,6 +14,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	settingsNamespace       = "wechat"
+	adminContactSettingKey  = "admin_contact"
+	adminContactDescription = "微信公众号管理员联系方式"
+)
+
 type Repo struct{ db *gorm.DB }
 
 func NewRepo(db *gorm.DB) *Repo { return &Repo{db: db} }
@@ -310,6 +316,37 @@ func (r *Repo) Stats(ctx context.Context) (domainwechat.Stats, error) {
 		return stats, translateError(err)
 	}
 	return stats, nil
+}
+
+func (r *Repo) GetAdminContact(ctx context.Context) (string, error) {
+	var item model.SystemSetting
+	err := r.db.WithContext(ctx).
+		Where("namespace = ? AND key = ?", settingsNamespace, adminContactSettingKey).
+		First(&item).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return domainwechat.DefaultAdminContact, nil
+	}
+	if err != nil {
+		return "", translateError(err)
+	}
+	contact := strings.TrimSpace(item.Value)
+	if contact == "" {
+		return domainwechat.DefaultAdminContact, nil
+	}
+	return contact, nil
+}
+
+func (r *Repo) SetAdminContact(ctx context.Context, contact string) error {
+	item := model.SystemSetting{Namespace: settingsNamespace, Key: adminContactSettingKey}
+	err := r.db.WithContext(ctx).
+		Where("namespace = ? AND key = ?", settingsNamespace, adminContactSettingKey).
+		Assign(model.SystemSetting{
+			Value:       strings.TrimSpace(contact),
+			ValueType:   "string",
+			Description: adminContactDescription,
+		}).
+		FirstOrCreate(&item).Error
+	return translateError(err)
 }
 
 func toReplyTemplate(item model.WeChatReplyTemplate) domainwechat.ReplyTemplate {

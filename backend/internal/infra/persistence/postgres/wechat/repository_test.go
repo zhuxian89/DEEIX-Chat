@@ -7,6 +7,7 @@ import (
 	"time"
 
 	domainregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/registrationcode"
+	domainwechat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/wechat"
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/models"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -97,5 +98,38 @@ func TestIssueRegistrationCodeClassifiesUsedByExistingOrDeletedUser(t *testing.T
 	}
 	if !deleted.Used || !deleted.DeletedUser {
 		t.Fatalf("deleted result = used:%v deleted:%v, want used true/deleted true", deleted.Used, deleted.DeletedUser)
+	}
+}
+
+func TestAdminContactDefaultsAndPersists(t *testing.T) {
+	db, err := gorm.Open(sqlite.Open("file:wechat_admin_contact?mode=memory&cache=shared"), &gorm.Config{})
+	if err != nil {
+		if strings.Contains(err.Error(), "requires cgo") {
+			t.Skip("SQLite repository test requires CGO")
+		}
+		t.Fatalf("open sqlite: %v", err)
+	}
+	if err := db.AutoMigrate(&model.SystemSetting{}); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	repo := NewRepo(db)
+	contact, err := repo.GetAdminContact(context.Background())
+	if err != nil {
+		t.Fatalf("get default contact: %v", err)
+	}
+	if contact != domainwechat.DefaultAdminContact {
+		t.Fatalf("default contact = %q, want %q", contact, domainwechat.DefaultAdminContact)
+	}
+
+	if err := repo.SetAdminContact(context.Background(), "new-admin"); err != nil {
+		t.Fatalf("set contact: %v", err)
+	}
+	contact, err = repo.GetAdminContact(context.Background())
+	if err != nil {
+		t.Fatalf("get saved contact: %v", err)
+	}
+	if contact != "new-admin" {
+		t.Fatalf("saved contact = %q, want new-admin", contact)
 	}
 }

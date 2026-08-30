@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Pencil, Plus, Power, RefreshCw } from "lucide-react";
+import { Check, Pencil, Plus, Power, RefreshCw, Save } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 
@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   createAdminWeChatRule,
   createAdminWeChatTemplate,
+  getAdminWeChatSettings,
   getAdminWeChatSummary,
   getPublicBuildInfo,
   listAdminWeChatActions,
@@ -24,6 +25,7 @@ import {
   setAdminWeChatRuleEnabled,
   setAdminWeChatTemplateEnabled,
   updateAdminWeChatRule,
+  updateAdminWeChatSettings,
   updateAdminWeChatTemplate,
   type WeChatActionOption,
   type WeChatBuildInfo,
@@ -31,6 +33,7 @@ import {
   type WeChatIssuanceRecord,
   type WeChatKeywordRule,
   type WeChatReplyTemplate,
+  type WeChatSettings,
   type WeChatSummary,
 } from "@/features/admin/api";
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
@@ -57,6 +60,7 @@ function statusBadge(enabled: boolean) {
 export function AdminWeChatPage() {
   const [token, setToken] = React.useState("");
   const [summary, setSummary] = React.useState<WeChatSummary | null>(null);
+  const [settings, setSettings] = React.useState<WeChatSettings>({ adminContact: "" });
   const [buildInfo, setBuildInfo] = React.useState<WeChatBuildInfo | null>(null);
   const [actions, setActions] = React.useState<WeChatActionOption[]>([]);
   const [rules, setRules] = React.useState<WeChatKeywordRule[]>([]);
@@ -70,18 +74,21 @@ export function AdminWeChatPage() {
   const [query, setQuery] = React.useState("");
   const [loading, setLoading] = React.useState(true);
   const [refreshing, setRefreshing] = React.useState(false);
+  const [savingSettings, setSavingSettings] = React.useState(false);
   const [ruleDraft, setRuleDraft] = React.useState<RuleDraft | null>(null);
   const [templateDraft, setTemplateDraft] = React.useState<TemplateDraft | null>(null);
 
   const loadBase = React.useCallback(async (accessToken: string) => {
-    const [summaryResult, actionResult, ruleResult, templateResult, buildResult] = await Promise.all([
+    const [summaryResult, settingsResult, actionResult, ruleResult, templateResult, buildResult] = await Promise.all([
       getAdminWeChatSummary(accessToken),
+      getAdminWeChatSettings(accessToken),
       listAdminWeChatActions(accessToken),
       listAdminWeChatRules(accessToken),
       listAdminWeChatTemplates(accessToken),
       getPublicBuildInfo().catch(() => null),
     ]);
     setSummary(summaryResult);
+    setSettings(settingsResult);
     setActions(actionResult);
     setRules(ruleResult.results ?? []);
     setTemplates(templateResult.results ?? []);
@@ -150,6 +157,24 @@ export function AdminWeChatPage() {
       toast.success("关键词规则已保存");
     } catch {
       toast.error("关键词规则保存失败");
+    }
+  };
+
+  const saveSettings = async () => {
+    if (!token || !settings.adminContact.trim()) {
+      toast.error("请填写管理员联系方式");
+      return;
+    }
+    setSavingSettings(true);
+    try {
+      const adminContact = settings.adminContact.trim();
+      await updateAdminWeChatSettings(token, { adminContact });
+      setSettings({ adminContact });
+      toast.success("管理员联系方式已保存");
+    } catch {
+      toast.error("管理员联系方式保存失败");
+    } finally {
+      setSavingSettings(false);
     }
   };
 
@@ -251,6 +276,24 @@ export function AdminWeChatPage() {
                 <dt className="text-muted-foreground">构建时间</dt><dd>{buildInfo.buildTime}</dd>
               </dl>
             ) : <p className="mt-2 text-muted-foreground">版本信息暂时不可用。</p>}
+          </div>
+          <div className="rounded-md border p-4">
+            <div className="font-medium">异常回复设置</div>
+            <div className="mt-3 flex max-w-xl flex-col gap-2 sm:flex-row sm:items-end">
+              <label className="grid flex-1 gap-1 text-sm">
+                <span>管理员联系方式</span>
+                <Input
+                  value={settings.adminContact}
+                  maxLength={128}
+                  onChange={(event) => setSettings({ adminContact: event.target.value })}
+                  placeholder="例如微信号 zhuxian1005"
+                />
+              </label>
+              <Button onClick={() => void saveSettings()} disabled={savingSettings || !settings.adminContact.trim()}>
+                <Save className="mr-2 size-4" />保存
+              </Button>
+            </div>
+            <p className="mt-2 text-sm text-muted-foreground">已注销账号申请新注册码时，将在公众号回复中显示此联系方式。</p>
           </div>
         </TabsContent>
 
