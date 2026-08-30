@@ -282,6 +282,9 @@ func (s *Service) finalizeEmailRegistration(ctx context.Context, prepared *prepa
 			"session_id": result.SessionID,
 		}),
 	)
+	if s.telegramNotifier != nil {
+		s.telegramNotifier.NotifyRegistration(result.User.ID, result.User.Username, prepared.userItem.Email)
+	}
 	return result, nil
 }
 

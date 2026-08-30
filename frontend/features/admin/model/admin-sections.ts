@@ -8,6 +8,7 @@ export const ADMIN_SECTIONS = [
   { id: "billing", label: "Billing", href: "/billing" },
   { id: "registration-codes", label: "Registration codes", href: "/registration-codes" },
   { id: "wechat", label: "WeChat", href: "/wechat" },
+  { id: "system-settings", label: "System settings", href: "/system-settings" },
   { id: "announcements", label: "Announcements", href: "/announcements" },
   { id: "logs", label: "Logs", href: "/logs" },
   { id: "content-moderation", label: "Content moderation", href: "/content-moderation" },

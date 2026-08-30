@@ -25,6 +25,7 @@ import (
 	applogcleanup "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/logcleanup"
 	appmcp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/mcp"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/memory"
+	apptelegram "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/notify/telegram"
 	appstorage "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/objectstorage"
 	appprocessing "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/processing"
 	apppromptpreset "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/promptpreset"
@@ -76,6 +77,7 @@ import (
 	wechatrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/wechat"
 	platformruntime "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/runtime"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/lifecycle"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/security"
 	platformhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http"
 	adminhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/admin"
 	announcementhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/announcement"
@@ -115,6 +117,7 @@ type App struct {
 	embeddingClient        *embedding.Client
 	mediaArtifactClient    *mediaartifact.Client
 	moderationClient       *moderationclient.Client
+	telegramNotifier       *apptelegram.Notifier
 	backgroundCancel       context.CancelFunc
 	// shutdown 是进程关停排空信号：翻转就绪探针并断开订阅型长连接。
 	shutdown *lifecycle.Shutdown
@@ -203,6 +206,7 @@ func NewApp() (*App, error) {
 	runtimeService.SetDockerRunner(platformruntime.NewDockerRunner())
 	settingsCache := buildSettingsCache(cfg, redisClient, memoryCache)
 	runtimeSettings := settings.NewRuntimeSettings(settingsRepo, settingsCache, cfg.DataEncryptionKey)
+	runtimeSettings.SetBaseline(cfg)
 	settingsHandler := settingshttp.NewHandler(settingsService, runtimeSettings, runtimeService, runtimeCfg)
 	settingsModule := settingshttp.NewModule(settingsHandler)
 	if err = settingsService.Seed(context.Background(), cfg); err != nil {
@@ -224,6 +228,11 @@ func NewApp() (*App, error) {
 	}
 
 	userRepo := userrepo.NewRepo(db)
+	telegramNotifier := apptelegram.NewNotifier(
+		settingsService,
+		apptelegram.NewClient(security.NewOutboundHTTPClient(cfg.StrictOutboundPolicy(), 10*time.Second), apptelegram.DefaultAPIBase),
+		log,
+	)
 	userService := user.NewService(userRepo)
 	billingRepo := billingrepo.NewRepo(db)
 	billingService := billing.NewService(billingRepo)
@@ -284,6 +293,7 @@ func NewApp() (*App, error) {
 	authService.SetProviderAuthBridge(buildProviderAuthBridge(cfg, redisClient, memoryCache))
 	authService.SetObjectStoreProvider(objectStoreProvider)
 	authService.SetAuditWriter(auditService)
+	authService.SetTelegramNotifier(telegramNotifier)
 	settingsService.SetAuthSafetyService(authService)
 	authService.SetSubscriptionResolver(billingService)
 	registrationCodeRepo := registrationcoderepo.NewRepo(db)
@@ -296,7 +306,7 @@ func NewApp() (*App, error) {
 	wechatRepo := wechatrepo.NewRepo(db)
 	wechatService := appwechat.NewServiceWithBaseURL(wechatRepo, cfg.PublicWebBaseURL)
 	wechatAdminService := appwechat.NewAdminService(wechatRepo)
-	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, cfg.WeChatCallbackToken), wechathttp.NewAdminHandler(wechatAdminService))
+	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, cfg.WeChatCallbackToken, telegramNotifier), wechathttp.NewAdminHandler(wechatAdminService))
 	bootstrapSuperAdmin, err := authService.EnsureBootstrapSuperAdmin(context.Background())
 	if err != nil {
 		return nil, err
@@ -496,6 +506,7 @@ func NewApp() (*App, error) {
 		embeddingClient:        embedClient,
 		mediaArtifactClient:    mediaArtifactClient,
 		moderationClient:       moderationClient,
+		telegramNotifier:       telegramNotifier,
 		backgroundCancel:       backgroundCancel,
 		shutdown:               shutdownSignal,
 	}, nil
@@ -578,6 +589,9 @@ func httpMaxHeaderBytes(value int) int {
 func (a *App) Close() {
 	if a.backgroundCancel != nil {
 		a.backgroundCancel()
+	}
+	if a.telegramNotifier != nil {
+		a.telegramNotifier.Close()
 	}
 	if a.redis != nil {
 		_ = a.redis.Close()

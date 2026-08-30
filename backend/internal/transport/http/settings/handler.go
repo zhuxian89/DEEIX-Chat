@@ -72,6 +72,22 @@ func (h *Handler) ListAll(c *gin.Context) {
 	response.Success(c, toSettingResponseMap(data))
 }
 
+// ListAvailable godoc
+// @Summary 查询可恢复的内置配置项
+// @Tags admin/settings
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} response.Envelope
+// @Router /admin/settings/available [get]
+func (h *Handler) ListAvailable(c *gin.Context) {
+	data, err := h.service.ListAvailable(c.Request.Context())
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, "list available settings failed")
+		return
+	}
+	response.Success(c, toSettingResponseMap(data))
+}
+
 // ListByNamespace godoc
 // @Summary 查询指定 namespace 的配置
 // @Description 查询指定 namespace 下的全部配置项
@@ -417,6 +433,46 @@ func upsertSettingPatchItem(items []appsettings.PatchItem, value appsettings.Pat
 		}
 	}
 	return append(items, value)
+}
+
+// Delete godoc
+// @Summary 删除配置项
+// @Tags admin/settings
+// @Produce json
+// @Security BearerAuth
+// @Param namespace path string true "命名空间"
+// @Param key path string true "配置键"
+// @Success 200 {object} response.Envelope
+// @Router /admin/settings/{namespace}/{key} [delete]
+func (h *Handler) Delete(c *gin.Context) {
+	namespace := c.Param("namespace")
+	key := c.Param("key")
+	if err := h.service.Delete(c.Request.Context(), namespace, key); err != nil {
+		if errors.Is(err, appsettings.ErrInvalidSetting) {
+			response.ErrorFrom(c, http.StatusBadRequest, err)
+			return
+		}
+		response.Error(c, http.StatusInternalServerError, "delete setting failed")
+		return
+	}
+
+	h.runtimeSettings.InvalidateCache(c.Request.Context(), namespace, key)
+	if err := h.runtimeSettings.ApplyTo(c.Request.Context(), h.runtime); err != nil {
+		response.Error(c, http.StatusInternalServerError, "refresh runtime settings failed")
+		return
+	}
+	h.service.RecordAudit(c.Request.Context(), appsettings.AuditInput{
+		UserID:    middleware.MustUserID(c),
+		RequestID: middleware.MustRequestID(c),
+		Action:    "settings.delete",
+		ClientIP:  c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Detail: map[string]string{
+			"namespace": namespace,
+			"key":       key,
+		},
+	})
+	response.Success(c, gin.H{"deleted": true})
 }
 
 // GetTikaRuntime godoc

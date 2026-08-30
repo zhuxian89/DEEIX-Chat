@@ -22,11 +22,17 @@ type RuntimeSettings struct {
 	repo              repository.SettingsRepository
 	cache             repository.SettingsCacheRepository
 	dataEncryptionKey string
+	baseline          *config.Config
 }
 
 // NewRuntimeSettings 创建运行时配置应用器。
 func NewRuntimeSettings(repo repository.SettingsRepository, cache repository.SettingsCacheRepository, dataEncryptionKey string) *RuntimeSettings {
 	return &RuntimeSettings{repo: repo, cache: cache, dataEncryptionKey: strings.TrimSpace(dataEncryptionKey)}
+}
+
+// SetBaseline 保存数据库覆盖前的配置，用于配置项删除后恢复其部署默认值。
+func (r *RuntimeSettings) SetBaseline(cfg config.Config) {
+	r.baseline = &cfg
 }
 
 // ApplyTo 从 DB 加载动态配置并覆盖到 cfg，同时写入 Redis 缓存。
@@ -37,6 +43,9 @@ func (r *RuntimeSettings) ApplyTo(ctx context.Context, runtime *config.Runtime) 
 	}
 
 	next := runtime.Snapshot()
+	if r.baseline != nil {
+		next = *r.baseline
+	}
 	for _, item := range items {
 		r.cacheSet(ctx, item)
 		value, err := r.runtimeValue(item)

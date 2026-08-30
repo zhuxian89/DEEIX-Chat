@@ -47,6 +47,12 @@ type Service struct {
 	auditWriter          auditWriter
 	avatarFileValidator  avatarFileValidator
 	providerAuthBridge   repository.ProviderAuthBridgeRepository
+	telegramNotifier     registrationNotifier
+}
+
+// registrationNotifier 把新用户注册事件异步通知管理员。
+type registrationNotifier interface {
+	NotifyRegistration(userID uint, username string, email string)
 }
 
 // GeoResolver 解析客户端 IP 的地理与网络归属信息。
@@ -145,6 +151,11 @@ func (s *Service) ShouldUseSecureCookies() bool {
 // SetAuditWriter 注入认证域审计写入器。
 func (s *Service) SetAuditWriter(writer auditWriter) {
 	s.auditWriter = writer
+}
+
+// SetTelegramNotifier 注入新用户注册管理员通知器。
+func (s *Service) SetTelegramNotifier(notifier registrationNotifier) {
+	s.telegramNotifier = notifier
 }
 
 // AuditInput 描述认证域审计写入。

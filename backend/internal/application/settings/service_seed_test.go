@@ -378,3 +378,25 @@ func TestSeedKeepsCustomModelOptionAllowedPaths(t *testing.T) {
 		t.Fatalf("expected custom model option defaults to stay unchanged, got %q", got)
 	}
 }
+
+func TestSeedAddsNotifyDefaults(t *testing.T) {
+	repo := newSettingsSeedRepo()
+	service := NewService(repo, "")
+
+	if err := service.Seed(context.Background(), config.Config{}); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+	enabled := repo.items["notify:enabled"]
+	if enabled.Value != "true" {
+		t.Fatalf("expected notify:enabled default true, got %q", enabled.Value)
+	}
+	if _, ok := repo.items["notify:bot_token"]; !ok {
+		t.Fatal("expected notify:bot_token seed to exist")
+	}
+	if !isSensitiveSetting("notify", "bot_token") {
+		t.Fatal("expected notify:bot_token to be sensitive")
+	}
+	if isSensitiveSetting("notify", "chat_id") {
+		t.Fatal("expected notify:chat_id not to be sensitive")
+	}
+}

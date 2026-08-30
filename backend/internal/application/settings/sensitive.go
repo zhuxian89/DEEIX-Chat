@@ -26,6 +26,7 @@ var sensitiveSettingKeys = map[string]struct{}{
 	"extract:llm_ocr_auth_token":           {},
 	"file:embedding_key":                   {},
 	"content_moderation:api_key":           {},
+	"notify:bot_token":                     {},
 }
 
 func isSensitiveSetting(namespace string, key string) bool {
@@ -98,6 +99,10 @@ func (s *Service) preparePatchItemsForStorage(patches []PatchItem) ([]domainsett
 			Namespace: p.Namespace,
 			Key:       p.Key,
 			Value:     p.Value,
+		}
+		if definition, ok := defaultSetting(p.Namespace, p.Key); ok {
+			item.ValueType = definition.ValueType
+			item.Description = definition.Description
 		}
 		if p.Clear {
 			item.Value = ""

@@ -30,12 +30,19 @@ func NewModule(handler *Handler, adminHandlers ...*AdminHandler) *Module {
 }
 
 type Handler struct {
-	service *appwechat.Service
-	token   string
+	service  *appwechat.Service
+	token    string
+	notifier wechatNotifier
 }
 
-func NewHandler(service *appwechat.Service, token string) *Handler {
-	return &Handler{service: service, token: strings.TrimSpace(token)}
+// wechatNotifier 镜像公众号对外发送的消息到管理员通知渠道。
+type wechatNotifier interface {
+	NotifyWeChatMessage(openID string, messageType string, content string)
+	NotifyWeChatReply(openID string, content string)
+}
+
+func NewHandler(service *appwechat.Service, token string, notifier wechatNotifier) *Handler {
+	return &Handler{service: service, token: strings.TrimSpace(token), notifier: notifier}
 }
 
 func (m *Module) RegisterPublicRoutes(api *gin.RouterGroup) {
@@ -104,6 +111,9 @@ func (h *Handler) Receive(c *gin.Context) {
 		response.Error(c, http.StatusBadRequest, "invalid wechat message")
 		return
 	}
+	if h.notifier != nil {
+		h.notifier.NotifyWeChatMessage(message.FromUserName, message.MsgType, message.Content)
+	}
 	if message.MsgType != "text" {
 		c.String(http.StatusOK, "success")
 		return
@@ -127,6 +137,9 @@ func (h *Handler) Receive(c *gin.Context) {
 		return
 	}
 	c.Data(http.StatusOK, "application/xml; charset=utf-8", reply)
+	if h.notifier != nil {
+		h.notifier.NotifyWeChatReply(message.FromUserName, result.Content)
+	}
 }
 
 func (h *Handler) validSignature(c *gin.Context) bool {

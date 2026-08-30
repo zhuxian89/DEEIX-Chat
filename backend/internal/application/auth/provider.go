@@ -1264,6 +1264,9 @@ func (s *Service) resolveProviderUserWithRegistrationCode(ctx context.Context, p
 		}
 		return nil, err
 	}
+	if s.telegramNotifier != nil {
+		s.telegramNotifier.NotifyRegistration(userItem.ID, userItem.Username, userItem.Email)
+	}
 	return userItem, nil
 }
 

@@ -148,6 +148,7 @@ func isSensitiveSettingKey(key string) bool {
 	return strings.Contains(normalized, "password") ||
 		strings.Contains(normalized, "secret") ||
 		strings.Contains(normalized, "auth_token") ||
+		strings.HasSuffix(normalized, "_token") ||
 		strings.Contains(normalized, "api_key") ||
 		strings.HasSuffix(normalized, "_key")
 }

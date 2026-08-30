@@ -192,6 +192,11 @@ func defaultSettings() []domainsettings.SystemSetting {
 		{Namespace: "mcp", Key: "mcp_max_tool_calls_per_run", Value: "8", ValueType: "int", Description: "单次 MCP 工具运行最大 MCP Tool Call 次数"},
 		{Namespace: "mcp", Key: "mcp_tool_prompt", Value: "", ValueType: "string", Description: "MCP Tool 调用提示词；空串使用内置默认值"},
 
+		// 管理员通知配置
+		{Namespace: "notify", Key: "enabled", Value: "true", ValueType: "bool", Description: "是否启用管理员 Telegram 通知"},
+		{Namespace: "notify", Key: "bot_token", Value: "", ValueType: "string", Description: "Telegram Bot Token"},
+		{Namespace: "notify", Key: "chat_id", Value: "", ValueType: "string", Description: "管理员 Telegram Chat ID"},
+
 		// 熔断配置
 		{Namespace: "circuit", Key: "channel_failure_threshold", Value: "3", ValueType: "int", Description: "熔断触发次数"},
 		{Namespace: "circuit", Key: "channel_failure_window_seconds", Value: "120", ValueType: "int", Description: "计数窗口(秒)"},
@@ -201,6 +206,15 @@ func defaultSettings() []domainsettings.SystemSetting {
 
 func defaultSettingsWithConfig(cfg config.Config) []domainsettings.SystemSetting {
 	return defaultSettings()
+}
+
+func defaultSetting(namespace, key string) (domainsettings.SystemSetting, bool) {
+	for _, item := range defaultSettings() {
+		if item.Namespace == namespace && item.Key == key {
+			return item, true
+		}
+	}
+	return domainsettings.SystemSetting{}, false
 }
 
 func obsoleteSettings() []domainsettings.SystemSetting {

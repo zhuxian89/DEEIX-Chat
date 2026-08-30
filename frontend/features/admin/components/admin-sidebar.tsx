@@ -28,6 +28,7 @@ const ADMIN_SECTION_LABEL_KEYS: Record<AdminSection, string> = {
   billing: "sections.billing",
   "registration-codes": "sections.registrationCodes",
   wechat: "sections.wechat",
+  "system-settings": "sections.systemSettings",
   announcements: "sections.announcements",
   logs: "sections.logs",
   "content-moderation": "sections.contentModeration",

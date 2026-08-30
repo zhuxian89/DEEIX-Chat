@@ -24,10 +24,28 @@ func (fakeRepository) IssueRegistrationCode(_ context.Context, _ string, _ strin
 
 var _ repository.WeChatRegistrationRepository = fakeRepository{}
 
+type fakeNotifier struct {
+	messageCalls int
+	replyCalls   int
+	messageType  string
+	content      string
+}
+
+func (f *fakeNotifier) NotifyWeChatMessage(_ string, messageType string, content string) {
+	f.messageCalls++
+	f.messageType = messageType
+	f.content = content
+}
+
+func (f *fakeNotifier) NotifyWeChatReply(_ string, content string) {
+	f.replyCalls++
+	f.content = content
+}
+
 func TestVerifySignature(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token").Verify)
+	router.GET("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token", nil).Verify)
 	values := url.Values{"timestamp": {"1"}, "nonce": {"2"}, "echostr": {"ok"}}
 	parts := []string{"token", "1", "2"}
 	sort.Strings(parts)
@@ -44,7 +62,7 @@ func TestModuleRegistersPublicCallbackPath(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	api := router.Group("/api/v1")
-	NewModule(NewHandler(appwechat.NewService(fakeRepository{}), "token")).RegisterPublicRoutes(api)
+	NewModule(NewHandler(appwechat.NewService(fakeRepository{}), "token", nil)).RegisterPublicRoutes(api)
 
 	values := url.Values{"timestamp": {"1"}, "nonce": {"2"}, "echostr": {"ok"}}
 	parts := []string{"token", "1", "2"}
@@ -61,13 +79,32 @@ func TestModuleRegistersPublicCallbackPath(t *testing.T) {
 func TestReceiveKeepsRegistrationTextKeyword(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.POST("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token").Receive)
+	router.POST("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token", nil).Receive)
 
 	body := `<xml><ToUserName>official-account</ToUserName><FromUserName>openid-text</FromUserName><CreateTime>1</CreateTime><MsgType>text</MsgType><Content>13004</Content></xml>`
 	recorder := httptest.NewRecorder()
 	router.ServeHTTP(recorder, signedRequest(http.MethodPost, "/wechat/callback", body))
 	if recorder.Code != http.StatusOK || !strings.Contains(recorder.Body.String(), "ABCD-EFGH-IJKL-MNPQ") {
 		t.Fatalf("status=%d body=%q", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestReceiveNotifiesAllWechatMessages(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	notifier := &fakeNotifier{}
+	router := gin.New()
+	router.POST("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token", notifier).Receive)
+
+	body := `<xml><ToUserName>official-account</ToUserName><FromUserName>openid-text</FromUserName><CreateTime>1</CreateTime><MsgType>text</MsgType><Content>hello</Content></xml>`
+	recorder := httptest.NewRecorder()
+	request := signedRequest(http.MethodPost, "/wechat/callback", body)
+	router.ServeHTTP(recorder, request)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+	if notifier.messageCalls != 1 || notifier.messageType != "text" || notifier.content != "hello" {
+		t.Fatalf("expected inbound message notification, got %#v", notifier)
 	}
 }
 

@@ -114,6 +114,31 @@ func (s *Service) ListAll(ctx context.Context) (map[string][]SettingItem, error)
 	return s.groupByNamespace(items), nil
 }
 
+// ListAvailable 返回数据库中尚未存在、但系统已定义且允许动态更新的配置项。
+// 管理端可用它恢复被删除的内置配置，避免客户端伪造未知配置键。
+func (s *Service) ListAvailable(ctx context.Context) (map[string][]SettingItem, error) {
+	items, err := s.repo.ListAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	present := make(map[string]struct{}, len(items))
+	for _, item := range items {
+		present[settingKey(item.Namespace, item.Key)] = struct{}{}
+	}
+
+	result := make(map[string][]SettingItem)
+	for _, definition := range defaultSettings() {
+		if !validNamespaces[definition.Namespace] {
+			continue
+		}
+		if _, exists := present[settingKey(definition.Namespace, definition.Key)]; exists {
+			continue
+		}
+		result[definition.Namespace] = append(result[definition.Namespace], s.settingResponse(definition))
+	}
+	return result, nil
+}
+
 // ListByNamespace 查询指定 namespace 的配置。
 func (s *Service) ListByNamespace(ctx context.Context, namespace string) ([]SettingItem, error) {
 	items, err := s.repo.ListByNamespace(ctx, namespace)
@@ -349,6 +374,7 @@ var validNamespaces = map[string]bool{
 	"extract": true,
 	"mcp":     true,
 	"circuit": true,
+	"notify":  true,
 }
 
 // IsValidNamespace 判断 namespace 是否允许被动态配置。
@@ -397,6 +423,20 @@ func (s *Service) BatchUpdate(ctx context.Context, patches []PatchItem) (map[str
 	}
 
 	return s.ListAll(ctx)
+}
+
+// Delete 删除一个已知配置项。删除后可通过批量更新重新创建并恢复默认元数据。
+func (s *Service) Delete(ctx context.Context, namespace, key string) error {
+	namespace = strings.TrimSpace(namespace)
+	key = strings.TrimSpace(key)
+	if !validNamespaces[namespace] {
+		return fmt.Errorf("%w: invalid namespace: %s", ErrInvalidSetting, namespace)
+	}
+	keyName := settingKey(namespace, key)
+	if _, ok := validSettingKeys[keyName]; !ok {
+		return fmt.Errorf("%w: invalid setting key: %s", ErrInvalidSetting, keyName)
+	}
+	return s.repo.Delete(ctx, namespace, key)
 }
 
 func (s *Service) groupByNamespace(items []domainsettings.SystemSetting) map[string][]SettingItem {
@@ -657,6 +697,12 @@ func validatePatchItem(item PatchItem) error {
 		return validateIntMinMax(value, 0, 5, key)
 	case "mcp:mcp_tool_prompt":
 		return validateStringMax(value, 20000, key)
+	case "notify:enabled":
+		if _, err := strconv.ParseBool(value); err != nil {
+			return fmt.Errorf("%s must be bool", key)
+		}
+	case "notify:bot_token", "notify:chat_id":
+		return validateStringMax(value, 512, key)
 	}
 	return nil
 }

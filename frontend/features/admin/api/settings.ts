@@ -44,6 +44,26 @@ export async function patchAdminSettings(
   );
 }
 
+export async function deleteAdminSetting(
+  accessToken: string,
+  namespace: string,
+  key: string,
+): Promise<{ deleted: boolean }> {
+  return authedRequest<{ deleted: boolean }>(
+    `/api/v1/admin/settings/${pathParam(namespace)}/${pathParam(key)}`,
+    { method: "DELETE", accessToken },
+    true,
+  );
+}
+
+export async function listAdminAvailableSettings(accessToken: string): Promise<SettingsGrouped> {
+  return authedRequest<SettingsGrouped>(
+    "/api/v1/admin/settings/available",
+    { accessToken },
+    true,
+  );
+}
+
 export async function getAdminTikaRuntime(accessToken: string): Promise<AdminTikaRuntimeView> {
   return authedRequest<AdminTikaRuntimeView>(
     "/api/v1/admin/settings/tika/runtime",

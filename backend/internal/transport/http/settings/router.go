@@ -23,6 +23,7 @@ func (m *Module) RegisterRoutes(api *gin.RouterGroup) {
 func (m *Module) RegisterAdminRoutes(adminGroup *gin.RouterGroup) {
 	g := adminGroup.Group("/settings")
 	g.GET("", m.Handler.ListAll)
+	g.GET("/available", m.Handler.ListAvailable)
 	g.GET("/tika/runtime", m.Handler.GetTikaRuntime)
 	g.POST("/tika/runtime/start", m.Handler.StartTikaRuntime)
 	g.POST("/tika/runtime/stop", m.Handler.StopTikaRuntime)
@@ -39,4 +40,5 @@ func (m *Module) RegisterAdminRoutes(adminGroup *gin.RouterGroup) {
 	g.POST("/embedding/reindex", m.Handler.TriggerReindex)
 	g.GET("/:namespace", m.Handler.ListByNamespace)
 	g.PATCH("", m.Handler.Patch)
+	g.DELETE("/:namespace/:key", m.Handler.Delete)
 }
