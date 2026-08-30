@@ -14463,6 +14463,45 @@ paths:
       summary: 查询指定 namespace 的配置
       tags:
       - admin/settings
+  /admin/settings/{namespace}/{key}:
+    delete:
+      parameters:
+      - description: 命名空间
+        in: path
+        name: namespace
+        required: true
+        type: string
+      - description: 配置键
+        in: path
+        name: key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Envelope'
+      security:
+      - BearerAuth: []
+      summary: 删除配置项
+      tags:
+      - admin/settings
+  /admin/settings/available:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/Envelope'
+      security:
+      - BearerAuth: []
+      summary: 查询可恢复的内置配置项
+      tags:
+      - admin/settings
   /admin/settings/docling/runtime:
     get:
       produces:

@@ -7102,6 +7102,30 @@ const docTemplate = `{
                 }
             }
         },
+        "/admin/settings/available": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin/settings"
+                ],
+                "summary": "查询可恢复的内置配置项",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/admin/settings/docling/runtime": {
             "get": {
                 "security": [
@@ -7458,6 +7482,46 @@ const docTemplate = `{
                         "type": "string",
                         "description": "命名空间",
                         "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/settings/{namespace}/{key}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "admin/settings"
+                ],
+                "summary": "删除配置项",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "命名空间",
+                        "name": "namespace",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "配置键",
+                        "name": "key",
                         "in": "path",
                         "required": true
                     }

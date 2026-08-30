@@ -7023,6 +7023,22 @@ export namespace Admin {
   /**
    * No description
    * @tags admin/settings
+   * @name SettingsAvailableList
+   * @summary 查询可恢复的内置配置项
+   * @request GET:/admin/settings/available
+   * @secure
+   */
+  export namespace SettingsAvailableList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = Envelope;
+  }
+
+  /**
+   * No description
+   * @tags admin/settings
    * @name SettingsDoclingRuntimeList
    * @summary 查询 Docling 运行状态
    * @request GET:/admin/settings/docling/runtime
@@ -7254,6 +7270,27 @@ export namespace Admin {
    */
   export namespace SettingsDetail {
     export type RequestParams = {
+      /** 命名空间 */
+      namespace: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = Envelope;
+  }
+
+  /**
+   * No description
+   * @tags admin/settings
+   * @name SettingsDelete
+   * @summary 删除配置项
+   * @request DELETE:/admin/settings/{namespace}/{key}
+   * @secure
+   */
+  export namespace SettingsDelete {
+    export type RequestParams = {
+      /** 配置键 */
+      key: string;
       /** 命名空间 */
       namespace: string;
     };
