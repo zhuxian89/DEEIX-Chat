@@ -8,10 +8,12 @@ import { normalizeAuthNextPath } from "@/shared/auth/local-path";
 export function LoginRoute() {
   const searchParams = useSearchParams();
   const invite = searchParams.get("invite") ?? undefined;
+  const code = searchParams.get("code") ?? undefined;
   return (
     <LoginPage
       nextPath={normalizeAuthNextPath(searchParams.get("next"), "")}
       invite={invite}
+      code={code}
     />
   );
 }

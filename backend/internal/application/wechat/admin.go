@@ -95,7 +95,7 @@ func (s *AdminService) SaveTemplate(ctx context.Context, item domainwechat.Reply
 func isValidRegistrationTemplate(content string) bool {
 	placeholders := templatePlaceholderPattern.FindAllString(content, -1)
 	for _, placeholder := range placeholders {
-		if placeholder != "{{CODE}}" {
+		if placeholder != "{{CODE}}" && placeholder != "{{REGISTER_LINK}}" {
 			return false
 		}
 	}

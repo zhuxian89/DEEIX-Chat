@@ -3,6 +3,7 @@ package wechat
 import (
 	"context"
 	"errors"
+	"net/url"
 	"strings"
 
 	appregistrationcode "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/registrationcode"
@@ -15,10 +16,25 @@ const keyword = "13004"
 const usedRegistrationCodeMessage = "\n该注册码已使用。"
 
 type Service struct {
-	repo repository.WeChatRegistrationRepository
+	repo    repository.WeChatRegistrationRepository
+	baseURL string
 }
 
 func NewService(repo repository.WeChatRegistrationRepository) *Service { return &Service{repo: repo} }
+
+// NewServiceWithBaseURL 携带站点根地址，用于在回复中渲染一键注册链接；
+// baseURL 为空时回退到纯注册码文案（与旧版行为一致）。
+func NewServiceWithBaseURL(repo repository.WeChatRegistrationRepository, baseURL string) *Service {
+	return &Service{repo: repo, baseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/")}
+}
+
+// registerLink 生成直达注册页并预填注册码的链接；无 baseURL 时返回空串。
+func (s *Service) registerLink(code string) string {
+	if s.baseURL == "" {
+		return ""
+	}
+	return s.baseURL + "/login?code=" + url.QueryEscape(code)
+}
 
 func (s *Service) IssueRegistrationCode(ctx context.Context, openID string) (string, error) {
 	openID = strings.TrimSpace(openID)
@@ -72,6 +88,8 @@ func (s *Service) HandleTextMessage(ctx context.Context, openID, content string)
 		content := "你的专属注册码：" + issued.Code
 		if issued.Used {
 			content += usedRegistrationCodeMessage
+		} else if link := s.registerLink(issued.Code); link != "" {
+			content += "\n点此直接注册：" + link
 		}
 		outcome := domainwechat.ResultIssued
 		if issued.Used {
@@ -134,8 +152,11 @@ func (s *Service) issueConfiguredMessage(ctx context.Context, repo repository.We
 			return result, nil
 		}
 		result.Content = strings.ReplaceAll(templateContent, "{{CODE}}", issue.Code)
+		result.Content = strings.ReplaceAll(result.Content, "{{REGISTER_LINK}}", s.registerLink(issue.Code))
 		if issue.Used {
 			result.Content += usedRegistrationCodeMessage
+		} else if link := s.registerLink(issue.Code); link != "" && !strings.Contains(templateContent, "{{REGISTER_LINK}}") {
+			result.Content += "\n点此直接注册：" + link
 		}
 		return result, nil
 	}

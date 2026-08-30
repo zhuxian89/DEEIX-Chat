@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 type LoginPageProps = {
   nextPath: string;
   invite?: string;
+  code?: string;
 };
 
 function LoginBrandMark() {
@@ -29,9 +30,9 @@ function LoginBrandMark() {
   );
 }
 
-export function LoginPage({ nextPath, invite }: LoginPageProps) {
+export function LoginPage({ nextPath, invite, code }: LoginPageProps) {
   const t = useTranslations("login");
-  const loginPage = useLoginPage({ nextPath, invite });
+  const loginPage = useLoginPage({ nextPath, invite, code });
   const {
     cancelTwoFactorChallenge,
     canShowRegisterSwitch,
@@ -73,6 +74,7 @@ export function LoginPage({ nextPath, invite }: LoginPageProps) {
     setRegisterCode,
     setRegisterPassword,
     setRegistrationCode,
+    setInvitationCode,
     setRegisterTurnstileToken,
     setResetCode,
     setResetPassword,
@@ -375,21 +377,19 @@ export function LoginPage({ nextPath, invite }: LoginPageProps) {
                     />
                   </div>
                 ) : null}
-                {invitationCode ? (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none text-foreground" htmlFor="invitation-code">
-                      {t("invitationCode")}
-                    </label>
-                    <Input
-                      id="invitation-code"
-                      autoComplete="off"
-                      className="h-9 border-input/50 opacity-60"
-                      value={invitationCode}
-                      disabled
-                      readOnly
-                    />
-                  </div>
-                ) : null}
+                <div className="space-y-2">
+                  <label className="text-sm font-medium leading-none text-foreground" htmlFor="invitation-code">
+                    {t("invitationCode")}
+                  </label>
+                  <Input
+                    id="invitation-code"
+                    autoComplete="off"
+                    className="h-9 border-input/50"
+                    placeholder={t("invitationCodePlaceholder")}
+                    value={invitationCode}
+                    onChange={(event) => setInvitationCode(event.target.value.toUpperCase())}
+                  />
+                </div>
                 {registerTurnstileRequired ? (
                   <TurnstileWidget
                     siteKey={registerTurnstileSiteKey}

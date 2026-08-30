@@ -14,6 +14,7 @@
   "registrationCode": "Registration code",
   "registrationCodePlaceholder": "Enter your registration code",
   "invitationCode": "Invitation code",
+  "invitationCodePlaceholder": "Optional invitation code",
   "useEmailVerification": "Use email instead",
   "useTwoFactorVerification": "Use two-factor instead",
   "signIn": "Sign in",

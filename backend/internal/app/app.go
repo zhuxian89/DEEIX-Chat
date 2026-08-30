@@ -294,7 +294,7 @@ func NewApp() (*App, error) {
 	invitationService := appinvitation.NewService(invitationRepo, runtimeCfg)
 	invitationModule := invitationhttp.NewModule(invitationhttp.NewHandler(invitationService))
 	wechatRepo := wechatrepo.NewRepo(db)
-	wechatService := appwechat.NewService(wechatRepo)
+	wechatService := appwechat.NewServiceWithBaseURL(wechatRepo, cfg.PublicWebBaseURL)
 	wechatAdminService := appwechat.NewAdminService(wechatRepo)
 	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, cfg.WeChatCallbackToken), wechathttp.NewAdminHandler(wechatAdminService))
 	bootstrapSuperAdmin, err := authService.EnsureBootstrapSuperAdmin(context.Background())

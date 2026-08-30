@@ -33,6 +33,7 @@ import {
 type UseLoginPageInput = {
   nextPath: string;
   invite?: string;
+  code?: string;
 };
 
 const VERIFICATION_CODE_RESEND_COOLDOWN_MS = 60_000;
@@ -53,11 +54,12 @@ function parseSecurityVerificationMethods(value: string | null): SecurityVerific
   }
 }
 
-export function useLoginPage({ nextPath, invite }: UseLoginPageInput) {
+export function useLoginPage({ nextPath, invite, code }: UseLoginPageInput) {
   const router = useRouter();
   const t = useTranslations("login");
   const resolveErrorMessage = useLocalizedErrorMessage();
   const initialInvite = (invite ?? "").trim();
+  const initialCode = (code ?? "").trim();
   const [settings, setSettings] = React.useState<LoginPageSettings>(DEFAULT_LOGIN_SETTINGS);
   const [options, setOptions] = React.useState<LoginOptionsData>(DEFAULT_LOGIN_OPTIONS);
   const [username, setUsername] = React.useState("");
@@ -67,10 +69,10 @@ export function useLoginPage({ nextPath, invite }: UseLoginPageInput) {
   const [twoFactorVerificationMethod, setTwoFactorVerificationMethod] = React.useState<SecurityVerificationMethod>("two_factor");
   const [twoFactorCode, setTwoFactorCode] = React.useState("");
   const [twoFactorEmailDebugCode, setTwoFactorEmailDebugCode] = React.useState("");
-  const [mode, setMode] = React.useState<LoginMode>(initialInvite ? "register" : "login");
+  const [mode, setMode] = React.useState<LoginMode>(initialInvite || initialCode ? "register" : "login");
   const [registerEmail, setRegisterEmail] = React.useState("");
   const [registerPassword, setRegisterPassword] = React.useState("");
-  const [registrationCode, setRegistrationCode] = React.useState("");
+  const [registrationCode, setRegistrationCode] = React.useState(initialCode);
   const [invitationCode, setInvitationCode] = React.useState(initialInvite);
   const [registerCode, setRegisterCode] = React.useState("");
   const [registerDebugCode, setRegisterDebugCode] = React.useState("");
@@ -483,6 +485,7 @@ export function useLoginPage({ nextPath, invite }: UseLoginPageInput) {
     registrationCodeRequired,
     registrationCode,
     invitationCode,
+    setInvitationCode,
     registerTurnstileRequired,
     registerTurnstileResetSignal,
     registerTurnstileSiteKey,
