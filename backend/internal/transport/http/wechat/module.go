@@ -12,6 +12,7 @@ import (
 	"time"
 
 	appwechat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/wechat"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/response"
 	"github.com/gin-gonic/gin"
 )
@@ -31,7 +32,7 @@ func NewModule(handler *Handler, adminHandlers ...*AdminHandler) *Module {
 
 type Handler struct {
 	service  *appwechat.Service
-	token    string
+	runtime  *config.Runtime
 	notifier wechatNotifier
 }
 
@@ -42,8 +43,8 @@ type wechatNotifier interface {
 	NotifyWeChatFollow(openID string)
 }
 
-func NewHandler(service *appwechat.Service, token string, notifier wechatNotifier) *Handler {
-	return &Handler{service: service, token: strings.TrimSpace(token), notifier: notifier}
+func NewHandler(service *appwechat.Service, runtime *config.Runtime, notifier wechatNotifier) *Handler {
+	return &Handler{service: service, runtime: runtime, notifier: notifier}
 }
 
 func (m *Module) RegisterPublicRoutes(api *gin.RouterGroup) {
@@ -151,10 +152,14 @@ func (h *Handler) Receive(c *gin.Context) {
 }
 
 func (h *Handler) validSignature(c *gin.Context) bool {
-	if h.token == "" {
+	if h == nil || h.runtime == nil {
 		return false
 	}
-	parts := []string{h.token, c.Query("timestamp"), c.Query("nonce")}
+	token := strings.TrimSpace(h.runtime.Snapshot().WeChatCallbackToken)
+	if token == "" {
+		return false
+	}
+	parts := []string{token, c.Query("timestamp"), c.Query("nonce")}
 	if parts[1] == "" || parts[2] == "" || c.Query("signature") == "" {
 		return false
 	}

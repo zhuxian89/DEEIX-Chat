@@ -3,7 +3,7 @@ epic: ../epics/wechat-miniapp-production.md
 phase: executing
 approved_revision: 3cb65024764640f3cc998cb6cfb2410040d27be18ca47e21f97b764f1a427bda
 current_item: ITEM-5
-next_action: 部署后端并按 miniapp/ACCEPTANCE.md 完成正式客户端真机与微信平台验收
+next_action: 部署后端，在管理后台参数配置中保存微信公众号与小程序参数，并按 miniapp/ACCEPTANCE.md 完成正式客户端验收
 blocked_by: 正式后端尚未部署，微信后台外部配置与正式客户端真机验收待 owner 执行
 item_progression: continuous
 milestone_commit: manual
@@ -33,3 +33,4 @@ remote_publish: manual
 - 2026-09-02：ITEM-3 完成。交付会话创建/进入、历史消息、多轮 NDJSON 流式对话、中文/Emoji 任意分块、停止、基础 Markdown、代码复制、图片选择/上传/发送和错误恢复；停止与真实失败具有不同 UI 状态。
 - 2026-09-02：ITEM-4 完成。交付独立生图流、停止、状态、内联图片、鉴权文件下载、预览和相册保存；request/uploadFile/downloadFile 合法域名要求已写入部署文档。
 - 2026-09-02：ITEM-5 本地部分完成。`pnpm check` 全绿（TypeScript、32 项测试、微信生产构建、隔离和产物安全扫描），产物约 361231 bytes；`go vet ./...`、Web TypeScript、API contract 和小程序/认证/计费/会话/注册码/公众号关键回归通过。全量 `go test ./...` 仅有既存 Windows 文件权限断言失败：`internal/infra/persistence/filecache` 得到 `0666`、测试期望 Unix `0644`，与本 Epic diff 无关。主 agent 按 owner 豁免完成 change review，blocking/important/nit 均为 0。部署配置与 `miniapp/ACCEPTANCE.md` 已生成；正式一键登录、对话、生图、上传下载和平台合规仍需部署后真机验收，因此 ITEM-5 保持未完成。
+- 2026-09-02：按 owner 的生产配置决策，将微信公众号 `callback_token` 与小程序开关、AppID、AppSecret、默认对话/生图模型统一纳入数据库 settings；两个密钥使用既有 `DATA_ENCRYPTION_KEY` 加密、管理接口脱敏，保存后运行时热更新。旧环境变量仅用于首次缺失 key 的兼容导入，不再是正式配置入口；残缺的小程序配置在保存时拒绝、运行时 fail closed。主 agent 按 Epic 豁免直接复审，定向 Go 测试、Go vet、Biome 与修改页面窄 TypeScript 检查通过。

@@ -90,6 +90,18 @@ func (r *RuntimeSettings) cacheSet(ctx context.Context, item domainsettings.Syst
 
 func (r *RuntimeSettings) applyItem(cfg *config.Config, item domainsettings.SystemSetting) {
 	switch item.Namespace + ":" + item.Key {
+	case "wechat:callback_token":
+		cfg.WeChatCallbackToken = strings.TrimSpace(item.Value)
+	case "wechat_miniapp:enabled":
+		cfg.WeChatMiniAppEnabled = toBool(item.Value, cfg.WeChatMiniAppEnabled)
+	case "wechat_miniapp:app_id":
+		cfg.WeChatMiniAppAppID = strings.TrimSpace(item.Value)
+	case "wechat_miniapp:app_secret":
+		cfg.WeChatMiniAppAppSecret = strings.TrimSpace(item.Value)
+	case "wechat_miniapp:default_chat_model":
+		cfg.WeChatMiniAppDefaultChatModel = strings.TrimSpace(item.Value)
+	case "wechat_miniapp:default_image_model":
+		cfg.WeChatMiniAppDefaultImageModel = strings.TrimSpace(item.Value)
 	// 认证配置
 	case "auth:token_ttl_hours":
 		cfg.TokenTTLHours = toInt(item.Value, cfg.TokenTTLHours)
@@ -393,6 +405,9 @@ func (r *RuntimeSettings) applyItem(cfg *config.Config, item domainsettings.Syst
 }
 
 func (r *RuntimeSettings) normalizeConfig(cfg *config.Config) {
+	if cfg.WeChatMiniAppEnabled && !completeWeChatMiniAppConfig(*cfg) {
+		cfg.WeChatMiniAppEnabled = false
+	}
 	if !cfg.EmailLoginEnabled {
 		cfg.EmailRegistrationEnabled = false
 	}

@@ -27,6 +27,8 @@ var sensitiveSettingKeys = map[string]struct{}{
 	"file:embedding_key":                   {},
 	"content_moderation:api_key":           {},
 	"notify:bot_token":                     {},
+	"wechat:callback_token":                {},
+	"wechat_miniapp:app_secret":            {},
 }
 
 func isSensitiveSetting(namespace string, key string) bool {

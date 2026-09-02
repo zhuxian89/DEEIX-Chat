@@ -46,11 +46,14 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   deleteAdminSetting,
   listAdminAvailableSettings,
+  listAdminLLMModels,
   listAdminSettings,
   patchAdminSettings,
 } from "@/features/admin/api";
+import { listAllAdminPages } from "@/features/admin/api/shared";
 import type { SettingItem, SettingsGrouped } from "@/shared/api/settings.types";
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
+import { parseKindsJSON } from "@/shared/model/llm-schema";
 
 const PAGE_SIZE = 20;
 
@@ -65,6 +68,13 @@ type SettingDraft = {
   sensitive: boolean;
   configured: boolean;
 };
+
+type MiniAppModelOptions = {
+  chat: string[];
+  image: string[];
+};
+
+const EMPTY_MODEL_VALUE = "__not_configured__";
 
 function flattenSettings(groups: SettingsGrouped): SettingRow[] {
   return Object.entries(groups)
@@ -84,18 +94,36 @@ export function AdminSystemSettingsPage() {
   const [page, setPage] = React.useState(1);
   const [draft, setDraft] = React.useState<SettingDraft | null>(null);
   const [deleteTarget, setDeleteTarget] = React.useState<SettingRow | null>(null);
+  const [miniAppModels, setMiniAppModels] = React.useState<MiniAppModelOptions>({ chat: [], image: [] });
 
   const load = React.useCallback(async () => {
     const accessToken = await resolveAccessToken();
     if (!accessToken) return;
     setLoading(true);
     try {
-      const [settings, available] = await Promise.all([
+      const [settings, available, models] = await Promise.all([
         listAdminSettings(accessToken),
         listAdminAvailableSettings(accessToken),
+        listAllAdminPages((options) =>
+          listAdminLLMModels(accessToken, {
+            ...options,
+            onlyActive: true,
+            sort: "sortOrder_asc",
+          }),
+        ).catch(() => []),
       ]);
       setRows(flattenSettings(settings));
       setAvailableRows(flattenSettings(available));
+      setMiniAppModels({
+        chat: models
+          .filter((model) => parseKindsJSON(model.kindsJSON).includes("chat"))
+          .map((model) => model.platformModelName.trim())
+          .filter(Boolean),
+        image: models
+          .filter((model) => parseKindsJSON(model.kindsJSON).includes("image_gen"))
+          .map((model) => model.platformModelName.trim())
+          .filter(Boolean),
+      });
     } catch {
       toast.error("参数加载失败");
     } finally {
@@ -382,6 +410,7 @@ export function AdminSystemSettingsPage() {
         draft={draft}
         availableRows={availableRows}
         saving={saving}
+        miniAppModels={miniAppModels}
         onChange={setDraft}
         onSelectRestoreDefinition={selectRestoreDefinition}
         onSave={() => void save()}
@@ -411,6 +440,7 @@ function SettingDialog({
   draft,
   availableRows,
   saving,
+  miniAppModels,
   onChange,
   onSelectRestoreDefinition,
   onSave,
@@ -418,6 +448,7 @@ function SettingDialog({
   draft: SettingDraft | null;
   availableRows: SettingRow[];
   saving: boolean;
+  miniAppModels: MiniAppModelOptions;
   onChange: (draft: SettingDraft | null) => void;
   onSelectRestoreDefinition: (value: string) => void;
   onSave: () => void;
@@ -475,7 +506,11 @@ function SettingDialog({
                 />
               </label>
             </div>
-            <SettingValueField draft={draft} onChange={(value) => update({ value })} />
+            <SettingValueField
+              draft={draft}
+              miniAppModels={miniAppModels}
+              onChange={(value) => update({ value })}
+            />
           </div>
         ) : null}
         <DialogFooter>
@@ -491,7 +526,15 @@ function SettingDialog({
   );
 }
 
-function SettingValueField({ draft, onChange }: { draft: SettingDraft; onChange: (value: string) => void }) {
+function SettingValueField({
+  draft,
+  miniAppModels,
+  onChange,
+}: {
+  draft: SettingDraft;
+  miniAppModels: MiniAppModelOptions;
+  onChange: (value: string) => void;
+}) {
   if (draft.valueType === "bool") {
     return (
       <label className="flex min-h-10 items-center justify-between gap-4 text-sm">
@@ -506,6 +549,38 @@ function SettingValueField({ draft, onChange }: { draft: SettingDraft; onChange:
       <label className="grid gap-1.5 text-sm">
         <span>参数值</span>
         <Textarea rows={8} className="font-mono text-xs" value={draft.value} onChange={(event) => onChange(event.target.value)} />
+      </label>
+    );
+  }
+
+  const modelOptions = draft.namespace === "wechat_miniapp"
+    ? draft.key === "default_chat_model"
+      ? miniAppModels.chat
+      : draft.key === "default_image_model"
+        ? miniAppModels.image
+        : null
+    : null;
+  if (modelOptions) {
+    const options = draft.value && !modelOptions.includes(draft.value)
+      ? [draft.value, ...modelOptions]
+      : modelOptions;
+    return (
+      <label className="grid gap-1.5 text-sm">
+        <span>参数值</span>
+        <Select
+          value={draft.value || EMPTY_MODEL_VALUE}
+          onValueChange={(value) => onChange(value === EMPTY_MODEL_VALUE ? "" : value)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="选择已启用模型" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={EMPTY_MODEL_VALUE}>未配置</SelectItem>
+            {options.map((model) => (
+              <SelectItem key={model} value={model}>{model}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </label>
     );
   }

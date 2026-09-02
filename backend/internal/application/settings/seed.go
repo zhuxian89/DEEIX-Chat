@@ -197,6 +197,16 @@ func defaultSettings() []domainsettings.SystemSetting {
 		{Namespace: "notify", Key: "bot_token", Value: "", ValueType: "string", Description: "Telegram Bot Token"},
 		{Namespace: "notify", Key: "chat_id", Value: "", ValueType: "string", Description: "管理员 Telegram Chat ID"},
 
+		// 微信公众号配置
+		{Namespace: "wechat", Key: "callback_token", Value: "", ValueType: "string", Description: "微信公众号服务器回调 Token"},
+
+		// 微信小程序配置
+		{Namespace: "wechat_miniapp", Key: "enabled", Value: "false", ValueType: "bool", Description: "是否启用微信小程序一键登录"},
+		{Namespace: "wechat_miniapp", Key: "app_id", Value: "", ValueType: "string", Description: "微信小程序 AppID"},
+		{Namespace: "wechat_miniapp", Key: "app_secret", Value: "", ValueType: "string", Description: "微信小程序 AppSecret"},
+		{Namespace: "wechat_miniapp", Key: "default_chat_model", Value: "", ValueType: "string", Description: "小程序 AI 对话快捷入口模型 platformModelName"},
+		{Namespace: "wechat_miniapp", Key: "default_image_model", Value: "", ValueType: "string", Description: "小程序 AI 生图快捷入口模型 platformModelName"},
+
 		// 熔断配置
 		{Namespace: "circuit", Key: "channel_failure_threshold", Value: "3", ValueType: "int", Description: "熔断触发次数"},
 		{Namespace: "circuit", Key: "channel_failure_window_seconds", Value: "120", ValueType: "int", Description: "计数窗口(秒)"},
@@ -205,7 +215,21 @@ func defaultSettings() []domainsettings.SystemSetting {
 }
 
 func defaultSettingsWithConfig(cfg config.Config) []domainsettings.SystemSetting {
-	return defaultSettings()
+	items := defaultSettings()
+	legacyValues := map[string]string{
+		"wechat:callback_token":              cfg.WeChatCallbackToken,
+		"wechat_miniapp:enabled":             strconv.FormatBool(cfg.WeChatMiniAppEnabled),
+		"wechat_miniapp:app_id":              cfg.WeChatMiniAppAppID,
+		"wechat_miniapp:app_secret":          cfg.WeChatMiniAppAppSecret,
+		"wechat_miniapp:default_chat_model":  cfg.WeChatMiniAppDefaultChatModel,
+		"wechat_miniapp:default_image_model": cfg.WeChatMiniAppDefaultImageModel,
+	}
+	for index := range items {
+		if value, ok := legacyValues[items[index].Namespace+":"+items[index].Key]; ok {
+			items[index].Value = value
+		}
+	}
+	return items
 }
 
 func defaultSetting(namespace, key string) (domainsettings.SystemSetting, bool) {

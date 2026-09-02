@@ -85,12 +85,11 @@ cp config.sqlite.example.yaml config.yaml
 - `OTEL_EXPORTER_OTLP_INSECURE`：是否使用明文传输
 - `OTEL_EXPORTER_OTLP_PROTOCOL`：OTLP exporter 协议，支持 `grpc`、`http`、`http/protobuf`，默认 `grpc`
 - `OTEL_TRACES_SAMPLER_ARG` / `OTEL_SAMPLING_RATE`：Trace 采样率，范围 `0~1`
-- `WECHAT_CALLBACK_TOKEN`：微信公众号服务器配置中的 Token。配置后回调地址为 `/api/v1/wechat/callback`；当前支持明文模式，`13004` 为内置默认规则；管理员可在后台配置关键词与回复模板，命中规则时按 OpenID 幂等发放注册码。
-- `WECHAT_MINIAPP_ENABLED`：微信小程序一键登录总开关，默认 `false`。
-- `WECHAT_MINIAPP_APP_ID` / `WECHAT_MINIAPP_APP_SECRET`：小程序服务端身份配置；仅在总开关开启时必填，AppSecret 不得下发给客户端。
-- `WECHAT_MINIAPP_DEFAULT_CHAT_MODEL` / `WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL`：小程序“AI 对话”和“AI 生图”快捷入口的固定模型，填写模型目录中的 `platformModelName`；仅影响新会话，不会让既有会话换模。
+- 微信公众号与小程序参数统一在管理后台“参数配置”维护。`wechat:callback_token`、`wechat_miniapp:app_secret` 使用 `DATA_ENCRYPTION_KEY` 加密入库，接口不返回明文；AppID、开关和两个快捷模型同样由数据库 settings 热更新，不要求后端重启。
+- 小程序启用前必须完整配置 `wechat_miniapp:app_id`、`app_secret`、`default_chat_model` 和 `default_image_model`。两个模型填写模型目录中的 `platformModelName`；管理后台提供已启用聊天/生图模型下拉框，配置只影响新会话。
+- 兼容升级时，后端会在这些 settings 首次不存在时一次性导入旧的 `WECHAT_CALLBACK_TOKEN` 与 `WECHAT_MINIAPP_*` 环境值并加密保存；确认后台显示“已配置”后即可删除旧环境变量，后续以数据库值为准。
 
-公众号回调使用独立的 `wechat_registration_issuances` 表记录 OpenID 与注册码的关系，不修改既有用户表。首次命中默认关键词 `13004` 会创建一个 `active` 注册码；未注册用户再次发送会返回原注册码，已注册用户会提示注册码已使用，已删除用户会提示联系管理员获取新的注册码。部署到微信公众号后台时，将服务器地址设置为 `<PUBLIC_API_BASE_URL>/api/v1/wechat/callback`，消息加解密模式选择“明文模式”，并填写与 `WECHAT_CALLBACK_TOKEN` 相同的 Token。
+公众号回调使用独立的 `wechat_registration_issuances` 表记录 OpenID 与注册码的关系，不修改既有用户表。首次命中默认关键词 `13004` 会创建一个 `active` 注册码；未注册用户再次发送会返回原注册码，已注册用户会提示注册码已使用，已删除用户会提示联系管理员获取新的注册码。部署到微信公众号后台时，将服务器地址设置为 `<PUBLIC_API_BASE_URL>/api/v1/wechat/callback`，消息加解密模式选择“明文模式”，Token 与后台参数 `wechat:callback_token` 完全一致。
 
 微信小程序登录接口为 `POST /api/v1/auth/wechat-miniapp/login`。客户端只提交 `wx.login` 的一次性 code；后端使用上述 AppID/AppSecret 调用微信 `code2Session`，按 `(app_id, open_id)` 幂等查找或快捷创建标准 DEEIX 用户。UnionID 在微信返回时可空留档，但当前不参与账号查找、公众号/Web 绑定或合并。快捷注册不消费注册码，现有 Web 注册码和公众号发码行为保持不变。小程序身份保存在独立的 `wechat_miniapp_bindings` 表，复用现有用户、订阅、余额、计费、会话和文件体系。
 

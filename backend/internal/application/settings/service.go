@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -366,15 +367,17 @@ func csvSet(raw string) map[string]struct{} {
 
 // validNamespaces 合法的 namespace 集合。
 var validNamespaces = map[string]bool{
-	"auth":    true,
-	"billing": true,
-	"chat":    true,
-	"storage": true,
-	"file":    true,
-	"extract": true,
-	"mcp":     true,
-	"circuit": true,
-	"notify":  true,
+	"auth":           true,
+	"billing":        true,
+	"chat":           true,
+	"storage":        true,
+	"file":           true,
+	"extract":        true,
+	"mcp":            true,
+	"circuit":        true,
+	"notify":         true,
+	"wechat":         true,
+	"wechat_miniapp": true,
 }
 
 // IsValidNamespace 判断 namespace 是否允许被动态配置。
@@ -412,6 +415,9 @@ func (s *Service) BatchUpdate(ctx context.Context, patches []PatchItem) (map[str
 		return nil, fmt.Errorf("%w: %v", ErrInvalidSetting, err)
 	}
 	if err := s.validateBillingPaymentSettings(ctx, patches); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidSetting, err)
+	}
+	if err := s.validateWeChatSettings(ctx, patches); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidSetting, err)
 	}
 	items, err := s.preparePatchItemsForStorage(patches)
@@ -703,6 +709,70 @@ func validatePatchItem(item PatchItem) error {
 		}
 	case "notify:bot_token", "notify:chat_id":
 		return validateStringMax(value, 512, key)
+	case "wechat:callback_token":
+		if value == "" {
+			return nil
+		}
+		if !wechatCallbackTokenPattern.MatchString(value) {
+			return fmt.Errorf("%s must contain 3-32 ASCII letters or digits", key)
+		}
+	case "wechat_miniapp:enabled":
+		if _, err := strconv.ParseBool(value); err != nil {
+			return fmt.Errorf("%s must be bool", key)
+		}
+	case "wechat_miniapp:app_id":
+		if value != "" && !wechatMiniAppIDPattern.MatchString(value) {
+			return fmt.Errorf("%s must be wx followed by 16 hexadecimal characters", key)
+		}
+	case "wechat_miniapp:app_secret":
+		return validateStringMax(value, 512, key)
+	case "wechat_miniapp:default_chat_model", "wechat_miniapp:default_image_model":
+		return validateStringMax(value, 255, key)
+	}
+	return nil
+}
+
+var (
+	wechatCallbackTokenPattern = regexp.MustCompile(`^[A-Za-z0-9]{3,32}$`)
+	wechatMiniAppIDPattern     = regexp.MustCompile(`^wx[0-9a-fA-F]{16}$`)
+)
+
+func completeWeChatMiniAppConfig(cfg config.Config) bool {
+	return wechatMiniAppIDPattern.MatchString(strings.TrimSpace(cfg.WeChatMiniAppAppID)) &&
+		strings.TrimSpace(cfg.WeChatMiniAppAppSecret) != "" &&
+		strings.TrimSpace(cfg.WeChatMiniAppDefaultChatModel) != "" &&
+		strings.TrimSpace(cfg.WeChatMiniAppDefaultImageModel) != ""
+}
+
+func (s *Service) validateWeChatSettings(ctx context.Context, patches []PatchItem) error {
+	hasRelevantPatch := false
+	for _, item := range patches {
+		if item.Namespace == "wechat" || item.Namespace == "wechat_miniapp" {
+			hasRelevantPatch = true
+			break
+		}
+	}
+	if !hasRelevantPatch {
+		return nil
+	}
+
+	next, err := s.loadEffectiveSettings(ctx, "wechat", "wechat_miniapp")
+	if err != nil {
+		return err
+	}
+	applyPatchesToEffectiveSettings(next, patches, "wechat", "wechat_miniapp")
+	enabled, _ := strconv.ParseBool(strings.TrimSpace(next["wechat_miniapp:enabled"]))
+	if !enabled {
+		return nil
+	}
+	required := []string{"app_id", "app_secret", "default_chat_model", "default_image_model"}
+	for _, key := range required {
+		if strings.TrimSpace(next["wechat_miniapp:"+key]) == "" {
+			return fmt.Errorf("wechat_miniapp:%s is required when wechat_miniapp:enabled is true", key)
+		}
+	}
+	if !wechatMiniAppIDPattern.MatchString(strings.TrimSpace(next["wechat_miniapp:app_id"])) {
+		return fmt.Errorf("wechat_miniapp:app_id must be wx followed by 16 hexadecimal characters")
 	}
 	return nil
 }

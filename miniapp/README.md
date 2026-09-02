@@ -10,23 +10,23 @@
 
 ## 后端生产配置
 
-在后端部署环境设置：
+在 Web 管理后台“参数配置”中设置：
 
-```env
-WECHAT_MINIAPP_ENABLED=true
-WECHAT_MINIAPP_APP_ID=wx0123456789abcdef
-WECHAT_MINIAPP_APP_SECRET=从微信公众平台获取的 AppSecret
-WECHAT_MINIAPP_DEFAULT_CHAT_MODEL=管理员模型页中的 platformModelName
-WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL=管理员模型页中的 platformModelName
+```text
+wechat_miniapp:enabled=true
+wechat_miniapp:app_id=wx0123456789abcdef
+wechat_miniapp:app_secret=从微信公众平台获取的 AppSecret
+wechat_miniapp:default_chat_model=管理员模型页中的 platformModelName
+wechat_miniapp:default_image_model=管理员模型页中的 platformModelName
 ```
 
 要求：
 
-- `APP_ID` 必须与构建/发布小程序使用的 AppID 一致。
+- `app_id` 必须与构建/发布小程序使用的 AppID 一致。
 - 两个默认模型填写 DEEIX 模型目录中的 `platformModelName`，不是展示名、供应商原始 ID 或数据库数字 ID。
 - 默认模型必须已启用，并对快捷注册用户所属权限组开放相应的 `chat` 或 `image_gen` 能力。
-- `APP_SECRET` 只进入后端密钥环境，禁止写入本目录、前端环境变量或微信项目配置。
-- 关闭 `WECHAT_MINIAPP_ENABLED` 会使一键登录返回稳定的服务不可用错误，不影响 Web 登录和公众号注册码流程。
+- `app_secret` 由后端使用 `DATA_ENCRYPTION_KEY` 加密保存，禁止写入本目录、前端环境变量或微信项目配置。
+- 关闭 `wechat_miniapp:enabled` 会使一键登录返回稳定的服务不可用错误，不影响 Web 登录和公众号注册码流程。
 
 后端首次启动会通过现有 schema 迁移创建独立的 `wechat_miniapp_bindings` 表。它不会修改既有用户、计费、会话或公众号表结构。
 
@@ -57,7 +57,7 @@ pnpm dev:weapp
 ## 微信开发者工具
 
 1. 导入 `miniapp/`，不要只导入 `dist/`。
-2. 确认详情中的小程序 AppID 与后端 `WECHAT_MINIAPP_APP_ID` 一致。
+2. 确认详情中的小程序 AppID 与后台参数 `wechat_miniapp:app_id` 一致。
 3. “项目配置”中的小程序目录应为 `dist/`。
 4. 建议使用已发布的稳定基础库，不把灰度基础库作为上线唯一验证结果。
 5. 修改微信后台域名后，在“详情 → 域名信息”刷新项目配置并重新编译。

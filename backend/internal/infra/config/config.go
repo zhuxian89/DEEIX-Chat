@@ -822,20 +822,6 @@ func (c Config) Validate() error {
 	if err := validateHTTPIntegrationURL(c.TurnstileSiteverifyURL, "TURNSTILE_SITEVERIFY_URL"); err != nil {
 		return err
 	}
-	if c.WeChatMiniAppEnabled {
-		if strings.TrimSpace(c.WeChatMiniAppAppID) == "" {
-			return errors.New("invalid config: WECHAT_MINIAPP_APP_ID must be set when WECHAT_MINIAPP_ENABLED=true")
-		}
-		if strings.TrimSpace(c.WeChatMiniAppAppSecret) == "" {
-			return errors.New("invalid config: WECHAT_MINIAPP_APP_SECRET must be set when WECHAT_MINIAPP_ENABLED=true")
-		}
-		if strings.TrimSpace(c.WeChatMiniAppDefaultChatModel) == "" {
-			return errors.New("invalid config: WECHAT_MINIAPP_DEFAULT_CHAT_MODEL must be set when WECHAT_MINIAPP_ENABLED=true")
-		}
-		if strings.TrimSpace(c.WeChatMiniAppDefaultImageModel) == "" {
-			return errors.New("invalid config: WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL must be set when WECHAT_MINIAPP_ENABLED=true")
-		}
-	}
 	if env != "prod" {
 		return nil
 	}

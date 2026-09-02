@@ -339,10 +339,6 @@ Static configuration environment variables:
 | Security | `SSRF_ALLOWED_HOSTS` | Exact hostnames for deployment-level integrations or trusted private redirect targets, comma-separated. |
 | Security | `SSRF_ALLOWED_CIDRS` | Trusted deployment-level integration or private redirect CIDRs, comma-separated. |
 | Security | `TURNSTILE_SITEVERIFY_URL` | Cloudflare Turnstile siteverify endpoint. |
-| WeChat | `WECHAT_CALLBACK_TOKEN` | Official-account callback Token; callback path is `/api/v1/wechat/callback` and plaintext mode issues a registration code for the built-in default keyword `13004`; keywords and reply templates are configurable in the admin console. |
-| WeChat Mini Program | `WECHAT_MINIAPP_ENABLED` | Enables the independent WeChat Mini Program one-tap login channel; disabled by default. |
-| WeChat Mini Program | `WECHAT_MINIAPP_APP_ID` / `WECHAT_MINIAPP_APP_SECRET` | Server-only Mini Program credentials used for `code2Session`; required when the channel is enabled. |
-| WeChat Mini Program | `WECHAT_MINIAPP_DEFAULT_CHAT_MODEL` / `WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL` | Fixed quick-entry models; values must be model-catalog `platformModelName` values. |
 | Database | `DATABASE_DRIVER` | `postgres` or `sqlite`. |
 | PostgreSQL | `POSTGRES_DSN` | PostgreSQL DSN. |
 | PostgreSQL | `POSTGRES_MAX_OPEN_CONNS` | Maximum open connections. |
@@ -388,7 +384,7 @@ Static configuration environment variables:
 | OpenTelemetry | `OTEL_EXPORTER_OTLP_PROTOCOL` | OTLP exporter protocol: `grpc`, `http`, or `http/protobuf`; defaults to `grpc`. |
 | OpenTelemetry | `OTEL_TRACES_SAMPLER_ARG` / `OTEL_SAMPLING_RATE` | Trace sampling rate from `0` to `1`; `OTEL_TRACES_SAMPLER_ARG` takes priority. |
 
-Authentication, registration, conversation settings, model option policies, file processing, RAG, embedding, MCP, billing, payments, and announcements are runtime business settings, not static YAML configuration. Their defaults are seeded by the backend and maintained in the admin console.
+Authentication, registration, conversation settings, model option policies, file processing, RAG, embedding, MCP, billing, payments, announcements, and WeChat official-account/Mini Program parameters are runtime business settings, not static YAML configuration. Their defaults are seeded by the backend and maintained in the admin console. WeChat callback tokens and Mini Program AppSecrets are encrypted with `DATA_ENCRYPTION_KEY` and never returned in plaintext.
 
 When SSRF protection is enabled in production, administrator-saved model, MCP, Embedding, OIDC/OAuth2, and custom Turnstile endpoints are authorized locally by exact origin (`scheme + host + port`) and do not require entries in the global allowlist. Model, MCP, and Embedding redirects retain standard compatibility: public cross-origin targets are allowed, while private cross-origin targets must match `SSRF_ALLOWED_HOSTS` or `SSRF_ALLOWED_CIDRS`; OIDC/OAuth2 and Turnstile keep their stricter identity boundary. Generated media is downloaded, validated, and stored by the backend: a private artifact URL inherits trust only when it has the same origin as the selected model endpoint; public cross-origin artifact URLs remain subject to the strict public-network policy, and private cross-origin artifact URLs are blocked. The global allowlist also remains available for deployment-level integrations that cannot be tied to an administrator-saved endpoint, such as selected GeoIP or extraction deployments. Link-local, multicast, unspecified, and known metadata targets always remain blocked. Invalid allowlist entries stop backend startup, and global allowlist changes require a restart.
 

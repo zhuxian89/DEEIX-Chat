@@ -315,7 +315,7 @@ func NewApp() (*App, error) {
 	wechatRepo := wechatrepo.NewRepo(db)
 	wechatService := appwechat.NewServiceWithBaseURL(wechatRepo, cfg.PublicWebBaseURL)
 	wechatAdminService := appwechat.NewAdminService(wechatRepo)
-	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, cfg.WeChatCallbackToken, telegramNotifier), wechathttp.NewAdminHandler(wechatAdminService))
+	wechatModule := wechathttp.NewModule(wechathttp.NewHandler(wechatService, runtimeCfg, telegramNotifier), wechathttp.NewAdminHandler(wechatAdminService))
 	bootstrapSuperAdmin, err := authService.EnsureBootstrapSuperAdmin(context.Background())
 	if err != nil {
 		return nil, err

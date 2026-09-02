@@ -400,3 +400,47 @@ func TestSeedAddsNotifyDefaults(t *testing.T) {
 		t.Fatal("expected notify:chat_id not to be sensitive")
 	}
 }
+
+func TestSeedImportsLegacyWeChatConfigAndEncryptsSecrets(t *testing.T) {
+	repo := newSettingsSeedRepo()
+	service := NewService(repo, "test-data-encryption-key")
+	cfg := config.Config{
+		WeChatCallbackToken:            "DEEIXWechat13003",
+		WeChatMiniAppEnabled:           true,
+		WeChatMiniAppAppID:             "wxafb49c7fd9b04cf9",
+		WeChatMiniAppAppSecret:         "miniapp-secret",
+		WeChatMiniAppDefaultChatModel:  "chat-model",
+		WeChatMiniAppDefaultImageModel: "image-model",
+	}
+
+	if err := service.Seed(context.Background(), cfg); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	for key, want := range map[string]string{
+		"wechat:callback_token":     "DEEIXWechat13003",
+		"wechat_miniapp:app_secret": "miniapp-secret",
+	} {
+		item := repo.items[key]
+		if item.Value == want {
+			t.Fatalf("expected %s to be encrypted at rest", key)
+		}
+		got, err := service.decryptSettingValue(item)
+		if err != nil {
+			t.Fatalf("decrypt %s: %v", key, err)
+		}
+		if got != want {
+			t.Fatalf("%s decrypted value = %q, want %q", key, got, want)
+		}
+	}
+
+	if got := repo.items["wechat_miniapp:enabled"].Value; got != "true" {
+		t.Fatalf("wechat_miniapp:enabled = %q", got)
+	}
+	if got := repo.items["wechat_miniapp:app_id"].Value; got != cfg.WeChatMiniAppAppID {
+		t.Fatalf("wechat_miniapp:app_id = %q", got)
+	}
+	if !isSensitiveSetting("wechat", "callback_token") || !isSensitiveSetting("wechat_miniapp", "app_secret") {
+		t.Fatal("expected WeChat credentials to be sensitive")
+	}
+}

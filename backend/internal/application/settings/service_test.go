@@ -171,6 +171,73 @@ func TestRuntimeSettingsNormalizeConfigDisablesEmbeddingDependentFeatures(t *tes
 	}
 }
 
+func TestWeChatMiniAppSettingsRequireCompleteConfigurationWhenEnabled(t *testing.T) {
+	repo := newSettingsSeedRepo()
+	service := NewService(repo, "test-data-encryption-key")
+	if err := service.Seed(context.Background(), config.Config{}); err != nil {
+		t.Fatalf("seed settings: %v", err)
+	}
+
+	if _, err := service.BatchUpdate(context.Background(), []PatchItem{{
+		Namespace: "wechat_miniapp", Key: "enabled", Value: "true",
+	}}); err == nil {
+		t.Fatal("expected incomplete mini app settings to be rejected")
+	}
+
+	patches := []PatchItem{
+		{Namespace: "wechat_miniapp", Key: "app_id", Value: "wxafb49c7fd9b04cf9"},
+		{Namespace: "wechat_miniapp", Key: "app_secret", Value: "miniapp-secret"},
+		{Namespace: "wechat_miniapp", Key: "default_chat_model", Value: "chat-model"},
+		{Namespace: "wechat_miniapp", Key: "default_image_model", Value: "image-model"},
+		{Namespace: "wechat_miniapp", Key: "enabled", Value: "true"},
+	}
+	if _, err := service.BatchUpdate(context.Background(), patches); err != nil {
+		t.Fatalf("complete mini app settings: %v", err)
+	}
+	if _, err := service.BatchUpdate(context.Background(), []PatchItem{{
+		Namespace: "wechat_miniapp", Key: "app_secret", Clear: true,
+	}}); err == nil {
+		t.Fatal("expected clearing the secret while enabled to be rejected")
+	}
+}
+
+func TestRuntimeSettingsAppliesWeChatConfiguration(t *testing.T) {
+	runtimeSettings := NewRuntimeSettings(nil, nil, "test-data-encryption-key")
+	cfg := config.Config{}
+	items := []domainsettings.SystemSetting{
+		{Namespace: "wechat", Key: "callback_token", Value: "callback-token"},
+		{Namespace: "wechat_miniapp", Key: "enabled", Value: "true"},
+		{Namespace: "wechat_miniapp", Key: "app_id", Value: "wxafb49c7fd9b04cf9"},
+		{Namespace: "wechat_miniapp", Key: "app_secret", Value: "miniapp-secret"},
+		{Namespace: "wechat_miniapp", Key: "default_chat_model", Value: "chat-model"},
+		{Namespace: "wechat_miniapp", Key: "default_image_model", Value: "image-model"},
+	}
+	for _, item := range items {
+		runtimeSettings.applyItem(&cfg, item)
+	}
+	if cfg.WeChatCallbackToken != "callback-token" || !cfg.WeChatMiniAppEnabled ||
+		cfg.WeChatMiniAppAppID != "wxafb49c7fd9b04cf9" || cfg.WeChatMiniAppAppSecret != "miniapp-secret" ||
+		cfg.WeChatMiniAppDefaultChatModel != "chat-model" || cfg.WeChatMiniAppDefaultImageModel != "image-model" {
+		t.Fatalf("runtime WeChat config = %+v", cfg)
+	}
+}
+
+func TestRuntimeSettingsDisablesIncompleteWeChatMiniAppConfiguration(t *testing.T) {
+	runtimeSettings := NewRuntimeSettings(nil, nil, "test-data-encryption-key")
+	cfg := config.Config{
+		WeChatMiniAppEnabled:          true,
+		WeChatMiniAppAppID:            "wxafb49c7fd9b04cf9",
+		WeChatMiniAppAppSecret:        "miniapp-secret",
+		WeChatMiniAppDefaultChatModel: "chat-model",
+	}
+
+	runtimeSettings.normalizeConfig(&cfg)
+
+	if cfg.WeChatMiniAppEnabled {
+		t.Fatal("expected incomplete mini app configuration to fail closed")
+	}
+}
+
 func TestValidateTurnstileRegistrationSettings(t *testing.T) {
 	repo := &testSettingsRepo{byNamespace: map[string][]domainsettings.SystemSetting{
 		"auth": {
