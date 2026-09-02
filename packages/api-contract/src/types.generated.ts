@@ -252,6 +252,35 @@ export interface AuthEventResponse {
   username: string;
 }
 
+export interface AuthLoginRequest {
+  /**
+   * @minLength 6
+   * @maxLength 128
+   */
+  password: string;
+  /**
+   * @minLength 3
+   * @maxLength 128
+   */
+  username: string;
+}
+
+export interface AuthLoginResponse {
+  accessToken: string;
+  expiresAt: string;
+  refreshExpiresAt: string;
+  sessionID: string;
+  twoFactorChallengeToken?: string;
+  twoFactorRequired: boolean;
+  user: AuthUserResponse;
+  verificationMethods?: string[];
+}
+
+export interface AuthLoginResponseDoc {
+  data: AuthLoginResponse;
+  errorMsg: string;
+}
+
 export interface AuthUserIdentityProviderSummaryResponse {
   id: number;
   logoURL: string;
@@ -1861,35 +1890,6 @@ export interface LoginOptionsResponseDoc {
   errorMsg: string;
 }
 
-export interface LoginRequest {
-  /**
-   * @minLength 6
-   * @maxLength 128
-   */
-  password: string;
-  /**
-   * @minLength 3
-   * @maxLength 128
-   */
-  username: string;
-}
-
-export interface LoginResponse {
-  accessToken: string;
-  expiresAt: string;
-  refreshExpiresAt: string;
-  sessionID: string;
-  twoFactorChallengeToken?: string;
-  twoFactorRequired: boolean;
-  user: AuthUserResponse;
-  verificationMethods?: string[];
-}
-
-export interface LoginResponseDoc {
-  data: LoginResponse;
-  errorMsg: string;
-}
-
 export interface LogoutResponse {
   revoked: boolean;
 }
@@ -2095,6 +2095,30 @@ export interface MessageTraceEventResponse {
   summary: string;
   title: string;
   updatedAt: string;
+}
+
+export interface MiniAppAuthResponse {
+  accessToken: string;
+  expiresAt: string;
+  refreshExpiresAt: string;
+  sessionID: string;
+  user: MiniAppUserResponse;
+}
+
+export interface MiniAppPresetsResponse {
+  chatModel: string;
+  imageModel: string;
+}
+
+export interface MiniAppUserResponse {
+  avatarURL: string;
+  displayName: string;
+  id: number;
+  publicID: string;
+  subscriptionPlanName: string;
+  subscriptionStatus: string;
+  subscriptionTier: string;
+  username: string;
 }
 
 export interface ModelDataResponse {
@@ -3059,7 +3083,7 @@ export interface RedemptionResponse {
 }
 
 export interface RefreshTokenResponseDoc {
-  data: LoginResponse;
+  data: AuthLoginResponse;
   errorMsg: string;
 }
 
@@ -4364,6 +4388,29 @@ export interface UserSettingsResponse {
 
 export interface UserSettingsResponseDoc {
   data: UserSettingsResponse;
+  errorMsg: string;
+}
+
+export interface WechatminiappErrorDoc {
+  data?: any | null;
+  errorCode: string;
+  errorMsg: string;
+  requestId?: string;
+}
+
+export interface WechatminiappLoginRequest {
+  /** @maxLength 256 */
+  code: string;
+}
+
+export interface WechatminiappLoginResponse {
+  auth: MiniAppAuthResponse;
+  created: boolean;
+  presets: MiniAppPresetsResponse;
+}
+
+export interface WechatminiappLoginResponseDoc {
+  data: WechatminiappLoginResponse;
   errorMsg: string;
 }
 
@@ -7701,9 +7748,9 @@ export namespace Auth {
   export namespace LoginCreate {
     export type RequestParams = {};
     export type RequestQuery = {};
-    export type RequestBody = LoginRequest;
+    export type RequestBody = AuthLoginRequest;
     export type RequestHeaders = {};
-    export type ResponseBody = LoginResponseDoc;
+    export type ResponseBody = AuthLoginResponseDoc;
   }
 
   /**
@@ -7816,7 +7863,7 @@ export namespace Auth {
     export type RequestQuery = {};
     export type RequestBody = ProviderAuthBridgeExchangeRequest;
     export type RequestHeaders = {};
-    export type ResponseBody = LoginResponseDoc;
+    export type ResponseBody = AuthLoginResponseDoc;
   }
 
   /**
@@ -7846,7 +7893,7 @@ export namespace Auth {
     export type RequestQuery = {};
     export type RequestBody = EmailRegistrationCompleteRequest;
     export type RequestHeaders = {};
-    export type ResponseBody = LoginResponseDoc;
+    export type ResponseBody = AuthLoginResponseDoc;
   }
 
   /**
@@ -7913,6 +7960,21 @@ export namespace Auth {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = LogoutResponseDoc;
+  }
+
+  /**
+   * @description 使用 wx.login 一次性 code 登录；首次使用时快捷创建标准 DEEIX 用户。UnionID 仅留档，不用于账号融合。
+   * @tags auth
+   * @name WechatMiniappLoginCreate
+   * @summary 微信小程序一键登录
+   * @request POST:/auth/wechat-miniapp/login
+   */
+  export namespace WechatMiniappLoginCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = WechatminiappLoginRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = WechatminiappLoginResponseDoc;
   }
 }
 

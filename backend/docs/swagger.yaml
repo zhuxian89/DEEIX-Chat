@@ -603,6 +603,58 @@ definitions:
     - userLabel
     - username
     type: object
+  AuthLoginRequest:
+    properties:
+      password:
+        maxLength: 128
+        minLength: 6
+        type: string
+      username:
+        maxLength: 128
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  AuthLoginResponse:
+    properties:
+      accessToken:
+        type: string
+      expiresAt:
+        type: string
+      refreshExpiresAt:
+        type: string
+      sessionID:
+        type: string
+      twoFactorChallengeToken:
+        type: string
+      twoFactorRequired:
+        type: boolean
+      user:
+        $ref: '#/definitions/AuthUserResponse'
+      verificationMethods:
+        items:
+          type: string
+        type: array
+    required:
+    - accessToken
+    - expiresAt
+    - refreshExpiresAt
+    - sessionID
+    - twoFactorRequired
+    - user
+    type: object
+  AuthLoginResponseDoc:
+    properties:
+      data:
+        $ref: '#/definitions/AuthLoginResponse'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
   AuthUserIdentityProviderSummaryResponse:
     properties:
       id:
@@ -4231,58 +4283,6 @@ definitions:
     - data
     - errorMsg
     type: object
-  LoginRequest:
-    properties:
-      password:
-        maxLength: 128
-        minLength: 6
-        type: string
-      username:
-        maxLength: 128
-        minLength: 3
-        type: string
-    required:
-    - password
-    - username
-    type: object
-  LoginResponse:
-    properties:
-      accessToken:
-        type: string
-      expiresAt:
-        type: string
-      refreshExpiresAt:
-        type: string
-      sessionID:
-        type: string
-      twoFactorChallengeToken:
-        type: string
-      twoFactorRequired:
-        type: boolean
-      user:
-        $ref: '#/definitions/AuthUserResponse'
-      verificationMethods:
-        items:
-          type: string
-        type: array
-    required:
-    - accessToken
-    - expiresAt
-    - refreshExpiresAt
-    - sessionID
-    - twoFactorRequired
-    - user
-    type: object
-  LoginResponseDoc:
-    properties:
-      data:
-        $ref: '#/definitions/LoginResponse'
-      errorMsg:
-        type: string
-    required:
-    - data
-    - errorMsg
-    type: object
   LogoutResponse:
     properties:
       revoked:
@@ -4773,6 +4773,63 @@ definitions:
     - summary
     - title
     - updatedAt
+    type: object
+  MiniAppAuthResponse:
+    properties:
+      accessToken:
+        type: string
+      expiresAt:
+        type: string
+      refreshExpiresAt:
+        type: string
+      sessionID:
+        type: string
+      user:
+        $ref: '#/definitions/MiniAppUserResponse'
+    required:
+    - accessToken
+    - expiresAt
+    - refreshExpiresAt
+    - sessionID
+    - user
+    type: object
+  MiniAppPresetsResponse:
+    properties:
+      chatModel:
+        type: string
+      imageModel:
+        type: string
+    required:
+    - chatModel
+    - imageModel
+    type: object
+  MiniAppUserResponse:
+    properties:
+      avatarURL:
+        type: string
+      displayName:
+        type: string
+      id:
+        type: integer
+      publicID:
+        type: string
+      subscriptionPlanName:
+        type: string
+      subscriptionStatus:
+        type: string
+      subscriptionTier:
+        type: string
+      username:
+        type: string
+    required:
+    - avatarURL
+    - displayName
+    - id
+    - publicID
+    - subscriptionPlanName
+    - subscriptionStatus
+    - subscriptionTier
+    - username
     type: object
   ModelDataResponse:
     properties:
@@ -6942,7 +6999,7 @@ definitions:
   RefreshTokenResponseDoc:
     properties:
       data:
-        $ref: '#/definitions/LoginResponse'
+        $ref: '#/definitions/AuthLoginResponse'
       errorMsg:
         type: string
     required:
@@ -9855,6 +9912,52 @@ definitions:
     properties:
       data:
         $ref: '#/definitions/UserSettingsResponse'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  WechatminiappErrorDoc:
+    properties:
+      data:
+        x-nullable: true
+      errorCode:
+        type: string
+      errorMsg:
+        type: string
+      requestId:
+        type: string
+    required:
+    - data
+    - errorCode
+    - errorMsg
+    type: object
+  WechatminiappLoginRequest:
+    properties:
+      code:
+        maxLength: 256
+        type: string
+    required:
+    - code
+    type: object
+  WechatminiappLoginResponse:
+    properties:
+      auth:
+        $ref: '#/definitions/MiniAppAuthResponse'
+      created:
+        type: boolean
+      presets:
+        $ref: '#/definitions/MiniAppPresetsResponse'
+    required:
+    - auth
+    - created
+    - presets
+    type: object
+  WechatminiappLoginResponseDoc:
+    properties:
+      data:
+        $ref: '#/definitions/WechatminiappLoginResponse'
       errorMsg:
         type: string
     required:
@@ -15460,14 +15563,14 @@ paths:
         name: body
         required: true
         schema:
-          $ref: '#/definitions/LoginRequest'
+          $ref: '#/definitions/AuthLoginRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/LoginResponseDoc'
+            $ref: '#/definitions/AuthLoginResponseDoc'
         "400":
           description: Bad Request
           schema:
@@ -15664,7 +15767,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/LoginResponseDoc'
+            $ref: '#/definitions/AuthLoginResponseDoc'
         "400":
           description: Bad Request
           schema:
@@ -15719,7 +15822,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/LoginResponseDoc'
+            $ref: '#/definitions/AuthLoginResponseDoc'
         "400":
           description: Bad Request
           schema:
@@ -15843,6 +15946,48 @@ paths:
       security:
       - BearerAuth: []
       summary: 更新当前会话精确位置
+      tags:
+      - auth
+  /auth/wechat-miniapp/login:
+    post:
+      consumes:
+      - application/json
+      description: 使用 wx.login 一次性 code 登录；首次使用时快捷创建标准 DEEIX 用户。UnionID 仅留档，不用于账号融合。
+      parameters:
+      - description: 微信小程序登录参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/WechatminiappLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/WechatminiappLoginResponseDoc'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/WechatminiappErrorDoc'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/WechatminiappErrorDoc'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/WechatminiappErrorDoc'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/WechatminiappErrorDoc'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/WechatminiappErrorDoc'
+      summary: 微信小程序一键登录
       tags:
       - auth
   /billing/account:

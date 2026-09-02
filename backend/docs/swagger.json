@@ -8725,7 +8725,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/LoginRequest"
+                            "$ref": "#/definitions/AuthLoginRequest"
                         }
                     }
                 ],
@@ -8733,7 +8733,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/LoginResponseDoc"
+                            "$ref": "#/definitions/AuthLoginResponseDoc"
                         }
                     },
                     "400": {
@@ -9037,7 +9037,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/LoginResponseDoc"
+                            "$ref": "#/definitions/AuthLoginResponseDoc"
                         }
                     },
                     "400": {
@@ -9121,7 +9121,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/LoginResponseDoc"
+                            "$ref": "#/definitions/AuthLoginResponseDoc"
                         }
                     },
                     "400": {
@@ -9314,6 +9314,70 @@
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/AuthErrorDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/wechat-miniapp/login": {
+            "post": {
+                "description": "使用 wx.login 一次性 code 登录；首次使用时快捷创建标准 DEEIX 用户。UnionID 仅留档，不用于账号融合。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "auth"
+                ],
+                "summary": "微信小程序一键登录",
+                "parameters": [
+                    {
+                        "description": "微信小程序登录参数",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/WechatminiappLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/WechatminiappLoginResponseDoc"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/WechatminiappErrorDoc"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/WechatminiappErrorDoc"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/WechatminiappErrorDoc"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/WechatminiappErrorDoc"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/WechatminiappErrorDoc"
                         }
                     }
                 }
@@ -15540,6 +15604,80 @@
                 }
             }
         },
+        "AuthLoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 6
+                },
+                "username": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "minLength": 3
+                }
+            }
+        },
+        "AuthLoginResponse": {
+            "type": "object",
+            "required": [
+                "accessToken",
+                "expiresAt",
+                "refreshExpiresAt",
+                "sessionID",
+                "twoFactorRequired",
+                "user"
+            ],
+            "properties": {
+                "accessToken": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "refreshExpiresAt": {
+                    "type": "string"
+                },
+                "sessionID": {
+                    "type": "string"
+                },
+                "twoFactorChallengeToken": {
+                    "type": "string"
+                },
+                "twoFactorRequired": {
+                    "type": "boolean"
+                },
+                "user": {
+                    "$ref": "#/definitions/AuthUserResponse"
+                },
+                "verificationMethods": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "AuthLoginResponseDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/AuthLoginResponse"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
         "AuthUserIdentityProviderSummaryResponse": {
             "type": "object",
             "required": [
@@ -20706,80 +20844,6 @@
                 }
             }
         },
-        "LoginRequest": {
-            "type": "object",
-            "required": [
-                "password",
-                "username"
-            ],
-            "properties": {
-                "password": {
-                    "type": "string",
-                    "maxLength": 128,
-                    "minLength": 6
-                },
-                "username": {
-                    "type": "string",
-                    "maxLength": 128,
-                    "minLength": 3
-                }
-            }
-        },
-        "LoginResponse": {
-            "type": "object",
-            "required": [
-                "accessToken",
-                "expiresAt",
-                "refreshExpiresAt",
-                "sessionID",
-                "twoFactorRequired",
-                "user"
-            ],
-            "properties": {
-                "accessToken": {
-                    "type": "string"
-                },
-                "expiresAt": {
-                    "type": "string"
-                },
-                "refreshExpiresAt": {
-                    "type": "string"
-                },
-                "sessionID": {
-                    "type": "string"
-                },
-                "twoFactorChallengeToken": {
-                    "type": "string"
-                },
-                "twoFactorRequired": {
-                    "type": "boolean"
-                },
-                "user": {
-                    "$ref": "#/definitions/AuthUserResponse"
-                },
-                "verificationMethods": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "LoginResponseDoc": {
-            "type": "object",
-            "required": [
-                "data",
-                "errorMsg"
-            ],
-            "properties": {
-                "data": {
-                    "$ref": "#/definitions/LoginResponse"
-                },
-                "errorMsg": {
-                    "type": "string"
-                }
-            }
-        },
         "LogoutResponse": {
             "type": "object",
             "required": [
@@ -21474,6 +21538,87 @@
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniAppAuthResponse": {
+            "type": "object",
+            "required": [
+                "accessToken",
+                "expiresAt",
+                "refreshExpiresAt",
+                "sessionID",
+                "user"
+            ],
+            "properties": {
+                "accessToken": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "refreshExpiresAt": {
+                    "type": "string"
+                },
+                "sessionID": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/MiniAppUserResponse"
+                }
+            }
+        },
+        "MiniAppPresetsResponse": {
+            "type": "object",
+            "required": [
+                "chatModel",
+                "imageModel"
+            ],
+            "properties": {
+                "chatModel": {
+                    "type": "string"
+                },
+                "imageModel": {
+                    "type": "string"
+                }
+            }
+        },
+        "MiniAppUserResponse": {
+            "type": "object",
+            "required": [
+                "avatarURL",
+                "displayName",
+                "id",
+                "publicID",
+                "subscriptionPlanName",
+                "subscriptionStatus",
+                "subscriptionTier",
+                "username"
+            ],
+            "properties": {
+                "avatarURL": {
+                    "type": "string"
+                },
+                "displayName": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "publicID": {
+                    "type": "string"
+                },
+                "subscriptionPlanName": {
+                    "type": "string"
+                },
+                "subscriptionStatus": {
+                    "type": "string"
+                },
+                "subscriptionTier": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -24557,7 +24702,7 @@
             ],
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/LoginResponse"
+                    "$ref": "#/definitions/AuthLoginResponse"
                 },
                 "errorMsg": {
                     "type": "string"
@@ -28671,6 +28816,74 @@
             "properties": {
                 "data": {
                     "$ref": "#/definitions/UserSettingsResponse"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "WechatminiappErrorDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorCode",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "x-nullable": true
+                },
+                "errorCode": {
+                    "type": "string"
+                },
+                "errorMsg": {
+                    "type": "string"
+                },
+                "requestId": {
+                    "type": "string"
+                }
+            }
+        },
+        "WechatminiappLoginRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 256
+                }
+            }
+        },
+        "WechatminiappLoginResponse": {
+            "type": "object",
+            "required": [
+                "auth",
+                "created",
+                "presets"
+            ],
+            "properties": {
+                "auth": {
+                    "$ref": "#/definitions/MiniAppAuthResponse"
+                },
+                "created": {
+                    "type": "boolean"
+                },
+                "presets": {
+                    "$ref": "#/definitions/MiniAppPresetsResponse"
+                }
+            }
+        },
+        "WechatminiappLoginResponseDoc": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/WechatminiappLoginResponse"
                 },
                 "errorMsg": {
                     "type": "string"
