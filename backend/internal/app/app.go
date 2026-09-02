@@ -38,6 +38,7 @@ import (
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/user"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/usersettings"
 	appwechat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/wechat"
+	appwechatminiapp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/wechatminiapp"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	moderationclient "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/contentmoderation"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/embedding"
@@ -77,6 +78,7 @@ import (
 	wechatrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/wechat"
 	platformruntime "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/runtime"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/lifecycle"
+	wechatminiappinfra "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/wechatminiapp"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/security"
 	platformhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http"
 	adminhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/admin"
@@ -97,6 +99,7 @@ import (
 	userhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/user"
 	usersettingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/usersettings"
 	wechathttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/wechat"
+	wechatminiapphttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/wechatminiapp"
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"go.uber.org/zap"
@@ -296,6 +299,12 @@ func NewApp() (*App, error) {
 	authService.SetTelegramNotifier(telegramNotifier)
 	settingsService.SetAuthSafetyService(authService)
 	authService.SetSubscriptionResolver(billingService)
+	wechatMiniAppClient := wechatminiappinfra.NewClient(
+		security.NewOutboundHTTPClient(cfg.StrictOutboundPolicy(), 10*time.Second),
+		wechatminiappinfra.DefaultAPIBase,
+	)
+	wechatMiniAppService := appwechatminiapp.NewService(runtimeCfg, userRepo, wechatMiniAppClient, authService)
+	wechatMiniAppModule := wechatminiapphttp.NewModule(wechatminiapphttp.NewHandler(wechatMiniAppService, authService))
 	registrationCodeRepo := registrationcoderepo.NewRepo(db)
 	registrationCodeService := appregistrationcode.NewService(registrationCodeRepo)
 	registrationCodeHandler := registrationcodehttp.NewHandler(registrationCodeService)
@@ -460,6 +469,7 @@ func NewApp() (*App, error) {
 		Admin:             adminModule,
 		RegistrationCode:  registrationCodeModule,
 		WeChat:            wechatModule,
+		WeChatMiniApp:     wechatMiniAppModule,
 		Invitation:        invitationModule,
 		ContentModeration: contentModerationModule,
 		Announcement:      announcementModule,

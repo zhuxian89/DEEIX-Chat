@@ -34,6 +34,7 @@ import (
 	userhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/user"
 	usersettingshttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/usersettings"
 	wechathttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/wechat"
+	wechatminiapphttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/wechatminiapp"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -74,6 +75,7 @@ type Modules struct {
 	UserSettings      *usersettingshttp.Module
 	RegistrationCode  *registrationcodehttp.Module
 	WeChat            *wechathttp.Module
+	WeChatMiniApp     *wechatminiapphttp.Module
 	Invitation        *invitationhttp.Module
 	StartupLog        func(*zap.Logger)
 	// Shutdown 是进程关停排空信号；排空期间就绪探针返回 503，引导负载均衡摘除流量。
@@ -128,11 +130,14 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 	if modules.WeChat != nil {
 		modules.WeChat.RegisterPublicRoutes(api)
 	}
-	if modules.Auth != nil || modules.Settings != nil || modules.Billing != nil || modules.Conversation != nil || modules.User != nil || modules.Channel != nil {
+	if modules.Auth != nil || modules.Settings != nil || modules.Billing != nil || modules.Conversation != nil || modules.User != nil || modules.Channel != nil || modules.WeChatMiniApp != nil {
 		publicAuth := api.Group("")
 		publicAuth.Use(middleware.PublicAuthRateLimit(limiter, cfg))
 		if modules.Auth != nil {
 			modules.Auth.RegisterPublicRoutes(publicAuth)
+		}
+		if modules.WeChatMiniApp != nil {
+			modules.WeChatMiniApp.RegisterPublicRoutes(publicAuth)
 		}
 		if modules.User != nil {
 			modules.User.RegisterPublicRoutes(publicAuth)

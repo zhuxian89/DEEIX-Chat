@@ -1,0 +1,62 @@
+{
+  "name": "@deeix/miniapp",
+  "version": "0.1.0",
+  "private": true,
+  "description": "DEEIX Chat production WeChat Mini Program",
+  "scripts": {
+    "build:weapp": "taro build --type weapp",
+    "configure:integration": "node scripts/configure-integration.mjs",
+    "configure:weapp": "node scripts/configure-wechat-project.mjs",
+    "dev:weapp": "taro build --type weapp --watch",
+    "typecheck": "tsc --noEmit --pretty false",
+    "test": "tsx --test scripts/cli-args.test.mjs src/validation/api-contract.test.ts src/validation/runtime-config.test.ts src/validation/cookie-observer.test.ts src/validation/memory-cookie-bridge.test.ts src/validation/stream-parser.test.ts src/validation/auth-probe.test.ts src/product/runtime-config.test.ts src/product/model-catalog.test.ts",
+    "check:isolation": "node scripts/check-isolation.mjs",
+    "check:dist": "node scripts/check-dist.mjs",
+    "check": "pnpm check:isolation && pnpm typecheck && pnpm test && pnpm build:weapp && pnpm check:dist"
+  },
+  "engines": {
+    "node": ">=20.18.0",
+    "pnpm": ">=10.17.0"
+  },
+  "dependencies": {
+    "@babel/runtime": "^7.24.4",
+    "@deeix/api-contract": "file:../packages/api-contract",
+    "@tarojs/components": "4.2.1",
+    "@tarojs/helper": "4.2.1",
+    "@tarojs/plugin-framework-react": "4.2.1",
+    "@tarojs/plugin-platform-weapp": "4.2.1",
+    "@tarojs/react": "4.2.1",
+    "@tarojs/runtime": "4.2.1",
+    "@tarojs/shared": "4.2.1",
+    "@tarojs/taro": "4.2.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.4",
+    "@babel/plugin-transform-class-properties": "7.25.9",
+    "@babel/preset-react": "^7.24.1",
+    "@pmmmwh/react-refresh-webpack-plugin": "^0.5.5",
+    "@tarojs/cli": "4.2.1",
+    "@tarojs/taro-loader": "4.2.1",
+    "@tarojs/webpack5-runner": "4.2.1",
+    "@types/node": "^20.17.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "@types/webpack-env": "^1.18.0",
+    "babel-preset-taro": "4.2.1",
+    "postcss": "^8.5.6",
+    "react-refresh": "^0.14.0",
+    "sass": "^1.75.0",
+    "tsconfig-paths-webpack-plugin": "^4.1.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.2",
+    "webpack": "5.91.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@swc/core",
+      "esbuild"
+    ]
+  }
+}

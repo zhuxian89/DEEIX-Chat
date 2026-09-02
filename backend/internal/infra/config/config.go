@@ -396,12 +396,19 @@ type Config struct {
 	SMTPFrom                     string
 	TurnstileSiteverifyURL       string
 	WeChatCallbackToken          string
-	OTelEnabled                  *bool
-	OTelExporterOTLPEndpoint     string
-	OTelExporterOTLPHeaders      string
-	OTelExporterOTLPInsecure     bool
-	OTelExporterOTLPProtocol     string
-	OTelSamplingRate             float64
+
+	WeChatMiniAppEnabled           bool
+	WeChatMiniAppAppID             string
+	WeChatMiniAppAppSecret         string
+	WeChatMiniAppDefaultChatModel  string
+	WeChatMiniAppDefaultImageModel string
+
+	OTelEnabled              *bool
+	OTelExporterOTLPEndpoint string
+	OTelExporterOTLPHeaders  string
+	OTelExporterOTLPInsecure bool
+	OTelExporterOTLPProtocol string
+	OTelSamplingRate         float64
 
 	// ── 动态配置（由 DB 种子初始化默认值，settings.RuntimeSettings.ApplyTo 覆盖） ──
 	// 认证配置
@@ -642,12 +649,19 @@ func Load() Config {
 		SMTPFrom:                     "",
 		TurnstileSiteverifyURL:       envOr("TURNSTILE_SITEVERIFY_URL", yc.Security.TurnstileSiteverifyURL, DefaultTurnstileSiteverifyURL),
 		WeChatCallbackToken:          strings.TrimSpace(os.Getenv("WECHAT_CALLBACK_TOKEN")),
-		OTelEnabled:                  envOrBoolOptional("OTEL_ENABLED", yc.Observability.Tracing.Enabled),
-		OTelExporterOTLPEndpoint:     envOr("OTEL_EXPORTER_OTLP_ENDPOINT", yc.Observability.Tracing.Endpoint, ""),
-		OTelExporterOTLPHeaders:      envOr("OTEL_EXPORTER_OTLP_HEADERS", yc.Observability.Tracing.Headers, ""),
-		OTelExporterOTLPInsecure:     envOrBoolPtr("OTEL_EXPORTER_OTLP_INSECURE", yc.Observability.Tracing.Insecure, false),
-		OTelExporterOTLPProtocol:     normalizeOTelExporterOTLPProtocol(envOr("OTEL_EXPORTER_OTLP_PROTOCOL", yc.Observability.Tracing.Protocol, "grpc")),
-		OTelSamplingRate:             envOrFloat("OTEL_TRACES_SAMPLER_ARG", envOrFloat("OTEL_SAMPLING_RATE", yc.Observability.Tracing.SamplingRate, 1), 1),
+
+		WeChatMiniAppEnabled:           envOrBoolPtr("WECHAT_MINIAPP_ENABLED", nil, false),
+		WeChatMiniAppAppID:             strings.TrimSpace(os.Getenv("WECHAT_MINIAPP_APP_ID")),
+		WeChatMiniAppAppSecret:         strings.TrimSpace(os.Getenv("WECHAT_MINIAPP_APP_SECRET")),
+		WeChatMiniAppDefaultChatModel:  strings.TrimSpace(os.Getenv("WECHAT_MINIAPP_DEFAULT_CHAT_MODEL")),
+		WeChatMiniAppDefaultImageModel: strings.TrimSpace(os.Getenv("WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL")),
+
+		OTelEnabled:              envOrBoolOptional("OTEL_ENABLED", yc.Observability.Tracing.Enabled),
+		OTelExporterOTLPEndpoint: envOr("OTEL_EXPORTER_OTLP_ENDPOINT", yc.Observability.Tracing.Endpoint, ""),
+		OTelExporterOTLPHeaders:  envOr("OTEL_EXPORTER_OTLP_HEADERS", yc.Observability.Tracing.Headers, ""),
+		OTelExporterOTLPInsecure: envOrBoolPtr("OTEL_EXPORTER_OTLP_INSECURE", yc.Observability.Tracing.Insecure, false),
+		OTelExporterOTLPProtocol: normalizeOTelExporterOTLPProtocol(envOr("OTEL_EXPORTER_OTLP_PROTOCOL", yc.Observability.Tracing.Protocol, "grpc")),
+		OTelSamplingRate:         envOrFloat("OTEL_TRACES_SAMPLER_ARG", envOrFloat("OTEL_SAMPLING_RATE", yc.Observability.Tracing.SamplingRate, 1), 1),
 
 		// 动态配置默认值（会被 DB 覆盖）
 		TokenTTLHours:                     24,
@@ -807,6 +821,20 @@ func (c Config) Validate() error {
 	}
 	if err := validateHTTPIntegrationURL(c.TurnstileSiteverifyURL, "TURNSTILE_SITEVERIFY_URL"); err != nil {
 		return err
+	}
+	if c.WeChatMiniAppEnabled {
+		if strings.TrimSpace(c.WeChatMiniAppAppID) == "" {
+			return errors.New("invalid config: WECHAT_MINIAPP_APP_ID must be set when WECHAT_MINIAPP_ENABLED=true")
+		}
+		if strings.TrimSpace(c.WeChatMiniAppAppSecret) == "" {
+			return errors.New("invalid config: WECHAT_MINIAPP_APP_SECRET must be set when WECHAT_MINIAPP_ENABLED=true")
+		}
+		if strings.TrimSpace(c.WeChatMiniAppDefaultChatModel) == "" {
+			return errors.New("invalid config: WECHAT_MINIAPP_DEFAULT_CHAT_MODEL must be set when WECHAT_MINIAPP_ENABLED=true")
+		}
+		if strings.TrimSpace(c.WeChatMiniAppDefaultImageModel) == "" {
+			return errors.New("invalid config: WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL must be set when WECHAT_MINIAPP_ENABLED=true")
+		}
 	}
 	if env != "prod" {
 		return nil

@@ -20,6 +20,7 @@ func Models() []interface{} {
 		&model.WeChatReplyTemplate{},
 		&model.WeChatKeywordRule{},
 		&model.WeChatKeywordInvocationLog{},
+		&model.WeChatMiniAppBinding{},
 		&model.UserCredential{},
 		&model.UserSession{},
 		&model.UserAuthEvent{},

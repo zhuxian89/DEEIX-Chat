@@ -1,6 +1,7 @@
 import type {
   ActiveSessionListResponse,
   ActiveSessionResponse,
+  AuthLoginResponse,
   AuthUserIdentityProviderSummaryResponse,
   AuthUserResponse,
   DeleteAccountRequest,
@@ -8,7 +9,6 @@ import type {
   EmailVerificationStartResponse,
 	IdentityProviderResponse,
   LoginOptionsResponse,
-  LoginResponse,
   LogoutResponse,
   PasswordResetCompleteResponse,
   PasswordResetStartResponse,
@@ -20,7 +20,7 @@ export type UserIdentityProviderSummaryDTO = AuthUserIdentityProviderSummaryResp
 
 export type UserDTO = AuthUserResponse;
 
-export type LoginData = Omit<LoginResponse, "user" | "verificationMethods"> & {
+export type LoginData = Omit<AuthLoginResponse, "user" | "verificationMethods"> & {
   user: UserDTO;
   twoFactorChallengeToken?: string;
   verificationMethods?: SecurityVerificationMethod[];

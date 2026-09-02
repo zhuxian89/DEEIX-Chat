@@ -340,6 +340,9 @@ Static configuration environment variables:
 | Security | `SSRF_ALLOWED_CIDRS` | Trusted deployment-level integration or private redirect CIDRs, comma-separated. |
 | Security | `TURNSTILE_SITEVERIFY_URL` | Cloudflare Turnstile siteverify endpoint. |
 | WeChat | `WECHAT_CALLBACK_TOKEN` | Official-account callback Token; callback path is `/api/v1/wechat/callback` and plaintext mode issues a registration code for the built-in default keyword `13004`; keywords and reply templates are configurable in the admin console. |
+| WeChat Mini Program | `WECHAT_MINIAPP_ENABLED` | Enables the independent WeChat Mini Program one-tap login channel; disabled by default. |
+| WeChat Mini Program | `WECHAT_MINIAPP_APP_ID` / `WECHAT_MINIAPP_APP_SECRET` | Server-only Mini Program credentials used for `code2Session`; required when the channel is enabled. |
+| WeChat Mini Program | `WECHAT_MINIAPP_DEFAULT_CHAT_MODEL` / `WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL` | Fixed quick-entry models; values must be model-catalog `platformModelName` values. |
 | Database | `DATABASE_DRIVER` | `postgres` or `sqlite`. |
 | PostgreSQL | `POSTGRES_DSN` | PostgreSQL DSN. |
 | PostgreSQL | `POSTGRES_MAX_OPEN_CONNS` | Maximum open connections. |
