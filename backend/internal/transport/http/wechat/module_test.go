@@ -27,6 +27,7 @@ var _ repository.WeChatRegistrationRepository = fakeRepository{}
 type fakeNotifier struct {
 	messageCalls int
 	replyCalls   int
+	followCalls  int
 	messageType  string
 	content      string
 }
@@ -40,6 +41,10 @@ func (f *fakeNotifier) NotifyWeChatMessage(_ string, messageType string, content
 func (f *fakeNotifier) NotifyWeChatReply(_ string, content string) {
 	f.replyCalls++
 	f.content = content
+}
+
+func (f *fakeNotifier) NotifyWeChatFollow(_ string) {
+	f.followCalls++
 }
 
 func TestVerifySignature(t *testing.T) {
@@ -89,7 +94,7 @@ func TestReceiveKeepsRegistrationTextKeyword(t *testing.T) {
 	}
 }
 
-func TestReceiveNotifiesAllWechatMessages(t *testing.T) {
+func TestReceiveNotifiesWechatMessages(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	notifier := &fakeNotifier{}
 	router := gin.New()
@@ -105,6 +110,36 @@ func TestReceiveNotifiesAllWechatMessages(t *testing.T) {
 	}
 	if notifier.messageCalls != 1 || notifier.messageType != "text" || notifier.content != "hello" {
 		t.Fatalf("expected inbound message notification, got %#v", notifier)
+	}
+}
+
+func TestReceiveNotifiesSubscribeEvent(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	notifier := &fakeNotifier{}
+	router := gin.New()
+	router.POST("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token", notifier).Receive)
+
+	body := `<xml><ToUserName>official-account</ToUserName><FromUserName>openid-follow</FromUserName><CreateTime>1</CreateTime><MsgType>event</MsgType><Event>subscribe</Event></xml>`
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, signedRequest(http.MethodPost, "/wechat/callback", body))
+
+	if recorder.Code != http.StatusOK || notifier.followCalls != 1 || notifier.messageCalls != 0 {
+		t.Fatalf("expected one follow notification, status=%d notifier=%#v", recorder.Code, notifier)
+	}
+}
+
+func TestReceiveSkipsOtherWechatEvents(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	notifier := &fakeNotifier{}
+	router := gin.New()
+	router.POST("/wechat/callback", NewHandler(appwechat.NewService(fakeRepository{}), "token", notifier).Receive)
+
+	body := `<xml><ToUserName>official-account</ToUserName><FromUserName>openid-unfollow</FromUserName><CreateTime>1</CreateTime><MsgType>event</MsgType><Event>unsubscribe</Event></xml>`
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, signedRequest(http.MethodPost, "/wechat/callback", body))
+
+	if recorder.Code != http.StatusOK || notifier.followCalls != 0 || notifier.messageCalls != 0 {
+		t.Fatalf("expected event notification to be skipped, status=%d notifier=%#v", recorder.Code, notifier)
 	}
 }
 

@@ -39,6 +39,7 @@ type Handler struct {
 type wechatNotifier interface {
 	NotifyWeChatMessage(openID string, messageType string, content string)
 	NotifyWeChatReply(openID string, content string)
+	NotifyWeChatFollow(openID string)
 }
 
 func NewHandler(service *appwechat.Service, token string, notifier wechatNotifier) *Handler {
@@ -76,6 +77,7 @@ type inboundMessage struct {
 	CreateTime   int64  `xml:"CreateTime"`
 	MsgType      string `xml:"MsgType"`
 	Content      string `xml:"Content"`
+	Event        string `xml:"Event"`
 	MsgID        int64  `xml:"MsgId"`
 }
 
@@ -112,7 +114,13 @@ func (h *Handler) Receive(c *gin.Context) {
 		return
 	}
 	if h.notifier != nil {
-		h.notifier.NotifyWeChatMessage(message.FromUserName, message.MsgType, message.Content)
+		if message.MsgType == "event" {
+			if message.Event == "subscribe" {
+				h.notifier.NotifyWeChatFollow(message.FromUserName)
+			}
+		} else {
+			h.notifier.NotifyWeChatMessage(message.FromUserName, message.MsgType, message.Content)
+		}
 	}
 	if message.MsgType != "text" {
 		c.String(http.StatusOK, "success")

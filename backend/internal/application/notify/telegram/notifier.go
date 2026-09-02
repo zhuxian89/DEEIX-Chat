@@ -93,6 +93,14 @@ func (n *Notifier) NotifyWeChatReply(openID string, content string) {
 	n.dispatch(text)
 }
 
+// NotifyWeChatFollow 异步通知管理员有用户关注微信公众号。
+func (n *Notifier) NotifyWeChatFollow(openID string) {
+	text := "👤 微信公众号新关注\n" +
+		"OpenID: " + openID + "\n" +
+		"时间: " + time.Now().Format("2006-01-02 15:04:05")
+	n.dispatch(text)
+}
+
 // dispatch 在独立 goroutine 中发送，超时 15s，失败仅记日志，绝不阻塞主流程。
 func (n *Notifier) dispatch(text string) {
 	if n == nil || n.client == nil {

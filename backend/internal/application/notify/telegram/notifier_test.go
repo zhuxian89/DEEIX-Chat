@@ -191,6 +191,24 @@ func TestNotifyWeChatReplyMirrorsReply(t *testing.T) {
 	}
 }
 
+func TestNotifyWeChatFollow(t *testing.T) {
+	var captured string
+	server := newTestServer(t, &captured)
+	defer server.Close()
+
+	settings := &fakeSettings{values: map[string]string{
+		KeyEnabled:  "true",
+		KeyBotToken: "bot-token",
+		KeyChatID:   "12345",
+	}}
+	notifier := NewNotifier(settings, NewClient(server.Client(), server.URL), nil)
+	notifier.NotifyWeChatFollow("openid-follow")
+	notifier.Close()
+	if !strings.Contains(captured, "微信公众号新关注") || !strings.Contains(captured, "openid-follow") {
+		t.Fatalf("expected wechat follow notification, got %q", captured)
+	}
+}
+
 func TestNotifySkipsWhenNotConfigured(t *testing.T) {
 	var captured string
 	server := newTestServer(t, &captured)
