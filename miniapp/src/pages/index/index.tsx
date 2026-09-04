@@ -4,12 +4,14 @@ import type {
   DailyCheckinStatusResponse,
   MiniAppUserResponse,
   PublicModelResponse,
+  PublicSharedConversationResponse,
   UsageMonthlyResponse,
+  UserMemoryResponse,
 } from "@deeix/api-contract";
-import { Button, Image, KeyboardAccessory, ScrollView, Text, Textarea, View } from "@tarojs/components";
-import Taro, { useDidShow } from "@tarojs/taro";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { DailyCheckinWheel } from "@/components/daily-checkin-wheel";
+import { Button, Image, Input, KeyboardAccessory, ScrollView, Text, Textarea, View } from "@tarojs/components";
+import Taro, { useDidShow, useRouter, useShareAppMessage } from "@tarojs/taro";
+import { type ComponentProps, type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { DailyCheckinEntry, DailyCheckinWheel } from "@/components/daily-checkin-wheel";
 import { Markdown } from "@/components/markdown";
 import { ConversationTrace } from "@/components/conversation-trace";
 import { resolveMiniAppConfig } from "@/product/runtime-config";
@@ -29,6 +31,7 @@ import { composerKeyboardStyle } from "@/product/keyboard-layout";
 import { MINIAPP_BUILD_VERSION } from "@/product/build-version";
 import { nextChatBottomScrollTop, shouldReleaseChatAutoFollow } from "@/product/chat-auto-scroll";
 import { wheelRotationForPrize } from "@/product/daily-checkin";
+import { miniAppSharedConversationPath } from "@/product/retention-contract";
 import {
   conversationSwipeOffset,
   conversationRefreshPageSize,
@@ -44,11 +47,94 @@ import {
   applyImageProgress,
   type ConversationMessage,
   createPendingImageTurn,
+  latestVisibleMessages,
   messageFromAPI,
 } from "@/product/message-timeline";
 import "./index.scss";
 
-type Screen = "home" | "chat" | "image" | "account";
+type Screen = "home" | "chat" | "image" | "account" | "checkin" | "history" | "memories" | "shared";
+
+type ConversationListItem = Pick<
+  ConversationResponse,
+  "isStarred" | "messageCount" | "publicID" | "title" | "updatedAt"
+> & Partial<Pick<ConversationResponse, "model">>;
+
+type MemoryEditor = {
+  memoryKey: string;
+  originalKey?: string;
+  value: string;
+};
+
+type PreparedShare = {
+  shareID: string;
+  title: string;
+};
+
+type HistoryPageResult = {
+  hasMore: boolean;
+  results: ConversationListItem[];
+};
+
+const HISTORY_LIST_PAGE_SIZE = 50;
+const HISTORY_SEARCH_PAGE_SIZE = 30;
+const MAX_PREFERENCE_MEMORIES = 20;
+
+function historyEmptyTitle(query: string, favoritesOnly: boolean): string {
+  if (query.trim()) {
+    return "没有找到相关对话";
+  }
+  return favoritesOnly ? "还没有收藏的对话" : "还没有对话";
+}
+
+function historyEmptyHint(favoritesOnly: boolean): string {
+  return favoritesOnly ? "收藏重要会话，稍后可以快速找到" : "换个关键词再试试";
+}
+
+async function fetchHistoryPage(
+  session: MiniAppSession,
+  query: string,
+  page: number,
+  favoritesOnly: boolean,
+): Promise<HistoryPageResult> {
+  if (query) {
+    const result = await session.searchConversations(query, page, HISTORY_SEARCH_PAGE_SIZE);
+    return {
+      hasMore: result.hasMore,
+      results: favoritesOnly
+        ? result.results.filter((conversation) => conversation.isStarred)
+        : result.results,
+    };
+  }
+
+  const result = await session.listConversationPage(
+    page,
+    HISTORY_LIST_PAGE_SIZE,
+    favoritesOnly ? "starred" : "all",
+  );
+  return {
+    hasMore: page === 1
+      ? result.results.length < result.total
+      : page * HISTORY_LIST_PAGE_SIZE < result.total,
+    results: result.results,
+  };
+}
+
+function mergeHistoryPage(
+  current: readonly ConversationListItem[],
+  incoming: readonly ConversationListItem[],
+): ConversationListItem[] {
+  const existingIDs = new Set(current.map((conversation) => conversation.publicID));
+  return [...current, ...incoming.filter((conversation) => !existingIDs.has(conversation.publicID))];
+}
+
+function chatGenerationFailureText(currentText: string, stopped: boolean): string {
+  if (stopped) {
+    return currentText ? `${currentText}\n\n（本次回复已停止）` : "本次回复已停止";
+  }
+  return currentText
+    ? `${currentText}\n\n（回复中断，可重新进入会话恢复）`
+    : "回复失败，请重试";
+}
 
 type PendingImage = {
   fileID: string;
@@ -79,6 +165,8 @@ type ScrollEventLike = {
   nativeEvent?: ScrollEventLike;
 };
 
+type ViewTouchHandler = NonNullable<ComponentProps<typeof View>["onTouchStart"]>;
+
 function readTouchPoint(event: unknown, changed = false): { x: number; y: number } | null {
   const candidate = event as TouchEventLike;
   const touches = changed
@@ -97,7 +185,7 @@ function readScrollTop(event: unknown): number | null {
 }
 
 function conversationActionWidthPx(): number {
-  return Taro.getWindowInfo().windowWidth * 304 / 750;
+  return Taro.getWindowInfo().windowWidth * 432 / 750;
 }
 
 let runtimeConfig: { apiBaseUrl: string } | null = null;
@@ -109,6 +197,8 @@ try {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const incomingShareID = typeof router.params.share === "string" ? router.params.share.trim() : "";
   const sessionRef = useRef<MiniAppSession | null>(null);
   const messageCounter = useRef(0);
   const historyLoadCounter = useRef(0);
@@ -155,6 +245,31 @@ export default function HomePage() {
   const chatScrollTopRef = useRef(0);
   const [chatAutoFollow, setChatAutoFollow] = useState(true);
   const [chatScrollTop, setChatScrollTop] = useState(0);
+  const historyRequestCounter = useRef(0);
+  const [historyQuery, setHistoryQuery] = useState("");
+  const [historyItems, setHistoryItems] = useState<ConversationListItem[]>([]);
+  const [historyFavoritesOnly, setHistoryFavoritesOnly] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [memories, setMemories] = useState<UserMemoryResponse[]>([]);
+  const [memoriesLoading, setMemoriesLoading] = useState(false);
+  const [memorySaving, setMemorySaving] = useState(false);
+  const [memoryEditor, setMemoryEditor] = useState<MemoryEditor | null>(null);
+  const [preparedShare, setPreparedShare] = useState<PreparedShare | null>(null);
+  const [shareSheetOpen, setShareSheetOpen] = useState(false);
+  const [shareWorking, setShareWorking] = useState(false);
+  const [sharedConversation, setSharedConversation] = useState<PublicSharedConversationResponse | null>(null);
+  const [sharedMessages, setSharedMessages] = useState<ConversationMessage[]>([]);
+  const [sharedLoading, setSharedLoading] = useState(false);
+
+  useShareAppMessage(() => ({
+    title: preparedShare?.title ? `${preparedShare.title}｜AI省着用` : "AI省着用",
+    path: preparedShare?.shareID
+      ? miniAppSharedConversationPath(preparedShare.shareID)
+      : "/pages/index/index",
+  }));
 
   const enableChatAutoFollow = useCallback((scrollNow = false) => {
     chatAutoFollowRef.current = true;
@@ -222,7 +337,44 @@ export default function HomePage() {
       setConversations(result.conversations);
       setConversationPage(1);
       setConversationTotal(result.conversationTotal);
-      setScreen("home");
+      if (incomingShareID) {
+        setSharedLoading(true);
+        setSharedConversation(null);
+        setSharedMessages([]);
+        setScreen("shared");
+        try {
+          const shared = await session.getSharedConversation(incomingShareID);
+          const allMessages = shared.messages
+            .map(messageFromAPI)
+            .filter((item): item is ConversationMessage => item !== null);
+          const defaultIDs = new Set(shared.defaultMessagePublicIDs);
+          const visibleMessages = defaultIDs.size > 0
+            ? allMessages.filter((message) => defaultIDs.has(message.id))
+            : latestVisibleMessages(allMessages);
+          setSharedConversation(shared);
+          setSharedMessages(visibleMessages);
+          setPreparedShare({ shareID: shared.shareID, title: shared.title || "AI 对话分享" });
+          for (const item of visibleMessages) {
+            if (!item.imageFileID) {
+              continue;
+            }
+            void session.downloadSharedImage(shared.shareID, item.imageFileID).then((imageSource) => {
+              if (!imageSource) {
+                return;
+              }
+              setSharedMessages((current) => current.map((message) => message.id === item.id
+                ? { ...message, imageSource }
+                : message));
+            });
+          }
+        } catch (error) {
+          setWorkspaceError(error instanceof Error ? error.message : "分享内容加载失败");
+        } finally {
+          setSharedLoading(false);
+        }
+      } else {
+        setScreen("home");
+      }
     } catch (error) {
       session.dispose();
       if (sessionRef.current === session) {
@@ -232,7 +384,7 @@ export default function HomePage() {
     } finally {
       setBooting(false);
     }
-  }, [applyDailyCheckinStatus]);
+  }, [applyDailyCheckinStatus, incomingShareID]);
 
   useEffect(() => {
     void bootstrap();
@@ -256,6 +408,44 @@ export default function HomePage() {
     Taro.onKeyboardHeightChange(handleKeyboardHeightChange);
     return () => Taro.offKeyboardHeightChange(handleKeyboardHeightChange);
   }, []);
+
+  useEffect(() => {
+    if (screen !== "history") {
+      return;
+    }
+    const session = sessionRef.current;
+    if (!session) {
+      return;
+    }
+    const requestID = ++historyRequestCounter.current;
+    const query = historyQuery.trim();
+    setHistoryLoading(true);
+    setHistoryPage(1);
+    setHistoryHasMore(false);
+    const timer = setTimeout(() => {
+      void (async () => {
+        try {
+          const result = await fetchHistoryPage(session, query, 1, historyFavoritesOnly);
+          if (requestID !== historyRequestCounter.current) {
+            return;
+          }
+          setHistoryItems(result.results);
+          setHistoryHasMore(result.hasMore);
+          setWorkspaceError("");
+        } catch (error) {
+          if (requestID === historyRequestCounter.current) {
+            setHistoryItems([]);
+            setWorkspaceError(error instanceof Error ? error.message : "历史会话加载失败");
+          }
+        } finally {
+          if (requestID === historyRequestCounter.current) {
+            setHistoryLoading(false);
+          }
+        }
+      })();
+    }, query ? 250 : 0);
+    return () => clearTimeout(timer);
+  }, [historyFavoritesOnly, historyQuery, screen]);
 
   const refreshConversations = async () => {
     const session = sessionRef.current;
@@ -407,8 +597,165 @@ export default function HomePage() {
     void loadAccountCenter();
   };
 
+  const openDailyCheckin = () => {
+    setWorkspaceError("");
+    setScreen("checkin");
+    void refreshDailyCheckinStatus();
+  };
+
+  const openHistory = () => {
+    setWorkspaceError("");
+    setHistoryQuery("");
+    setHistoryFavoritesOnly(false);
+    setScreen("history");
+  };
+
+  const loadMoreHistory = async () => {
+    const session = sessionRef.current;
+    if (!session || historyLoading || historyLoadingMore || !historyHasMore) {
+      return;
+    }
+    const nextPage = historyPage + 1;
+    const query = historyQuery.trim();
+    setHistoryLoadingMore(true);
+    try {
+      const result = await fetchHistoryPage(session, query, nextPage, historyFavoritesOnly);
+      setHistoryItems((current) => mergeHistoryPage(current, result.results));
+      setHistoryPage(nextPage);
+      setHistoryHasMore(result.hasMore);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "加载更多会话失败");
+    } finally {
+      setHistoryLoadingMore(false);
+    }
+  };
+
+  const loadUserMemories = async () => {
+    const session = sessionRef.current;
+    if (!session || memoriesLoading) {
+      return;
+    }
+    setMemoriesLoading(true);
+    setWorkspaceError("");
+    try {
+      const result = await session.listUserMemories();
+      setMemories(result.filter((item) => item.scope === "preference"));
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "AI 偏好记忆加载失败");
+    } finally {
+      setMemoriesLoading(false);
+    }
+  };
+
+  const openUserMemories = () => {
+    setMemoryEditor(null);
+    setScreen("memories");
+    void loadUserMemories();
+  };
+
+  const saveUserMemory = async () => {
+    const session = sessionRef.current;
+    const editor = memoryEditor;
+    const memoryKey = editor?.memoryKey.trim() ?? "";
+    const value = editor?.value.trim() ?? "";
+    if (!session || !editor || !memoryKey || !value || memorySaving) {
+      return;
+    }
+    setMemorySaving(true);
+    setWorkspaceError("");
+    try {
+      await session.upsertUserMemory(memoryKey, value);
+      const now = new Date().toISOString();
+      setMemories((current) => {
+        const existing = current.find((item) => item.memoryKey === memoryKey);
+        if (existing) {
+          return current.map((item) => item.memoryKey === memoryKey
+            ? { ...item, updatedAt: now, value }
+            : item);
+        }
+        return [{
+          createdAt: now,
+          id: Date.now(),
+          memoryKey,
+          scope: "preference",
+          updatedAt: now,
+          updatedBy: "user",
+          userID: 0,
+          value,
+        }, ...current];
+      });
+      setMemoryEditor(null);
+      await Taro.showToast({ title: editor.originalKey ? "偏好已更新" : "偏好已记住", icon: "success" });
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "保存偏好失败");
+    } finally {
+      setMemorySaving(false);
+    }
+  };
+
+  const deleteUserMemory = async (memory: UserMemoryResponse) => {
+    const session = sessionRef.current;
+    if (!session || memorySaving) {
+      return;
+    }
+    const confirmation = await Taro.showModal({
+      title: "删除这条偏好？",
+      content: `AI 将不再记住“${memory.memoryKey}”。`,
+      confirmText: "删除",
+      confirmColor: "#d14343",
+    });
+    if (!confirmation.confirm) {
+      return;
+    }
+    setMemorySaving(true);
+    setWorkspaceError("");
+    try {
+      await session.deleteUserMemory(memory.memoryKey);
+      setMemories((current) => current.filter((item) => item.memoryKey !== memory.memoryKey));
+      await Taro.showToast({ title: "已删除", icon: "success" });
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "删除偏好失败");
+    } finally {
+      setMemorySaving(false);
+    }
+  };
+
+  const prepareConversationShare = async (conversation: ConversationListItem) => {
+    const session = sessionRef.current;
+    if (!session || shareWorking || conversation.messageCount <= 0) {
+      if (conversation.messageCount <= 0) {
+        await Taro.showToast({ title: "发送一条消息后才能分享", icon: "none" });
+      }
+      return;
+    }
+    setShareWorking(true);
+    setWorkspaceError("");
+    try {
+      const share = await session.createConversationShare(conversation.publicID);
+      setPreparedShare({ shareID: share.shareID, title: conversation.title || "AI 对话分享" });
+      setShareSheetOpen(true);
+      setConversations((current) => current.map((item) => item.publicID === conversation.publicID
+        ? { ...item, shareID: share.shareID, shareStatus: share.status, sharedAt: share.createdAt }
+        : item));
+      await Taro.showShareMenu({ withShareTicket: true });
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "创建分享失败");
+    } finally {
+      setShareWorking(false);
+    }
+  };
+
+  const copyPreparedShareLink = async () => {
+    if (!preparedShare?.shareID || !runtimeConfig) {
+      return;
+    }
+    const url = `${runtimeConfig.apiBaseUrl}/share?conversation_id=${encodeURIComponent(preparedShare.shareID)}`;
+    await Taro.setClipboardData({ data: url });
+  };
+
   const updateConversation = (updated: ConversationResponse) => {
     setConversations((items) => items.map((item) => item.publicID === updated.publicID ? updated : item));
+    setHistoryItems((items) => items.map((item) => item.publicID === updated.publicID ? updated : item));
     setCurrentConversation((current) => current?.publicID === updated.publicID ? updated : current);
   };
 
@@ -477,7 +824,9 @@ export default function HomePage() {
     setCurrentConversation(conversation);
     setScreen(resolvedMode);
     const applyHistory = (history: Awaited<ReturnType<MiniAppSession["listMessages"]>>) => {
-      const timeline = history.map(messageFromAPI).filter((item): item is ConversationMessage => item !== null);
+      const timeline = latestVisibleMessages(
+        history.map(messageFromAPI).filter((item): item is ConversationMessage => item !== null),
+      );
       setMessages(timeline);
       for (const item of timeline) {
         if (!item.imageFileID) {
@@ -677,15 +1026,23 @@ export default function HomePage() {
             }
           : item));
       }, attachment ? [attachment.fileID] : [], networkSearchAvailable && networkSearchEnabled);
-      setMessages((items) => items.map((item) => item.id === assistantID
-        ? {
-            ...item,
+      const persistedUser = result.userMessage ? messageFromAPI(result.userMessage) : null;
+      const persistedAssistant = result.assistantMessage ? messageFromAPI(result.assistantMessage) : null;
+      setMessages((items) => items.map((item) => {
+        if (item.id === userID && persistedUser) {
+          return { ...persistedUser, imageSource: attachment?.localPath ?? persistedUser.imageSource };
+        }
+        if (item.id === assistantID) {
+          return {
+            ...(persistedAssistant ?? item),
             activityStatus: undefined,
             pending: false,
-            processTrace: result.processTrace ?? item.processTrace,
+            processTrace: result.processTrace ?? persistedAssistant?.processTrace ?? item.processTrace,
             text: result.text,
-          }
-        : item));
+          };
+        }
+        return item;
+      }));
       updateConversation({ ...conversation, model: selectedModel.platformModelName });
       void refreshConversations();
       void refreshBalance();
@@ -699,13 +1056,7 @@ export default function HomePage() {
             ...item,
             activityStatus: undefined,
             pending: false,
-            text: stopped
-              ? item.text
-                ? `${item.text}\n\n（本次回复已停止）`
-                : "本次回复已停止"
-              : item.text
-                ? `${item.text}\n\n（回复中断，可重新进入会话恢复）`
-                : "回复失败，请重试",
+            text: chatGenerationFailureText(item.text, stopped),
           }
         : item));
       if (attachment) {
@@ -900,12 +1251,20 @@ export default function HomePage() {
         },
         attachment ? [attachment.fileID] : [],
       );
-      setMessages((items) => items.map((item) => item.id === assistantID
-        ? {
-            ...applyImageProgress(item, { ...result, pending: false }),
+      const persistedUser = result.userMessage ? messageFromAPI(result.userMessage) : null;
+      const persistedAssistant = result.assistantMessage ? messageFromAPI(result.assistantMessage) : null;
+      setMessages((items) => items.map((item) => {
+        if (item.id === userID && persistedUser) {
+          return { ...persistedUser, imageSource: attachment?.localPath ?? persistedUser.imageSource };
+        }
+        if (item.id === assistantID) {
+          return {
+            ...applyImageProgress(persistedAssistant ?? item, { ...result, pending: false }),
             modelName: selectedModel.platformModelName,
-          }
-        : item));
+          };
+        }
+        return item;
+      }));
       updateConversation({ ...conversation, model: selectedModel.platformModelName });
       void refreshConversations();
       void refreshBalance();
@@ -932,7 +1291,7 @@ export default function HomePage() {
     }
   };
 
-  const requestRenameConversation = async (conversation: ConversationResponse) => {
+  const requestRenameConversation = async (conversation: ConversationListItem) => {
     const session = sessionRef.current;
     if (!session || managingConversationID) {
       return;
@@ -953,8 +1312,7 @@ export default function HomePage() {
     setWorkspaceError("");
     try {
       const updated = await session.renameConversation(conversation.publicID, title);
-      setConversations((items) => items.map((item) => item.publicID === updated.publicID ? updated : item));
-      setCurrentConversation((current) => current?.publicID === updated.publicID ? updated : current);
+      updateConversation(updated);
     } catch (error) {
       setWorkspaceError(error instanceof Error ? error.message : "重命名失败，请重试");
     } finally {
@@ -963,7 +1321,7 @@ export default function HomePage() {
     }
   };
 
-  const requestDeleteConversation = async (conversation: ConversationResponse) => {
+  const requestDeleteConversation = async (conversation: ConversationListItem) => {
     const session = sessionRef.current;
     if (!session || managingConversationID) {
       return;
@@ -998,6 +1356,7 @@ export default function HomePage() {
       const result = await session.deleteConversation(conversation.publicID, deleteFiles);
       if (result.deleted) {
         setConversations((items) => items.filter((item) => item.publicID !== conversation.publicID));
+        setHistoryItems((items) => items.filter((item) => item.publicID !== conversation.publicID));
         setConversationTotal((total) => Math.max(0, total - 1));
         if (currentConversation?.publicID === conversation.publicID) {
           goHome();
@@ -1011,14 +1370,62 @@ export default function HomePage() {
     }
   };
 
-  const showConversationActions = async (conversation: ConversationResponse) => {
+  const toggleConversationStar = async (conversation: ConversationListItem) => {
+    const session = sessionRef.current;
+    if (!session || managingConversationID) {
+      return;
+    }
+    setManagingConversationID(conversation.publicID);
+    setWorkspaceError("");
+    try {
+      const updated = await session.setConversationStar(conversation.publicID, !conversation.isStarred);
+      updateConversation(updated);
+      if (historyFavoritesOnly && !updated.isStarred) {
+        setHistoryItems((items) => items.filter((item) => item.publicID !== updated.publicID));
+      }
+      await Taro.showToast({ title: updated.isStarred ? "已收藏" : "已取消收藏", icon: "none" });
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "收藏操作失败");
+    } finally {
+      setManagingConversationID("");
+      setOpenSwipeConversationID("");
+    }
+  };
+
+  const enterHistoryConversation = async (conversation: ConversationListItem) => {
+    const session = sessionRef.current;
+    if (!session) {
+      return;
+    }
+    setManagingConversationID(conversation.publicID);
+    try {
+      const fullConversation = await session.getConversation(conversation.publicID);
+      updateConversation(fullConversation);
+      await enterConversation(fullConversation);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "打开会话失败");
+    } finally {
+      setManagingConversationID("");
+    }
+  };
+
+  const showConversationActions = async (conversation: ConversationListItem) => {
     const selected = await Taro.showActionSheet({
-      itemList: ["重命名", "删除"],
+      itemList: [conversation.isStarred ? "取消收藏" : "收藏会话", "重命名", "分享给好友", "删除"],
     }).catch(() => null);
-    if (selected?.tapIndex === 0) {
-      await requestRenameConversation(conversation);
-    } else if (selected?.tapIndex === 1) {
-      await requestDeleteConversation(conversation);
+    switch (selected?.tapIndex) {
+      case 0:
+        await toggleConversationStar(conversation);
+        break;
+      case 1:
+        await requestRenameConversation(conversation);
+        break;
+      case 2:
+        await prepareConversationShare(conversation);
+        break;
+      case 3:
+        await requestDeleteConversation(conversation);
+        break;
     }
   };
 
@@ -1057,6 +1464,193 @@ export default function HomePage() {
     await Taro.previewImage({ current: source, urls: [source] });
   };
 
+  const copyAssistantAnswer = async (message: ConversationMessage) => {
+    if (!message.text.trim()) {
+      return;
+    }
+    try {
+      await Taro.setClipboardData({ data: message.text });
+    } catch {
+      await Taro.showToast({ title: "复制失败，请重试", icon: "none" });
+    }
+  };
+
+  const regenerateChatAnswer = async (message: ConversationMessage) => {
+    const session = sessionRef.current;
+    const conversation = currentConversation;
+    const model = selectedChatModel;
+    const sourceIndex = messages.findIndex((item) => item.id === message.id);
+    const parentUser = messages.find((item) => item.id === message.parentPublicID && item.role === "user");
+    if (!session || !conversation || !model || running || sourceIndex < 0 || !parentUser ||
+      message.id.startsWith("local-")) {
+      await Taro.showToast({ title: "这条回答暂时无法重新生成", icon: "none" });
+      return;
+    }
+    const previousMessages = messages;
+    messageCounter.current += 1;
+    const pendingID = `local-retry-${messageCounter.current}`;
+    enableChatAutoFollow(true);
+    setMessages([
+      ...messages.slice(0, sourceIndex),
+      {
+        activityStatus: "正在重新思考…",
+        id: pendingID,
+        parentPublicID: parentUser.id,
+        pending: true,
+        role: "assistant",
+        sourcePublicID: message.id,
+        text: "",
+      },
+    ]);
+    setRunning(true);
+    setStopping(false);
+    setWorkspaceError("");
+    try {
+      const result = await session.sendChat(
+        conversation,
+        model.platformModelName,
+        parentUser.text,
+        (progress) => {
+          setMessages((items) => items.map((item) => item.id === pendingID
+            ? {
+                ...item,
+                activityStatus: progress.status || (progress.text ? "正在生成新回答…" : "正在重新思考…"),
+                processTrace: progress.processTrace ?? item.processTrace,
+                text: progress.text || item.text,
+              }
+            : item));
+        },
+        parentUser.imageFileID ? [parentUser.imageFileID] : [],
+        networkSearchAvailable && networkSearchEnabled,
+        {
+          branchReason: "retry",
+          parentMessagePublicID: parentUser.id,
+          sourceMessagePublicID: message.id,
+        },
+      );
+      const persisted = result.assistantMessage ? messageFromAPI(result.assistantMessage) : null;
+      setMessages((items) => items.map((item) => item.id === pendingID
+        ? {
+            ...(persisted ?? item),
+            activityStatus: undefined,
+            pending: false,
+            processTrace: result.processTrace ?? persisted?.processTrace ?? item.processTrace,
+            text: result.text,
+          }
+        : item));
+      void refreshBalance();
+      void refreshConversations();
+    } catch (error) {
+      setMessages(previousMessages);
+      if (!(error instanceof MiniAppRequestAbortedError)) {
+        setWorkspaceError(error instanceof Error ? error.message : "重新生成失败，请重试");
+      }
+    } finally {
+      setRunning(false);
+      setStopping(false);
+    }
+  };
+
+  const regenerateImageAnswer = async (message: ConversationMessage) => {
+    const session = sessionRef.current;
+    const conversation = currentConversation;
+    const sourceIndex = messages.findIndex((item) => item.id === message.id);
+    const parentUser = messages.find((item) => item.id === message.parentPublicID && item.role === "user");
+    const editing = Boolean(parentUser?.imageFileID);
+    const modelFromMessage = models.find((item) =>
+      item.platformModelName === message.modelName &&
+      supportsModelKind(item, editing ? "image_edit" : "image_gen"));
+    let fallbackModel = selectedImageModel;
+    if (editing) {
+      fallbackModel = resolveImageEditModel(models, selectedImageModel?.platformModelName ?? "", "");
+    }
+    const model = modelFromMessage ?? fallbackModel;
+    if (!session || !conversation || !parentUser || !model || running || sourceIndex < 0 ||
+      message.id.startsWith("local-")) {
+      await Taro.showToast({ title: "这张图片暂时无法重新生成", icon: "none" });
+      return;
+    }
+    const decision = resolveImageSubmitDecision(model, editing);
+    if (!decision.task) {
+      await Taro.showToast({ title: "当前没有可用的图片模型", icon: "none" });
+      return;
+    }
+    const previousMessages = messages;
+    messageCounter.current += 1;
+    const pendingID = `local-image-retry-${messageCounter.current}`;
+    setSelectedImageModel(model);
+    setMessages([
+      ...messages.slice(0, sourceIndex),
+      {
+        id: pendingID,
+        imageStatus: editing ? "正在重新编辑图片" : "正在重新生成图片",
+        parentPublicID: parentUser.id,
+        pending: true,
+        role: "assistant",
+        sourcePublicID: message.id,
+        text: "",
+      },
+    ]);
+    setRunning(true);
+    setStopping(false);
+    setWorkspaceError("");
+    try {
+      const result = await session.generateImage(
+        conversation,
+        model.platformModelName,
+        decision.task,
+        parentUser.text,
+        (progress) => {
+          setMessages((items) => items.map((item) => item.id === pendingID
+            ? applyImageProgress(item, progress)
+            : item));
+        },
+        parentUser.imageFileID ? [parentUser.imageFileID] : [],
+        {
+          branchReason: "retry",
+          parentMessagePublicID: parentUser.id,
+          sourceMessagePublicID: message.id,
+        },
+      );
+      const persisted = result.assistantMessage ? messageFromAPI(result.assistantMessage) : null;
+      setMessages((items) => items.map((item) => item.id === pendingID
+        ? {
+            ...applyImageProgress(persisted ?? item, { ...result, pending: false }),
+            modelName: model.platformModelName,
+          }
+        : item));
+      void refreshBalance();
+      void refreshConversations();
+    } catch (error) {
+      setMessages(previousMessages);
+      if (!(error instanceof MiniAppRequestAbortedError)) {
+        setWorkspaceError(error instanceof Error ? error.message : "重新生成图片失败");
+      }
+    } finally {
+      setRunning(false);
+      setStopping(false);
+    }
+  };
+
+  const cloneSharedConversation = async () => {
+    const session = sessionRef.current;
+    if (!session || !sharedConversation || shareWorking) {
+      return;
+    }
+    setShareWorking(true);
+    setWorkspaceError("");
+    try {
+      const cloned = await session.cloneSharedConversation(sharedConversation.shareID);
+      setConversations((current) => [cloned, ...current.filter((item) => item.publicID !== cloned.publicID)]);
+      setConversationTotal((total) => total + 1);
+      await enterConversation(cloned);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : "保存到我的对话失败");
+    } finally {
+      setShareWorking(false);
+    }
+  };
+
   const openPrivacy = async () => {
     try {
       await Taro.openPrivacyContract();
@@ -1073,6 +1667,14 @@ export default function HomePage() {
       confirmText: "我知道了",
     });
   };
+
+  const shareOverlay = shareSheetOpen && preparedShare ? (
+    <ShareSheet
+      share={preparedShare}
+      onClose={() => setShareSheetOpen(false)}
+      onCopy={() => void copyPreparedShareLink()}
+    />
+  ) : null;
 
   if (booting) {
     return (
@@ -1091,6 +1693,222 @@ export default function HomePage() {
         <Text className="stateTitle">暂时无法进入</Text>
         <Text className="stateHint">{bootError || "登录响应不完整"}</Text>
         <Button className="primaryButton retryButton" onClick={bootstrap}>重新登录</Button>
+      </View>
+    );
+  }
+
+  if (screen === "checkin") {
+    return (
+      <ScrollView className="checkinPage" scrollY enhanced showScrollbar={false}>
+        <Header title="每日签到" onBack={() => setScreen("home")} />
+        {dailyCheckin?.enabled ? (
+          <DailyCheckinWheel
+            status={dailyCheckin}
+            isClaiming={isDailyCheckinClaiming}
+            rotation={dailyCheckinRotation}
+            revealResult={showDailyCheckinResult}
+            onClaim={() => void claimDailyCheckin()}
+          />
+        ) : (
+          <View className="checkinUnavailable">
+            <Text className="checkinUnavailableTitle">签到暂未开放</Text>
+            <Text className="checkinUnavailableHint">稍后再回来看看吧</Text>
+          </View>
+        )}
+        {workspaceError ? <Text className="errorBanner checkinError">{workspaceError}</Text> : null}
+      </ScrollView>
+    );
+  }
+
+  if (screen === "history") {
+    let historyContent: ReactNode;
+    if (historyLoading) {
+      historyContent = (
+        <View className="historyState"><View className="imageSpinner" /><Text>正在查找对话…</Text></View>
+      );
+    } else if (historyItems.length === 0) {
+      historyContent = (
+        <View className="historyState">
+          <Text className="historyStateIcon">{historyFavoritesOnly ? "☆" : "⌕"}</Text>
+          <Text className="historyStateTitle">{historyEmptyTitle(historyQuery, historyFavoritesOnly)}</Text>
+          <Text className="historyStateHint">{historyEmptyHint(historyFavoritesOnly)}</Text>
+          {historyHasMore ? (
+            <Button className="historyContinueButton" loading={historyLoadingMore} disabled={historyLoadingMore} onClick={() => void loadMoreHistory()}>
+              继续查找收藏
+            </Button>
+          ) : null}
+        </View>
+      );
+    } else {
+      historyContent = (
+        <View className="conversationList historyConversationList">
+          {historyItems.map((conversation) => (
+            <ConversationHistoryRow
+              busy={managingConversationID === conversation.publicID}
+              conversation={conversation}
+              key={conversation.publicID}
+              mode={sessionRef.current?.conversationMode(conversation) ?? "chat"}
+              open={openSwipeConversationID === conversation.publicID}
+              onDelete={() => void requestDeleteConversation(conversation)}
+              onEnter={() => void enterHistoryConversation(conversation)}
+              onMore={() => void showConversationActions(conversation)}
+              onOpen={() => setOpenSwipeConversationID(conversation.publicID)}
+              onRename={() => void requestRenameConversation(conversation)}
+              onReset={() => setOpenSwipeConversationID("")}
+              onStar={() => void toggleConversationStar(conversation)}
+            />
+          ))}
+          {historyHasMore ? (
+            <Button className="loadMoreButton" loading={historyLoadingMore} disabled={historyLoadingMore} onClick={() => void loadMoreHistory()}>
+              {historyLoadingMore ? "正在加载…" : "加载更多"}
+            </Button>
+          ) : null}
+        </View>
+      );
+    }
+    return (
+      <View className="historyPage">
+        <Header title="全部对话" onBack={() => setScreen("home")} />
+        <View className="historySearchBar">
+          <Text className="historySearchIcon">⌕</Text>
+          <Input
+            className="historySearchInput"
+            value={historyQuery}
+            placeholder="搜索标题和对话内容"
+            confirmType="search"
+            onInput={(event) => setHistoryQuery(event.detail.value)}
+          />
+          {historyQuery ? <Text className="historySearchClear" onClick={() => setHistoryQuery("")}>×</Text> : null}
+        </View>
+        <View className="historyFilterRow">
+          <View
+            className={`historyFilter ${!historyFavoritesOnly ? "historyFilterActive" : ""}`}
+            onClick={() => setHistoryFavoritesOnly(false)}
+          >全部会话</View>
+          <View
+            className={`historyFilter ${historyFavoritesOnly ? "historyFilterActive" : ""}`}
+            onClick={() => setHistoryFavoritesOnly(true)}
+          >★ 我的收藏</View>
+        </View>
+        <ScrollView className="historyResults" scrollY enhanced showScrollbar={false}>
+          {historyContent}
+          {workspaceError ? <Text className="errorBanner historyError">{workspaceError}</Text> : null}
+        </ScrollView>
+        {shareOverlay}
+      </View>
+    );
+  }
+
+  if (screen === "memories") {
+    const atLimit = memories.length >= MAX_PREFERENCE_MEMORIES;
+    let memoryContent: ReactNode;
+    if (memoriesLoading) {
+      memoryContent = (
+        <View className="memoryState"><View className="imageSpinner" /><Text>正在读取记忆…</Text></View>
+      );
+    } else if (memories.length === 0) {
+      memoryContent = (
+        <View className="memoryState">
+          <Text className="memoryStateTitle">还没有保存偏好</Text>
+          <Text className="memoryStateHint">例如“回复风格：请使用简洁中文”</Text>
+        </View>
+      );
+    } else {
+      memoryContent = (
+        <View className="memoryList">
+          {memories.map((memory) => (
+            <View className="memoryCard" key={memory.memoryKey}>
+              <View className="memoryCardBody">
+                <Text className="memoryCardKey">{memory.memoryKey}</Text>
+                <Text className="memoryCardValue">{memory.value}</Text>
+              </View>
+              <View className="memoryCardActions">
+                <Text onClick={() => setMemoryEditor({ originalKey: memory.memoryKey, memoryKey: memory.memoryKey, value: memory.value })}>编辑</Text>
+                <Text className="memoryDelete" onClick={() => void deleteUserMemory(memory)}>删除</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      );
+    }
+    return (
+      <ScrollView className="memoryPage" scrollY enhanced showScrollbar={false}>
+        <Header title="AI 偏好记忆" onBack={() => setScreen("account")} />
+        <View className="memoryHero">
+          <Text className="memoryHeroIcon">✦</Text>
+          <Text className="memoryHeroTitle">让 AI 更懂你</Text>
+          <Text className="memoryHeroHint">保存回复风格、身份背景等长期偏好，之后的每次对话都会自动参考。</Text>
+        </View>
+        <View className="memorySectionHeader">
+          <Text>我的偏好</Text>
+          <Text className="memoryCount">{memories.length} / {MAX_PREFERENCE_MEMORIES}</Text>
+        </View>
+        {memoryContent}
+        <Button
+          className="memoryAddButton"
+          disabled={atLimit || memoriesLoading}
+          onClick={() => setMemoryEditor({ memoryKey: "", value: "" })}
+        >{atLimit ? `已达到 ${MAX_PREFERENCE_MEMORIES} 条上限` : "＋ 添加一条偏好"}</Button>
+        {workspaceError ? <Text className="errorBanner memoryError">{workspaceError}</Text> : null}
+        {memoryEditor ? (
+          <MemoryEditorSheet
+            editor={memoryEditor}
+            saving={memorySaving}
+            onChange={setMemoryEditor}
+            onClose={() => setMemoryEditor(null)}
+            onSave={() => void saveUserMemory()}
+          />
+        ) : null}
+      </ScrollView>
+    );
+  }
+
+  if (screen === "shared") {
+    let sharedContent: ReactNode;
+    if (sharedLoading) {
+      sharedContent = (
+        <View className="sharedState"><View className="imageSpinner" /><Text>正在打开分享…</Text></View>
+      );
+    } else if (!sharedConversation) {
+      sharedContent = (
+        <View className="sharedState">
+          <Text className="sharedStateTitle">分享内容无法打开</Text>
+          <Text className="sharedStateHint">链接可能已经失效或被分享者撤销</Text>
+        </View>
+      );
+    } else {
+      sharedContent = (
+        <>
+          <View className="sharedHero">
+            <Text className="sharedEyebrow">AI 对话分享</Text>
+            <Text className="sharedTitle">{sharedConversation.title || "未命名对话"}</Text>
+            <Text className="sharedMeta">共 {sharedMessages.length} 条消息 · 内容为分享时快照</Text>
+          </View>
+          <View className="sharedMessageList">
+            {sharedMessages.map((message) => (
+              <View className={`message message-${message.role}`} key={message.id}>
+                <Text className="messageAuthor">{message.role === "user" ? "提问" : "AI"}</Text>
+                <View className="messageContent">
+                  {message.imageSource ? <Image className="messageImage" src={message.imageSource} mode="widthFix" onClick={() => void previewImage(message.imageSource)} /> : null}
+                  {message.text ? <Markdown>{message.text}</Markdown> : null}
+                </View>
+              </View>
+            ))}
+          </View>
+          <Button className="sharedCloneButton" loading={shareWorking} disabled={shareWorking} onClick={() => void cloneSharedConversation()}>
+            保存到我的对话
+          </Button>
+          <Button className="sharedReshareButton" openType="share">转发给微信好友</Button>
+        </>
+      );
+    }
+    return (
+      <View className="sharedPage">
+        <Header title="好友分享" onBack={() => { setPreparedShare(null); setScreen("home"); }} />
+        <ScrollView className="sharedContent" scrollY enhanced showScrollbar={false}>
+          {sharedContent}
+          {workspaceError ? <Text className="errorBanner sharedError">{workspaceError}</Text> : null}
+        </ScrollView>
       </View>
     );
   }
@@ -1181,6 +1999,18 @@ export default function HomePage() {
             <AccountInfoRow label="计费方式" value={billingOverview?.mode === "period" ? "订阅额度" : billingOverview?.mode === "usage" ? "按量计费" : "用量记录"} />
             <AccountInfoRow label="周期开始" value={formatAccountDate(billingOverview?.periodStartAt)} />
             <AccountInfoRow label="周期结束" value={formatAccountDate(billingOverview?.periodEndAt)} />
+          </View>
+        </View>
+
+        <View className="accountSection">
+          <Text className="accountSectionTitle">个性化</Text>
+          <View className="accountLinkCard" onClick={openUserMemories}>
+            <View className="accountLinkIcon">✦</View>
+            <View className="accountLinkBody">
+              <Text className="accountLinkTitle">AI 偏好记忆</Text>
+              <Text className="accountLinkHint">让 AI 在后续对话中记住你的习惯</Text>
+            </View>
+            <Text className="accountLinkArrow">›</Text>
           </View>
         </View>
 
@@ -1286,6 +2116,12 @@ export default function HomePage() {
                       </View>
                     ) : null}
                   </View>
+                  {message.role === "assistant" && !message.pending && message.text ? (
+                    <View className="messageActions">
+                      <Text onClick={() => void copyAssistantAnswer(message)}>复制</Text>
+                      <Text onClick={() => void regenerateChatAnswer(message)}>重新生成</Text>
+                    </View>
+                  ) : null}
                 </View>
               ))}
             </ScrollView>
@@ -1348,6 +2184,9 @@ export default function HomePage() {
                     />
                     <Text className="imageStatus">{message.imageStatus || "图片生成完成"}</Text>
                     <View className="imageActions">
+                      <Button className="imageActionButton" disabled={running} onClick={() => void regenerateImageAnswer(message)}>
+                        重新生成
+                      </Button>
                       {message.imageFileID ? (
                         <Button className="imageActionButton imageEditButton" onClick={() => void continueEditingImage(message)}>
                           继续编辑
@@ -1470,6 +2309,7 @@ export default function HomePage() {
             onSelect={(model) => selectWorkspaceModel(modelPickerMode, model)}
           />
         ) : null}
+        {shareOverlay}
       </View>
     );
   }
@@ -1494,12 +2334,9 @@ export default function HomePage() {
       </View>
 
       {dailyCheckin?.enabled ? (
-        <DailyCheckinWheel
+        <DailyCheckinEntry
           status={dailyCheckin}
-          isClaiming={isDailyCheckinClaiming}
-          rotation={dailyCheckinRotation}
-          revealResult={showDailyCheckinResult}
-          onClaim={() => void claimDailyCheckin()}
+          onOpen={openDailyCheckin}
         />
       ) : null}
 
@@ -1530,7 +2367,7 @@ export default function HomePage() {
 
       <View className="sectionHeader">
         <Text className="sectionTitle">最近对话</Text>
-        <Text className="sectionMeta">{conversationTotal} 条</Text>
+        <Text className="sectionMeta" onClick={openHistory}>搜索与收藏 · {conversationTotal} 条 ›</Text>
       </View>
       {conversations.length === 0 ? (
         <View className="emptyHistory">
@@ -1552,6 +2389,7 @@ export default function HomePage() {
               onOpen={() => setOpenSwipeConversationID(conversation.publicID)}
               onRename={() => void requestRenameConversation(conversation)}
               onReset={() => setOpenSwipeConversationID("")}
+              onStar={() => void toggleConversationStar(conversation)}
             />
           ))}
           {conversations.length < conversationTotal ? (
@@ -1571,6 +2409,7 @@ export default function HomePage() {
         <Text onClick={openPrivacy}>隐私保护指引</Text>
         <Text onClick={openTermsNotice}>用户协议</Text>
       </View>
+      {shareOverlay}
     </View>
   );
 }
@@ -1649,6 +2488,83 @@ function ModelPickerSheet({
   );
 }
 
+function ShareSheet({
+  share,
+  onClose,
+  onCopy,
+}: {
+  share: PreparedShare;
+  onClose(): void;
+  onCopy(): void;
+}) {
+  return (
+    <View className="shareBackdrop" onClick={onClose}>
+      <View className="shareSheet" onClick={(event) => event.stopPropagation()}>
+        <View className="shareHandle" />
+        <Text className="shareSheetTitle">分享这段对话</Text>
+        <Text className="shareSheetHint">将发送当前对话的公开快照，后续新消息不会自动加入。</Text>
+        <Button className="shareWechatButton" openType="share">发送给微信好友</Button>
+        <Button className="shareCopyButton" onClick={onCopy}>复制网页分享链接</Button>
+        <Text className="shareSheetID">分享编号 {share.shareID.slice(0, 8)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function MemoryEditorSheet({
+  editor,
+  saving,
+  onChange,
+  onClose,
+  onSave,
+}: {
+  editor: MemoryEditor;
+  saving: boolean;
+  onChange(editor: MemoryEditor): void;
+  onClose(): void;
+  onSave(): void;
+}) {
+  const editing = Boolean(editor.originalKey);
+  const canSave = Boolean(editor.memoryKey.trim() && editor.value.trim() && !saving);
+  return (
+    <View className="memoryEditorBackdrop" onClick={onClose}>
+      <View className="memoryEditorSheet" onClick={(event) => event.stopPropagation()}>
+        <View className="memoryEditorHeader">
+          <View>
+            <Text className="memoryEditorTitle">{editing ? "编辑偏好" : "添加偏好"}</Text>
+            <Text className="memoryEditorHint">AI 会在之后的对话中自动参考</Text>
+          </View>
+          <Text className="memoryEditorClose" onClick={onClose}>×</Text>
+        </View>
+        <Text className="memoryEditorLabel">偏好名称</Text>
+        <Input
+          className={`memoryEditorInput ${editing ? "memoryEditorInputDisabled" : ""}`}
+          disabled={editing || saving}
+          maxlength={128}
+          value={editor.memoryKey}
+          placeholder="例如：回复风格"
+          onInput={(event) => onChange({ ...editor, memoryKey: event.detail.value })}
+        />
+        <Text className="memoryEditorLabel">偏好内容</Text>
+        <Textarea
+          className="memoryEditorTextarea"
+          disabled={saving}
+          maxlength={10000}
+          value={editor.value}
+          placeholder="例如：请使用简洁的中文回复，并先给出结论"
+          onInput={(event) => onChange({ ...editor, value: event.detail.value })}
+        />
+        <View className="memoryEditorActions">
+          <Button className="memoryEditorCancel" disabled={saving} onClick={onClose}>取消</Button>
+          <Button className="memoryEditorSave" disabled={!canSave} loading={saving} onClick={onSave}>
+            {saving ? "保存中" : "保存"}
+          </Button>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 function ConversationHistoryRow({
   busy,
   conversation,
@@ -1660,9 +2576,10 @@ function ConversationHistoryRow({
   onOpen,
   onRename,
   onReset,
+  onStar,
 }: {
   busy: boolean;
-  conversation: ConversationResponse;
+  conversation: ConversationListItem;
   mode: ConversationMode;
   open: boolean;
   onDelete(): void;
@@ -1671,6 +2588,7 @@ function ConversationHistoryRow({
   onOpen(): void;
   onRename(): void;
   onReset(): void;
+  onStar(): void;
 }) {
   const touchStart = useRef<{
     actionWidth: number;
@@ -1682,87 +2600,104 @@ function ConversationHistoryRow({
   } | null>(null);
   const swiped = useRef(false);
   const [dragOffset, setDragOffset] = useState<number | null>(null);
+
+  const handleTouchStart: ViewTouchHandler = (event) => {
+    const touch = readTouchPoint(event);
+    touchStart.current = touch ? {
+      actionWidth: conversationActionWidthPx(),
+      axis: null,
+      lastX: touch.x,
+      lastY: touch.y,
+      x: touch.x,
+      y: touch.y,
+    } : null;
+    swiped.current = false;
+  };
+
+  const handleTouchMove: ViewTouchHandler = (event) => {
+    const start = touchStart.current;
+    const touch = readTouchPoint(event);
+    if (!start || !touch) {
+      return;
+    }
+    start.lastX = touch.x;
+    start.lastY = touch.y;
+    const deltaX = touch.x - start.x;
+    const deltaY = touch.y - start.y;
+    if (!start.axis && Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= 6) {
+      start.axis = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
+    }
+    if (start.axis !== "horizontal") {
+      return;
+    }
+    event.preventDefault();
+    swiped.current = Math.abs(deltaX) >= 8;
+    setDragOffset(conversationSwipeOffset(deltaX, start.actionWidth, open));
+  };
+
+  const handleTouchEnd: ViewTouchHandler = (event) => {
+    const start = touchStart.current;
+    const touch = readTouchPoint(event, true) ?? (start ? { x: start.lastX, y: start.lastY } : null);
+    touchStart.current = null;
+    setDragOffset(null);
+    if (!start || !touch) {
+      return;
+    }
+    const deltaX = touch.x - start.x;
+    const deltaY = touch.y - start.y;
+    const swipe = settleConversationSwipe(deltaX, deltaY, open);
+    swiped.current = start.axis === "horizontal" && Math.abs(deltaX) >= 8;
+    if (swipe === "open") {
+      onOpen();
+    } else {
+      onReset();
+    }
+  };
+
+  const handleTouchCancel = () => {
+    touchStart.current = null;
+    swiped.current = false;
+    setDragOffset(null);
+  };
+
+  const handleClick = () => {
+    if (swiped.current) {
+      swiped.current = false;
+      return;
+    }
+    if (open) {
+      onReset();
+    } else {
+      onEnter();
+    }
+  };
+
   return (
     <View className={`conversationSwipe ${busy ? "conversationSwipeBusy" : ""}`}>
       <View className="conversationSwipeActions">
+        <View className="conversationSwipeAction favoriteAction" onClick={onStar}>
+          {conversation.isStarred ? "取消收藏" : "收藏"}
+        </View>
         <View className="conversationSwipeAction renameAction" onClick={onRename}>重命名</View>
         <View className="conversationSwipeAction deleteAction" onClick={onDelete}>删除</View>
       </View>
       <View
         className={`conversationRow conversationSwipeContent ${open ? "conversationSwipeOpen" : ""}`}
         style={dragOffset === null ? undefined : { transform: `translateX(${dragOffset}px)`, transition: "none" }}
-        onTouchStart={(event) => {
-          const touch = readTouchPoint(event);
-          touchStart.current = touch ? {
-            actionWidth: conversationActionWidthPx(),
-            axis: null,
-            lastX: touch.x,
-            lastY: touch.y,
-            x: touch.x,
-            y: touch.y,
-          } : null;
-          swiped.current = false;
-        }}
-        onTouchMove={(event) => {
-          const start = touchStart.current;
-          const touch = readTouchPoint(event);
-          if (!start || !touch) {
-            return;
-          }
-          start.lastX = touch.x;
-          start.lastY = touch.y;
-          const deltaX = touch.x - start.x;
-          const deltaY = touch.y - start.y;
-          if (!start.axis && Math.max(Math.abs(deltaX), Math.abs(deltaY)) >= 6) {
-            start.axis = Math.abs(deltaX) > Math.abs(deltaY) ? "horizontal" : "vertical";
-          }
-          if (start.axis !== "horizontal") {
-            return;
-          }
-          event.preventDefault();
-          swiped.current = Math.abs(deltaX) >= 8;
-          setDragOffset(conversationSwipeOffset(deltaX, start.actionWidth, open));
-        }}
-        onTouchEnd={(event) => {
-          const start = touchStart.current;
-          const touch = readTouchPoint(event, true) ?? (start ? { x: start.lastX, y: start.lastY } : null);
-          touchStart.current = null;
-          setDragOffset(null);
-          if (!start || !touch) {
-            return;
-          }
-          const deltaX = touch.x - start.x;
-          const deltaY = touch.y - start.y;
-          const swipe = settleConversationSwipe(deltaX, deltaY, open);
-          swiped.current = start.axis === "horizontal" && Math.abs(deltaX) >= 8;
-          if (swipe === "open") {
-            onOpen();
-          } else {
-            onReset();
-          }
-        }}
-        onTouchCancel={() => {
-          touchStart.current = null;
-          swiped.current = false;
-          setDragOffset(null);
-        }}
-        onClick={() => {
-          if (swiped.current) {
-            swiped.current = false;
-            return;
-          }
-          if (open) {
-            onReset();
-          } else {
-            onEnter();
-          }
-        }}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchCancel}
+        onClick={handleClick}
       >
         <View className={`conversationIcon conversationIcon-${mode}`}>
           {mode === "image" ? "◇" : "✦"}
         </View>
         <View className="conversationBody">
-          <Text className="conversationName">{conversation.title || "未命名对话"}</Text>
+          <View className="conversationNameRow">
+            <Text className="conversationName">{conversation.title || "未命名对话"}</Text>
+            {conversation.isStarred ? <Text className="conversationStar">★</Text> : null}
+          </View>
           <Text className="conversationMeta">
             {mode === "image" ? "AI 生图" : "AI 对话"} · {conversation.messageCount} 条消息
           </Text>

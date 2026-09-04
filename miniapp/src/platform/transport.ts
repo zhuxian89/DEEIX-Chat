@@ -11,7 +11,7 @@ export type ApiEnvelope<T> = {
 
 export type ApiRequest = {
   path: string;
-  method?: "DELETE" | "GET" | "PATCH" | "POST";
+  method?: "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
   accessToken?: string;
   body?: unknown;
 };

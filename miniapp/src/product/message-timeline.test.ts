@@ -4,6 +4,7 @@ import type { MessageResponse } from "@deeix/api-contract";
 import {
   applyImageProgress,
   createPendingImageTurn,
+  latestVisibleMessages,
   messageFromAPI,
 } from "./message-timeline";
 
@@ -145,4 +146,35 @@ test("chat history preserves the backend thinking and tool trace", () => {
 
   assert.equal(message?.processTrace?.upstreamThink?.contentMarkdown, "需要查询最新资料。");
   assert.equal(message?.processTrace?.tools?.summary, "1 次工具调用已完成");
+});
+
+test("message history preserves the Web branch metadata", () => {
+  const message = messageFromAPI(serverMessage({
+    branchReason: "retry",
+    content: "新回答",
+    parentPublicID: "user-parent-1",
+    publicID: "assistant-retry-1",
+    sourcePublicID: "assistant-source-1",
+  }));
+
+  assert.equal(message?.branchReason, "retry");
+  assert.equal(message?.parentPublicID, "user-parent-1");
+  assert.equal(message?.sourcePublicID, "assistant-source-1");
+});
+
+test("message history shows the latest visible branch like the Web client", () => {
+  const root = messageFromAPI(serverMessage({ id: 1, publicID: "user-1", role: "user", content: "问题" }));
+  const oldReply = messageFromAPI(serverMessage({ id: 2, publicID: "assistant-old", parentPublicID: "user-1", content: "旧回答" }));
+  const oldFollowup = messageFromAPI(serverMessage({ id: 3, publicID: "user-old-child", parentPublicID: "assistant-old", role: "user", content: "旧分支追问" }));
+  const retryReply = messageFromAPI(serverMessage({ id: 4, publicID: "assistant-retry", parentPublicID: "user-1", sourcePublicID: "assistant-old", branchReason: "retry", content: "新回答" }));
+
+  const visible = latestVisibleMessages([root, oldReply, oldFollowup, retryReply].filter((item): item is NonNullable<typeof item> => Boolean(item)));
+  assert.deepEqual(visible.map((item) => item.id), ["user-1", "assistant-retry"]);
+});
+
+test("message history keeps the latest visible suffix when the tail page omits old ancestors", () => {
+  const user = messageFromAPI(serverMessage({ id: 80, publicID: "user-80", parentPublicID: "assistant-79", role: "user", content: "继续" }));
+  const assistant = messageFromAPI(serverMessage({ id: 81, publicID: "assistant-81", parentPublicID: "user-80", content: "回答" }));
+  const visible = latestVisibleMessages([user, assistant].filter((item): item is NonNullable<typeof item> => Boolean(item)));
+  assert.deepEqual(visible.map((item) => item.id), ["user-80", "assistant-81"]);
 });

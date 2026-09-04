@@ -148,176 +148,308 @@ page {
   white-space: nowrap;
 }
 
-.checkinCard {
-  background: linear-gradient(145deg, #fffdf8, #f6f1ff);
-  border: 1px solid rgba(110, 82, 255, 0.1);
-  border-radius: 32px;
-  box-shadow: 0 18px 44px rgba(52, 42, 91, 0.09);
+.checkinEntry {
+  align-items: center;
+  background: linear-gradient(135deg, #fff, #fff8e9);
+  border: 1px solid rgba(239, 141, 25, 0.14);
+  border-radius: 26px;
+  box-shadow: 0 12px 32px rgba(57, 47, 32, 0.07);
   box-sizing: border-box;
-  margin-bottom: 24px;
-  overflow: hidden;
-  padding: 28px;
-  position: relative;
-}
-
-.checkinCard::after {
-  background: rgba(255, 190, 72, 0.18);
-  border-radius: 50%;
-  content: "";
-  height: 190px;
-  position: absolute;
-  right: -70px;
-  top: -92px;
-  width: 190px;
-}
-
-.checkinCopy,
-.checkinBody {
   display: flex;
+  margin-bottom: 24px;
+  min-height: 116px;
+  padding: 20px 22px;
 }
 
-.checkinCopy {
-  align-items: flex-start;
-  justify-content: space-between;
-  position: relative;
-  z-index: 1;
+.checkinEntryClaimed {
+  background: linear-gradient(135deg, #fff, #f1fbf6);
+  border-color: rgba(47, 183, 149, 0.16);
 }
 
-.checkinEyebrow {
-  color: #ef8d19;
+.checkinEntryIcon {
+  align-items: center;
+  background: linear-gradient(145deg, #ffb24a, #ff7a45);
+  border-radius: 22px;
+  box-shadow: 0 8px 20px rgba(239, 141, 25, 0.2);
+  color: #fff;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 25px;
+  font-weight: 850;
+  height: 72px;
+  justify-content: center;
+  width: 72px;
+}
+
+.checkinEntryClaimed .checkinEntryIcon {
+  background: linear-gradient(145deg, #39bd91, #1b9c76);
+  box-shadow: 0 8px 20px rgba(47, 183, 149, 0.18);
+}
+
+.checkinEntryCopy {
+  flex: 1;
+  min-width: 0;
+  padding: 0 18px;
+}
+
+.checkinEntryEyebrow {
+  color: #a17a45;
   display: block;
+  font-size: 18px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.checkinEntryTitle {
+  color: #29262f;
+  display: block;
+  font-size: 24px;
+  font-weight: 750;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkinEntryAction {
+  align-items: center;
+  color: #7158e8;
+  display: flex;
+  flex: 0 0 auto;
+  font-size: 20px;
+  font-weight: 750;
+}
+
+.checkinEntryArrow {
+  font-size: 34px;
+  line-height: 1;
+  margin-left: 5px;
+}
+
+.checkinPage {
+  background: radial-gradient(circle at 90% 3%, rgba(255, 187, 77, 0.17), transparent 25%), #f4f5f7;
+  box-sizing: border-box;
+  height: 100vh;
+  padding: 30px 28px 70px;
+}
+
+.checkinPanel {
+  box-sizing: border-box;
+  padding-bottom: 50px;
+}
+
+.checkinPageIntro {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 16px 24px;
+  text-align: center;
+}
+
+.checkinPageEyebrow {
+  color: #ef8d19;
   font-size: 20px;
   font-weight: 800;
-  letter-spacing: 3px;
-  margin-bottom: 7px;
+  letter-spacing: 4px;
 }
 
-.checkinTitle {
-  color: #27232f;
+.checkinPageTitle {
+  color: #24212a;
   display: block;
-  font-size: 34px;
-  font-weight: 800;
+  font-size: 42px;
+  font-weight: 850;
+  letter-spacing: -1px;
+  margin-top: 10px;
 }
 
-.checkinSubtitle {
-  color: #79747f;
+.checkinPageSubtitle {
+  color: #77727e;
   display: block;
-  font-size: 21px;
+  font-size: 22px;
   margin-top: 8px;
 }
 
-.checkinStreak {
-  background: #fff2cf;
-  border: 1px solid #f9df9d;
+.checkinPageStreak {
+  background: #fff1cf;
+  border: 1px solid #f5d994;
   border-radius: 999px;
-  color: #a9630c;
+  color: #9f650f;
   font-size: 18px;
   font-weight: 700;
-  line-height: 36px;
-  padding: 0 14px;
-  position: relative;
-  white-space: nowrap;
-  z-index: 1;
-}
-
-.checkinBody {
-  align-items: center;
-  gap: 28px;
-  margin-top: 24px;
+  margin-top: 14px;
+  padding: 8px 16px;
 }
 
 .wheelStage {
-  flex: 0 0 auto;
-  height: 254px;
+  height: 500px;
+  margin: 12px auto 34px;
   position: relative;
-  width: 254px;
+  width: 500px;
 }
 
 .wheelPointer {
-  border-left: 15px solid transparent;
-  border-right: 15px solid transparent;
-  border-top: 32px solid #332b41;
-  filter: drop-shadow(0 4px 4px rgba(42, 36, 53, 0.2));
+  border-left: 22px solid transparent;
+  border-right: 22px solid transparent;
+  border-top: 45px solid #29242f;
+  filter: drop-shadow(0 5px 5px rgba(42, 36, 53, 0.22));
   left: 50%;
   position: absolute;
-  top: -6px;
+  top: -10px;
   transform: translateX(-50%);
-  z-index: 4;
+  z-index: 5;
 }
 
 .checkinWheel {
-  border: 9px solid #fff;
+  border: 12px solid #fff;
   border-radius: 50%;
-  box-shadow: 0 8px 28px rgba(66, 52, 105, 0.18), inset 0 0 0 3px rgba(255, 255, 255, 0.45);
+  box-shadow: 0 18px 44px rgba(66, 52, 105, 0.2), inset 0 0 0 3px rgba(255, 255, 255, 0.5);
   box-sizing: border-box;
-  height: 254px;
+  height: 500px;
+  overflow: hidden;
   position: relative;
   transition: transform 2.2s cubic-bezier(0.12, 0.72, 0.12, 1);
-  width: 254px;
+  width: 500px;
 }
 
 .wheelLabel {
-  align-items: center;
   color: #fff;
-  display: flex;
-  flex-direction: column;
   position: absolute;
-  text-shadow: 0 1px 3px rgba(59, 42, 20, 0.28);
-  transform-origin: center;
+  text-shadow: 0 2px 5px rgba(43, 30, 18, 0.3);
+  transform: translate(-50%, -50%);
   white-space: nowrap;
 }
 
+.wheelLabelContent {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  transition: transform 2.2s cubic-bezier(0.12, 0.72, 0.12, 1);
+}
+
 .wheelCalls {
-  font-size: 24px;
-  font-weight: 850;
+  font-size: 34px;
+  font-weight: 900;
   line-height: 1;
 }
 
 .wheelUnit {
-  font-size: 15px;
-  font-weight: 650;
-  margin-top: 3px;
+  font-size: 18px;
+  font-weight: 700;
+  margin-top: 5px;
 }
 
 .wheelCenter {
   align-items: center;
-  background: linear-gradient(145deg, #fff7d9, #fff);
-  border: 5px solid rgba(255, 255, 255, 0.9);
+  background: linear-gradient(145deg, #fff8dc, #fff);
+  border: 7px solid rgba(255, 255, 255, 0.94);
   border-radius: 50%;
-  box-shadow: 0 5px 18px rgba(70, 54, 109, 0.22);
+  box-shadow: 0 8px 24px rgba(70, 54, 109, 0.24);
   color: #6e52ff;
   display: flex;
-  font-size: 30px;
-  font-weight: 900;
-  height: 70px;
+  flex-direction: column;
+  height: 108px;
   justify-content: center;
   left: 50%;
   position: absolute;
   top: 50%;
   transform: translate(-50%, -50%);
-  width: 70px;
+  width: 108px;
+  z-index: 4;
+}
+
+.wheelCenterMain {
+  font-size: 34px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.wheelCenterHint {
+  color: #9b86ea;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 5px;
+}
+
+.checkinPrizeCard,
+.checkinResult {
+  background: #fff;
+  border-radius: 28px;
+  box-shadow: 0 12px 34px rgba(31, 29, 42, 0.06);
+}
+
+.checkinPrizeCard {
+  padding: 24px;
+}
+
+.checkinPrizeHeader {
+  color: #8a8790;
+  display: flex;
+  font-size: 18px;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.checkinPrizeGrid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.checkinPrizeItem {
+  align-items: center;
+  background: #f7f7f9;
+  border-radius: 17px;
+  display: flex;
+  min-width: 0;
+  padding: 15px 16px;
+}
+
+.checkinPrizeColor {
+  border: 3px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 2px 7px rgba(38, 34, 45, 0.14);
+  flex: 0 0 auto;
+  height: 20px;
+  margin-right: 10px;
+  width: 20px;
+}
+
+.checkinPrizeCalls {
+  color: #302d35;
+  flex: 1;
+  font-size: 21px;
+  font-weight: 750;
+}
+
+.checkinPrizeProbability {
+  color: #89858f;
+  font-size: 18px;
 }
 
 .checkinResult {
-  align-items: stretch;
+  align-items: center;
   display: flex;
-  flex: 1;
   flex-direction: column;
-  min-width: 0;
+  margin-top: 20px;
+  padding: 26px;
+  text-align: center;
+}
+
+.checkinResultClaimed {
+  background: linear-gradient(145deg, #fff, #f3fbf7);
 }
 
 .checkinWinLabel {
-  color: #5f5967;
+  color: #77727e;
   display: block;
   font-size: 20px;
 }
 
 .checkinWinValue {
-  color: #6e52ff;
+  color: #16a277;
   display: block;
-  font-size: 43px;
+  font-size: 48px;
   font-weight: 900;
-  line-height: 1.15;
+  line-height: 1.1;
   margin-top: 8px;
 }
 
@@ -327,14 +459,14 @@ page {
   font-size: 27px;
   font-weight: 750;
   line-height: 1.35;
-  margin-top: 10px;
+  margin-top: 9px;
 }
 
 .checkinMoney {
-  color: #9b720f;
+  color: #6c887d;
   display: block;
   font-size: 19px;
-  margin-top: 4px;
+  margin-top: 5px;
 }
 
 .checkinButton {
@@ -342,11 +474,11 @@ page {
   border: 0 !important;
   border-radius: 999px !important;
   color: #fff !important;
-  font-size: 21px !important;
+  font-size: 23px !important;
   font-weight: 750 !important;
-  line-height: 66px !important;
-  margin: 20px 0 0 !important;
-  padding: 0 18px !important;
+  line-height: 72px !important;
+  margin: 22px 0 0 !important;
+  padding: 0 20px !important;
   width: 100%;
 }
 
@@ -357,14 +489,27 @@ page {
 }
 
 .checkinNotice {
-  border-top: 1px solid rgba(69, 61, 80, 0.08);
-  color: #8c8792;
+  color: #929099;
   display: block;
   font-size: 18px;
-  line-height: 1.5;
-  margin-top: 22px;
-  padding-top: 18px;
+  line-height: 1.55;
+  padding: 22px 18px 0;
+  text-align: center;
 }
+
+.checkinUnavailable {
+  align-items: center;
+  background: #fff;
+  border-radius: 28px;
+  display: flex;
+  flex-direction: column;
+  margin-top: 40px;
+  padding: 70px 30px;
+}
+
+.checkinUnavailableTitle { font-size: 29px; font-weight: 750; }
+.checkinUnavailableHint { color: #92939a; font-size: 21px; margin-top: 9px; }
+.checkinError { margin-bottom: 40px; }
 
 .quickGrid {
   display: grid;
@@ -617,6 +762,8 @@ page {
   box-shadow: none;
   color: #111;
 }
+.messageActions { color: #85868e; display: flex; font-size: 20px; gap: 28px; margin: 10px 10px 0; }
+.messageActions text { padding: 8px 0; }
 .message-assistant .messageContent::before,
 .message-user .messageContent::after {
   border-bottom: 9px solid transparent;
@@ -866,17 +1013,27 @@ page {
 .accountInfoRow:last-child { border-bottom: 0; }
 .accountInfoLabel { color: #777986; font-size: 22px; }
 .accountInfoValue { color: #29272f; font-size: 22px; font-weight: 650; }
+.accountLinkCard { align-items: center; background: #fff; border-radius: 27px; box-shadow: 0 12px 36px rgba(31,29,42,.05); display: flex; padding: 23px 24px; }
+.accountLinkIcon { align-items: center; background: #eeeafe; border-radius: 17px; color: #6249d8; display: flex; flex: 0 0 auto; font-size: 27px; font-weight: 800; height: 64px; justify-content: center; width: 64px; }
+.accountLinkBody { flex: 1; min-width: 0; padding: 0 18px; }
+.accountLinkTitle { color: #29272f; display: block; font-size: 24px; font-weight: 720; }
+.accountLinkHint { color: #999aa2; display: block; font-size: 19px; margin-top: 5px; }
+.accountLinkArrow { color: #aaa8b2; font-size: 38px; }
 .accountRefreshButton { background: #ece9fa !important; border: 0 !important; border-radius: 19px !important; color: #614bd0 !important; font-size: 23px !important; font-weight: 700; margin: 34px 0 0 !important; }
 .accountLegal { color: #9a9ba3; display: flex; flex-wrap: wrap; font-size: 19px; gap: 24px; justify-content: center; padding: 26px 0 50px; }
 
 .conversationSwipe { overflow: hidden; position: relative; }
 .conversationSwipeBusy { opacity: .58; pointer-events: none; }
-.conversationSwipeActions { bottom: 0; display: flex; position: absolute; right: 0; top: 0; width: 304px; }
-.conversationSwipeAction { align-items: center; color: #fff; display: flex; font-size: 22px; font-weight: 650; justify-content: center; letter-spacing: 1px; width: 152px; }
+.conversationSwipeActions { bottom: 0; display: flex; position: absolute; right: 0; top: 0; width: 432px; }
+.conversationSwipeAction { align-items: center; color: #fff; display: flex; font-size: 20px; font-weight: 650; justify-content: center; letter-spacing: 1px; width: 144px; }
+.favoriteAction { background: #c99728; }
 .renameAction { background: #7461dc; }
 .deleteAction { background: #d95d64; }
 .conversationSwipeContent { box-sizing: border-box; position: relative; transform: translateX(0); transition: transform 180ms ease; width: 100%; z-index: 1; }
-.conversationSwipeOpen { transform: translateX(-304px); }
+.conversationSwipeOpen { transform: translateX(-432px); }
+.conversationNameRow { align-items: center; display: flex; min-width: 0; }
+.conversationNameRow .conversationName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversationStar { color: #d39a21; flex: 0 0 auto; font-size: 20px; margin-left: 9px; }
 .conversationMore {
   align-items: center;
   background: #f4f2fa;
@@ -915,3 +1072,84 @@ page {
 
 .errorBanner { background: #fff0f0; border: 1px solid #ffd3d3; border-radius: 18px; color: #b43e3e; display: block; font-size: 23px; line-height: 1.55; margin-top: 20px; padding: 18px 20px; }
 .workspaceError { flex: 0 0 auto; margin: 8px 0 0; }
+
+.historyPage,
+.sharedPage { background: #f4f5f7; box-sizing: border-box; display: flex; flex-direction: column; height: 100vh; overflow: hidden; padding: 30px 28px 0; }
+.historySearchBar { align-items: center; background: #fff; border: 1px solid rgba(39,36,47,.05); border-radius: 23px; box-shadow: 0 8px 24px rgba(31,29,42,.05); display: flex; flex: 0 0 auto; min-height: 82px; padding: 0 20px; }
+.historySearchIcon { color: #777986; font-size: 34px; margin-right: 13px; }
+.historySearchInput { flex: 1; font-size: 25px; min-width: 0; }
+.historySearchClear { color: #999aa2; font-size: 36px; padding: 10px; }
+.historyFilterRow { display: flex; flex: 0 0 auto; gap: 14px; padding: 18px 2px; }
+.historyFilter { background: #e9e9ee; border-radius: 999px; color: #777986; font-size: 21px; padding: 11px 20px; }
+.historyFilterActive { background: #29272f; color: #fff; font-weight: 700; }
+.historyResults { flex: 1; min-height: 0; }
+.historyConversationList { margin-bottom: 50px; }
+.historyState { align-items: center; color: #8f9098; display: flex; flex-direction: column; padding: 100px 30px; text-align: center; }
+.historyStateIcon { color: #aaa8b2; font-size: 60px; margin-bottom: 14px; }
+.historyStateTitle { color: #45434b; font-size: 27px; font-weight: 700; }
+.historyStateHint { font-size: 21px; line-height: 1.5; margin-top: 9px; }
+.historyContinueButton { background: #ece9fa !important; border: 0 !important; border-radius: 18px !important; color: #614bd0 !important; font-size: 21px !important; margin: 22px 0 0 !important; }
+.historyError { margin-bottom: 50px; }
+
+.memoryPage { background: radial-gradient(circle at 94% 0, rgba(110,82,255,.13), transparent 28%), #f4f5f7; box-sizing: border-box; height: 100vh; padding: 30px 28px 70px; }
+.memoryHero { align-items: center; background: linear-gradient(145deg, #302b42, #635194); border-radius: 30px; box-shadow: 0 18px 42px rgba(40,31,67,.15); color: #fff; display: flex; flex-direction: column; padding: 32px 28px; text-align: center; }
+.memoryHeroIcon { align-items: center; background: rgba(255,255,255,.15); border-radius: 18px; display: flex; font-size: 31px; height: 64px; justify-content: center; width: 64px; }
+.memoryHeroTitle { font-size: 31px; font-weight: 800; margin-top: 16px; }
+.memoryHeroHint { color: rgba(255,255,255,.72); font-size: 21px; line-height: 1.55; margin-top: 8px; }
+.memorySectionHeader { align-items: center; display: flex; font-size: 27px; font-weight: 750; justify-content: space-between; margin: 32px 4px 14px; }
+.memoryCount { color: #999aa2; font-size: 20px; font-weight: 500; }
+.memoryList { display: flex; flex-direction: column; gap: 13px; }
+.memoryCard { align-items: center; background: #fff; border-radius: 24px; box-shadow: 0 10px 28px rgba(31,29,42,.055); display: flex; padding: 21px 22px; }
+.memoryCardBody { flex: 1; min-width: 0; }
+.memoryCardKey { color: #2c2932; display: block; font-size: 24px; font-weight: 720; }
+.memoryCardValue { color: #7d7e86; display: -webkit-box; font-size: 21px; line-height: 1.5; margin-top: 6px; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.memoryCardActions { color: #654ee5; display: flex; flex: 0 0 auto; flex-direction: column; font-size: 20px; gap: 13px; margin-left: 18px; text-align: right; }
+.memoryDelete { color: #c44d55; }
+.memoryState { align-items: center; background: rgba(255,255,255,.75); border-radius: 24px; color: #8f9098; display: flex; flex-direction: column; padding: 55px 24px; text-align: center; }
+.memoryStateTitle { color: #45434b; font-size: 25px; font-weight: 700; }
+.memoryStateHint { font-size: 20px; margin-top: 8px; }
+.memoryAddButton { background: #ece9fa !important; border: 0 !important; border-radius: 20px !important; color: #614bd0 !important; font-size: 23px !important; font-weight: 700; margin: 22px 0 0 !important; }
+.memoryError { margin-bottom: 40px; }
+
+.memoryEditorBackdrop,
+.shareBackdrop { align-items: flex-end; background: rgba(20,18,27,.42); box-sizing: border-box; display: flex; inset: 0; padding: 22px 20px calc(22px + env(safe-area-inset-bottom)); position: fixed; z-index: 260; }
+.memoryEditorSheet,
+.shareSheet { background: #fff; border-radius: 30px; box-shadow: 0 24px 80px rgba(20,18,27,.25); box-sizing: border-box; padding: 26px; width: 100%; }
+.memoryEditorHeader { align-items: flex-start; display: flex; justify-content: space-between; margin-bottom: 22px; }
+.memoryEditorTitle { color: #24222a; display: block; font-size: 30px; font-weight: 780; }
+.memoryEditorHint { color: #999aa2; display: block; font-size: 19px; margin-top: 5px; }
+.memoryEditorClose { color: #777986; font-size: 42px; line-height: 45px; padding-left: 24px; }
+.memoryEditorLabel { color: #5f5d65; display: block; font-size: 20px; font-weight: 650; margin: 18px 2px 9px; }
+.memoryEditorInput,
+.memoryEditorTextarea { background: #f6f6f8; border: 1px solid #e8e8ed; border-radius: 18px; box-sizing: border-box; font-size: 24px; padding: 17px 18px; width: 100%; }
+.memoryEditorInputDisabled { color: #8f9098; }
+.memoryEditorTextarea { height: 180px; line-height: 1.5; }
+.memoryEditorActions { display: flex; gap: 14px; margin-top: 24px; }
+.memoryEditorCancel,
+.memoryEditorSave { border: 0 !important; border-radius: 18px !important; flex: 1; font-size: 23px !important; font-weight: 700; margin: 0 !important; }
+.memoryEditorCancel { background: #f0f0f3 !important; color: #5f5d65 !important; }
+.memoryEditorSave { background: #6e52ff !important; color: #fff !important; }
+
+.shareHandle { background: #d9d8de; border-radius: 999px; height: 8px; margin: -10px auto 20px; width: 70px; }
+.shareSheetTitle { color: #24222a; display: block; font-size: 31px; font-weight: 780; text-align: center; }
+.shareSheetHint { color: #8d8e96; display: block; font-size: 21px; line-height: 1.5; margin: 9px auto 23px; max-width: 560px; text-align: center; }
+.shareWechatButton,
+.shareCopyButton { border: 0 !important; border-radius: 19px !important; font-size: 23px !important; font-weight: 700; margin: 13px 0 0 !important; }
+.shareWechatButton { background: #07c160 !important; color: #fff !important; }
+.shareCopyButton { background: #eff0f3 !important; color: #45434b !important; }
+.shareSheetID { color: #aaa8b2; display: block; font-size: 17px; margin-top: 18px; text-align: center; }
+
+.sharedContent { flex: 1; min-height: 0; }
+.sharedHero { background: linear-gradient(145deg, #fff, #f2efff); border-radius: 28px; box-shadow: 0 12px 34px rgba(31,29,42,.06); margin-bottom: 28px; padding: 27px; }
+.sharedEyebrow { color: #6b54db; display: block; font-size: 19px; font-weight: 750; }
+.sharedTitle { color: #25232b; display: block; font-size: 31px; font-weight: 800; line-height: 1.4; margin-top: 8px; }
+.sharedMeta { color: #999aa2; display: block; font-size: 19px; margin-top: 8px; }
+.sharedMessageList { padding: 0 2px; }
+.sharedCloneButton,
+.sharedReshareButton { border: 0 !important; border-radius: 20px !important; font-size: 23px !important; font-weight: 700; margin: 14px 0 !important; }
+.sharedCloneButton { background: #6e52ff !important; color: #fff !important; }
+.sharedReshareButton { background: #e8f8ee !important; color: #07984d !important; }
+.sharedState { align-items: center; color: #8f9098; display: flex; flex-direction: column; padding: 110px 30px; text-align: center; }
+.sharedStateTitle { color: #45434b; font-size: 27px; font-weight: 700; }
+.sharedStateHint { font-size: 21px; line-height: 1.5; margin-top: 9px; }
+.sharedError { margin-bottom: 50px; }

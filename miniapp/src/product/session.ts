@@ -5,6 +5,8 @@ import type {
   BillingOverviewResponse,
   ConversationDeleteResponse,
   ConversationResponse,
+  ConversationSearchPageResponse,
+  ConversationShareResponse,
   CreateConversationRequest,
   DailyCheckinClaimResponse,
   DailyCheckinStatusResponse,
@@ -12,8 +14,10 @@ import type {
   FileUploadResponse,
   MessageResponse,
   PublicModelResponse,
+  PublicSharedConversationResponse,
   RenameConversationRequest,
   ToolListResponse,
+  UserMemoryResponse,
   UsageMonthlyResponse,
   WechatminiappLoginResponse,
 } from "@deeix/api-contract";
@@ -35,6 +39,7 @@ import {
   imageGenerationStreamPath,
   renameConversationPath,
   resumeConversationRunPath,
+  type MessageBranchRequest,
 } from "./conversation-contract";
 import {
   applyConversationStreamEvent,
@@ -53,17 +58,22 @@ import {
 } from "./model-options";
 import type { ImageSubmitTask } from "./image-task";
 import { removeNativeWebSearchOptions, resolveExaNetworkToolIDs } from "./network-search";
+import {
+  conversationSearchPath,
+  conversationSharePath,
+  conversationStarPath,
+  sharedConversationClonePath,
+  sharedConversationFilePath,
+  sharedConversationPath,
+  userMemoryCollectionPath,
+  userMemoryPath,
+} from "./retention-contract";
 
 export type PagePayload<T> = { results: T[]; total: number };
 
-type CompletedMessage = {
-  attachments?: string;
-  content?: string;
-  processTrace?: unknown;
-};
-
 type CompletedPayload = {
-  assistantMessage?: CompletedMessage;
+  assistantMessage?: MessageResponse;
+  userMessage?: MessageResponse;
 };
 
 type AttachmentSnapshot = {
@@ -86,16 +96,20 @@ export type BootstrapResult = {
 };
 
 export type ChatStreamResult = {
+  assistantMessage?: MessageResponse;
   processTrace?: ConversationProcessTrace;
   text: string;
+  userMessage?: MessageResponse;
 };
 
 export type ChatGenerationProgress = Pick<ConversationStreamState, "processTrace" | "status" | "text">;
 
 export type ImageGenerationResult = {
+  assistantMessage?: MessageResponse;
   imageFileID?: string;
   imageSource: string | null;
   status: string;
+  userMessage?: MessageResponse;
 };
 
 export type ImageGenerationProgress = ImageGenerationResult;
@@ -183,11 +197,22 @@ export class MiniAppSession {
     };
   }
 
-  async listConversationPage(page = 1, pageSize = 50): Promise<PagePayload<ConversationResponse>> {
+  async listConversationPage(
+    page = 1,
+    pageSize = 50,
+    starred: "all" | "starred" | "unstarred" = "all",
+  ): Promise<PagePayload<ConversationResponse>> {
     const result = await this.request<PagePayload<ConversationResponse>>({
-      path: `/api/v1/conversations?page=${Math.max(1, Math.floor(page))}&page_size=${Math.max(1, Math.floor(pageSize))}&status=active&starred=all&share=all&project=all`,
+      path: `/api/v1/conversations?page=${Math.max(1, Math.floor(page))}&page_size=${Math.max(1, Math.floor(pageSize))}&status=active&starred=${starred}&share=all&project=all`,
     });
     return { results: result.results ?? [], total: result.total ?? 0 };
+  }
+
+  async searchConversations(query: string, page = 1, pageSize = 30): Promise<ConversationSearchPageResponse> {
+    const result = await this.request<ConversationSearchPageResponse>({
+      path: conversationSearchPath(query, page, pageSize),
+    });
+    return { hasMore: result.hasMore ?? false, results: result.results ?? [] };
   }
 
   async listMessages(conversationID: string): Promise<MessageResponse[]> {
@@ -247,7 +272,53 @@ export class MiniAppSession {
     });
   }
 
-  conversationMode(conversation: ConversationResponse): ConversationMode {
+  async setConversationStar(conversationID: string, starred: boolean): Promise<ConversationResponse> {
+    return this.request<ConversationResponse>({
+      path: conversationStarPath(conversationID),
+      method: "PATCH",
+      body: { starred },
+    });
+  }
+
+  async createConversationShare(conversationID: string): Promise<ConversationShareResponse> {
+    return this.request<ConversationShareResponse>({
+      path: conversationSharePath(conversationID),
+      method: "POST",
+      body: {},
+    });
+  }
+
+  async getSharedConversation(shareID: string): Promise<PublicSharedConversationResponse> {
+    return this.rawRequest<PublicSharedConversationResponse>({ path: sharedConversationPath(shareID) });
+  }
+
+  async cloneSharedConversation(shareID: string): Promise<ConversationResponse> {
+    return this.request<ConversationResponse>({
+      path: sharedConversationClonePath(shareID),
+      method: "POST",
+    });
+  }
+
+  async listUserMemories(): Promise<UserMemoryResponse[]> {
+    return this.request<UserMemoryResponse[]>({ path: userMemoryCollectionPath });
+  }
+
+  async upsertUserMemory(memoryKey: string, value: string): Promise<{ saved: boolean }> {
+    return this.request<{ saved: boolean }>({
+      path: userMemoryCollectionPath,
+      method: "PUT",
+      body: { memoryKey: memoryKey.trim(), value: value.trim(), scope: "preference" },
+    });
+  }
+
+  async deleteUserMemory(memoryKey: string): Promise<{ saved: boolean }> {
+    return this.request<{ saved: boolean }>({
+      path: userMemoryPath(memoryKey),
+      method: "DELETE",
+    });
+  }
+
+  conversationMode(conversation: { model?: string }): ConversationMode {
     const model = this.models.find((item) => item.platformModelName === conversation.model);
     return model && (supportsModelKind(model, "image_gen") || supportsModelKind(model, "image_edit")) &&
       !supportsModelKind(model, "chat") ? "image" : "chat";
@@ -264,6 +335,7 @@ export class MiniAppSession {
     onProgress: (progress: ChatGenerationProgress) => void,
     fileIDs: readonly string[] = [],
     useNetworkSearch = false,
+    branch: MessageBranchRequest = { branchReason: "default" },
   ): Promise<ChatStreamResult> {
     await this.ensureAccessToken();
     const model = selectedModelName.trim();
@@ -280,6 +352,7 @@ export class MiniAppSession {
       fileIDs,
       this.requestOptionsForModel(model, selectedToolIDs.length > 0),
       selectedToolIDs,
+      branch,
     );
     try {
       const stream = await this.runConversationStream({
@@ -320,8 +393,10 @@ export class MiniAppSession {
         throw new Error("AI 已完成响应，但没有返回文本");
       }
       return {
+        assistantMessage: completed.assistantMessage,
         processTrace: normalizeConversationProcessTrace(completed.assistantMessage?.processTrace) ?? streamState.processTrace,
         text,
+        userMessage: completed.userMessage,
       };
     } catch (error) {
       if (this.abortRequested) {
@@ -340,6 +415,7 @@ export class MiniAppSession {
     prompt: string,
     onProgress?: (progress: ImageGenerationProgress) => void,
     fileIDs: readonly string[] = [],
+    branch: MessageBranchRequest = { branchReason: "default" },
   ): Promise<ImageGenerationResult> {
     await this.ensureAccessToken();
     const model = selectedModelName.trim();
@@ -369,6 +445,7 @@ export class MiniAppSession {
             clientRunID,
             fileIDs,
             this.requestOptionsForModel(model),
+            branch,
           ),
           timeoutMs: 300_000,
           onEvent,
@@ -390,11 +467,13 @@ export class MiniAppSession {
         streamState.imageSource = await this.downloadMessageImage(fileID).catch(() => streamState.imageSource);
       }
       return {
+        assistantMessage: (stream.completedData as CompletedPayload)?.assistantMessage,
         imageFileID: fileID || undefined,
         imageSource: streamState.imageSource,
         status: streamState.imageSource
           ? editing ? "图片编辑完成" : "图片生成完成"
           : `${streamState.status}，但没有收到可显示的图片`,
+        userMessage: (stream.completedData as CompletedPayload)?.userMessage,
       };
     } catch (error) {
       if (this.abortRequested) {
@@ -481,6 +560,16 @@ export class MiniAppSession {
       await this.refresh();
       download = await this.performDownload(fileID);
     }
+    return download.statusCode >= 200 && download.statusCode < 300 && download.tempFilePath
+      ? download.tempFilePath
+      : null;
+  }
+
+  async downloadSharedImage(shareID: string, fileID: string): Promise<string | null> {
+    const download = await Taro.downloadFile({
+      url: buildApiUrl(this.baseUrl, sharedConversationFilePath(shareID, fileID)),
+      timeout: 120_000,
+    });
     return download.statusCode >= 200 && download.statusCode < 300 && download.tempFilePath
       ? download.tempFilePath
       : null;

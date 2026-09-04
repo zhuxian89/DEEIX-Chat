@@ -4,7 +4,7 @@ export default defineAppConfig({
     backgroundTextStyle: "light",
     backgroundColor: "#f4f7f6",
     navigationBarBackgroundColor: "#ffffff",
-    navigationBarTitleText: "AI省着用 · 0.1.26",
+    navigationBarTitleText: "AI省着用 · 0.1.27",
     navigationBarTextStyle: "black",
   },
 });

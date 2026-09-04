@@ -1,5 +1,11 @@
 import type { SendMessageRequest } from "@deeix/api-contract";
 
+export type MessageBranchRequest = {
+  branchReason: "default" | "retry" | "edit";
+  parentMessagePublicID?: string;
+  sourceMessagePublicID?: string;
+};
+
 function pathID(value: string): string {
   return encodeURIComponent(value.trim());
 }
@@ -23,27 +29,32 @@ export function createChatRunRequest(
   fileIDs: readonly string[] = [],
   options?: Record<string, unknown>,
   selectedToolIDs: readonly number[] = [],
+  branch: MessageBranchRequest = { branchReason: "default" },
 ): SendMessageRequest {
   return {
-    branchReason: "default",
+    branchReason: branch.branchReason,
     clientRunID,
     content,
     contentType: fileIDs.length > 0 ? "mixed" : "text",
-    fileIDs: fileIDs.length > 0 ? [...fileIDs] : undefined,
+    ...(fileIDs.length > 0 ? { fileIDs: [...fileIDs] } : {}),
     knowledgeBaseIDs: [],
     model,
-    options: options && Object.keys(options).length > 0 ? options : undefined,
-    selectedToolIDs: selectedToolIDs.length > 0 ? [...selectedToolIDs] : undefined,
+    ...(options && Object.keys(options).length > 0 ? { options } : {}),
+    ...(branch.parentMessagePublicID ? { parentMessagePublicID: branch.parentMessagePublicID } : {}),
+    ...(selectedToolIDs.length > 0 ? { selectedToolIDs: [...selectedToolIDs] } : {}),
+    ...(branch.sourceMessagePublicID ? { sourceMessagePublicID: branch.sourceMessagePublicID } : {}),
   };
 }
 
 export type ImageRunRequest = {
-  branchReason: "default";
+  branchReason: "default" | "retry" | "edit";
   clientRunID: string;
   fileIDs?: string[];
   model: string;
   options?: Record<string, unknown>;
+  parentMessagePublicID?: string;
   prompt: string;
+  sourceMessagePublicID?: string;
 };
 
 export function createImageRunRequest(
@@ -52,14 +63,17 @@ export function createImageRunRequest(
   clientRunID: string,
   fileIDs: readonly string[] = [],
   options?: Record<string, unknown>,
+  branch: MessageBranchRequest = { branchReason: "default" },
 ): ImageRunRequest {
   return {
-    branchReason: "default",
+    branchReason: branch.branchReason,
     clientRunID,
     ...(fileIDs.length > 0 ? { fileIDs: [...fileIDs] } : {}),
     model,
     ...(options && Object.keys(options).length > 0 ? { options } : {}),
+    ...(branch.parentMessagePublicID ? { parentMessagePublicID: branch.parentMessagePublicID } : {}),
     prompt,
+    ...(branch.sourceMessagePublicID ? { sourceMessagePublicID: branch.sourceMessagePublicID } : {}),
   };
 }
 

@@ -1,4 +1,4 @@
-import type { MessageResponse } from "@deeix/api-contract";
+import type { MessageResponse, PublicSharedMessageResponse } from "@deeix/api-contract";
 import {
   type ConversationProcessTrace,
   normalizeConversationProcessTrace,
@@ -21,6 +21,7 @@ export type ImageProgress = {
 
 export type ConversationMessage = {
   activityStatus?: string;
+  branchReason?: string;
   contentType?: string;
   id: string;
   imageFileID?: string;
@@ -28,9 +29,11 @@ export type ConversationMessage = {
   imageStatus?: string;
   modelName?: string;
   pending?: boolean;
+  parentPublicID?: string;
   processTrace?: ConversationProcessTrace;
   role: "assistant" | "user";
   runID?: string;
+  sourcePublicID?: string;
   text: string;
 };
 
@@ -55,7 +58,7 @@ function imageAttachment(raw: string): AttachmentSnapshot | null {
   }
 }
 
-export function messageFromAPI(message: MessageResponse): ConversationMessage | null {
+export function messageFromAPI(message: MessageResponse | PublicSharedMessageResponse): ConversationMessage | null {
   if (message.role !== "user" && message.role !== "assistant") {
     return null;
   }
@@ -70,19 +73,59 @@ export function messageFromAPI(message: MessageResponse): ConversationMessage | 
   }
   return {
     activityStatus: pending && !imageMessage ? "正在继续生成回复" : undefined,
-    id: message.publicID || String(message.id),
+    branchReason: message.branchReason.trim() || undefined,
+    id: message.publicID || ("id" in message ? String(message.id) : ""),
     contentType,
     imageFileID: imageFileID || undefined,
     imageStatus: imageFileID ? "图片生成完成" : pending && imageMessage ? "正在生成图片" : undefined,
     modelName: message.platformModelName.trim() || undefined,
     pending,
+    parentPublicID: message.parentPublicID.trim() || undefined,
     processTrace: message.role === "assistant"
       ? normalizeConversationProcessTrace(message.processTrace)
       : undefined,
     role: message.role,
     runID: message.runID.trim() || undefined,
+    sourcePublicID: message.sourcePublicID.trim() || undefined,
     text,
   };
+}
+
+export function latestVisibleMessages(messages: readonly ConversationMessage[]): ConversationMessage[] {
+  const children = new Map<string, ConversationMessage[]>();
+  for (const message of messages) {
+    const parentKey = message.parentPublicID?.trim() ?? "";
+    const siblings = children.get(parentKey) ?? [];
+    siblings.push(message);
+    children.set(parentKey, siblings);
+  }
+
+  const visible: ConversationMessage[] = [];
+  const visited = new Set<string>();
+  let parentKey = "";
+  while (true) {
+    const siblings = children.get(parentKey);
+    const selected = siblings?.at(-1);
+    if (!selected || visited.has(selected.id)) {
+      break;
+    }
+    visited.add(selected.id);
+    visible.push(selected);
+    parentKey = selected.id;
+  }
+  if (visible.length > 0 || messages.length === 0) {
+    return visible;
+  }
+
+  const byID = new Map(messages.map((message) => [message.id, message]));
+  const suffix: ConversationMessage[] = [];
+  let current = messages.at(-1);
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id);
+    suffix.push(current);
+    current = current.parentPublicID ? byID.get(current.parentPublicID) : undefined;
+  }
+  return suffix.reverse();
 }
 
 export function createPendingImageTurn(

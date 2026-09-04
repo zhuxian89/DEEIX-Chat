@@ -62,6 +62,38 @@ test("chat and image starts carry the same run ID and Web model options", () => 
   });
 });
 
+test("regeneration keeps the mature Web message branch contract", () => {
+  const branch = {
+    branchReason: "retry" as const,
+    parentMessagePublicID: "user-parent-1",
+    sourceMessagePublicID: "assistant-source-1",
+  };
+  assert.deepEqual(
+    createChatRunRequest("原始问题", "chat-model", "run-chat-retry", [], undefined, [], branch),
+    {
+      branchReason: "retry",
+      clientRunID: "run-chat-retry",
+      content: "原始问题",
+      contentType: "text",
+      knowledgeBaseIDs: [],
+      model: "chat-model",
+      parentMessagePublicID: "user-parent-1",
+      sourceMessagePublicID: "assistant-source-1",
+    },
+  );
+  assert.deepEqual(
+    createImageRunRequest("雨夜城市", "image-model", "run-image-retry", [], undefined, branch),
+    {
+      branchReason: "retry",
+      clientRunID: "run-image-retry",
+      model: "image-model",
+      parentMessagePublicID: "user-parent-1",
+      prompt: "雨夜城市",
+      sourceMessagePublicID: "assistant-source-1",
+    },
+  );
+});
+
 test("generation resume and cancel paths match the mature web API contract", () => {
   assert.equal(
     resumeConversationRunPath("run/a", 0),
