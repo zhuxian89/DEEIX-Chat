@@ -18,6 +18,7 @@ import (
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/compact"
 	appcontentmoderation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/contentmoderation"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/conversation"
+	appdailycheckin "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/dailycheckin"
 	appembedding "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/embedding"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/extraction"
 	appinvitation "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/invitation"
@@ -63,6 +64,7 @@ import (
 	channelrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/channel"
 	contentmoderationrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/contentmoderation"
 	conversationrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/conversation"
+	dailycheckinrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/dailycheckin"
 	invitationrepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/invitation"
 	knowledgebaserepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/knowledgebase"
 	logcleanuprepo "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/postgres/logcleanup"
@@ -88,6 +90,7 @@ import (
 	channelhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/channel"
 	contentmoderationhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/contentmoderation"
 	conversationhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/conversation"
+	dailycheckinhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/dailycheckin"
 	invitationhttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/invitation"
 	knowledgebasehttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/knowledgebase"
 	mcphttp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/mcp"
@@ -248,6 +251,9 @@ func NewApp() (*App, error) {
 	paymentCheckoutService := billing.NewPaymentCheckoutService(stripepayment.New(cfg.StrictOutboundPolicy()), epaypayment.New())
 	billingHandler := billinghttp.NewHandler(billingService, settingsService, runtimeCfg, officialPricingService, paymentCheckoutService, log)
 	billingModule := billinghttp.NewModule(billingHandler)
+	dailyCheckinRepo := dailycheckinrepo.NewRepo(db)
+	dailyCheckinService := appdailycheckin.NewService(dailyCheckinRepo, settingsService)
+	dailyCheckinModule := dailycheckinhttp.NewModule(dailycheckinhttp.NewHandler(dailyCheckinService))
 	// 组合根绑定对象存储默认工厂；application 侧未显式注入工厂的 provider 均使用该实现。
 	appstorage.RegisterDefaultFactory(objectstore.New)
 	objectStoreProvider := appstorage.NewRuntimeProvider(runtimeCfg, objectstore.New)
@@ -466,6 +472,7 @@ func NewApp() (*App, error) {
 		MCP:               mcpModule,
 		Memory:            memoryModule,
 		Billing:           billingModule,
+		DailyCheckin:      dailyCheckinModule,
 		Admin:             adminModule,
 		RegistrationCode:  registrationCodeModule,
 		WeChat:            wechatModule,

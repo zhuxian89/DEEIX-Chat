@@ -3050,6 +3050,83 @@ definitions:
     - data
     - errorMsg
     type: object
+  DailyCheckinClaimResponse:
+    properties:
+      alreadyClaimed:
+        type: boolean
+      awardedCalls:
+        type: integer
+      businessDate:
+        type: string
+      claimedNow:
+        type: boolean
+      prizeKey:
+        type: string
+      rewardUsd:
+        type: number
+      streakDays:
+        type: integer
+      unitPriceUsd:
+        type: number
+    required:
+    - alreadyClaimed
+    - awardedCalls
+    - businessDate
+    - claimedNow
+    - prizeKey
+    - rewardUsd
+    - streakDays
+    - unitPriceUsd
+    type: object
+  DailyCheckinPrizeResponse:
+    properties:
+      calls:
+        type: integer
+      prizeKey:
+        type: string
+      weightBps:
+        type: integer
+    required:
+    - calls
+    - prizeKey
+    - weightBps
+    type: object
+  DailyCheckinStatusResponse:
+    properties:
+      awardedCalls:
+        type: integer
+      businessDate:
+        type: string
+      claimed:
+        type: boolean
+      enabled:
+        type: boolean
+      nextAvailableAt:
+        type: string
+      prizeKey:
+        type: string
+      prizes:
+        items:
+          $ref: '#/definitions/DailyCheckinPrizeResponse'
+        type: array
+      rewardUsd:
+        type: number
+      streakDays:
+        type: integer
+      unitPriceUsd:
+        type: number
+    required:
+    - awardedCalls
+    - businessDate
+    - claimed
+    - enabled
+    - nextAvailableAt
+    - prizeKey
+    - prizes
+    - rewardUsd
+    - streakDays
+    - unitPriceUsd
+    type: object
   DeleteAccountRequest:
     properties:
       code:
@@ -17628,6 +17705,42 @@ paths:
       summary: 批量关闭会话公开分享
       tags:
       - chat
+  /daily-checkin/claim:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DailyCheckinClaimResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/Envelope'
+      security:
+      - BearerAuth: []
+      summary: 领取每日签到转盘奖励
+      tags:
+      - daily-checkin
+  /daily-checkin/status:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/DailyCheckinStatusResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/Envelope'
+      security:
+      - BearerAuth: []
+      summary: 获取每日签到状态
+      tags:
+      - daily-checkin
   /files:
     get:
       consumes:

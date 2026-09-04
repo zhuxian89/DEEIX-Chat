@@ -11966,6 +11966,66 @@ const docTemplate = `{
                 }
             }
         },
+        "/daily-checkin/claim": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "daily-checkin"
+                ],
+                "summary": "领取每日签到转盘奖励",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/DailyCheckinClaimResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/daily-checkin/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "daily-checkin"
+                ],
+                "summary": "获取每日签到状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/DailyCheckinStatusResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/files": {
             "get": {
                 "security": [
@@ -19073,6 +19133,114 @@ const docTemplate = `{
                 },
                 "errorMsg": {
                     "type": "string"
+                }
+            }
+        },
+        "DailyCheckinClaimResponse": {
+            "type": "object",
+            "required": [
+                "alreadyClaimed",
+                "awardedCalls",
+                "businessDate",
+                "claimedNow",
+                "prizeKey",
+                "rewardUsd",
+                "streakDays",
+                "unitPriceUsd"
+            ],
+            "properties": {
+                "alreadyClaimed": {
+                    "type": "boolean"
+                },
+                "awardedCalls": {
+                    "type": "integer"
+                },
+                "businessDate": {
+                    "type": "string"
+                },
+                "claimedNow": {
+                    "type": "boolean"
+                },
+                "prizeKey": {
+                    "type": "string"
+                },
+                "rewardUsd": {
+                    "type": "number"
+                },
+                "streakDays": {
+                    "type": "integer"
+                },
+                "unitPriceUsd": {
+                    "type": "number"
+                }
+            }
+        },
+        "DailyCheckinPrizeResponse": {
+            "type": "object",
+            "required": [
+                "calls",
+                "prizeKey",
+                "weightBps"
+            ],
+            "properties": {
+                "calls": {
+                    "type": "integer"
+                },
+                "prizeKey": {
+                    "type": "string"
+                },
+                "weightBps": {
+                    "type": "integer"
+                }
+            }
+        },
+        "DailyCheckinStatusResponse": {
+            "type": "object",
+            "required": [
+                "awardedCalls",
+                "businessDate",
+                "claimed",
+                "enabled",
+                "nextAvailableAt",
+                "prizeKey",
+                "prizes",
+                "rewardUsd",
+                "streakDays",
+                "unitPriceUsd"
+            ],
+            "properties": {
+                "awardedCalls": {
+                    "type": "integer"
+                },
+                "businessDate": {
+                    "type": "string"
+                },
+                "claimed": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "nextAvailableAt": {
+                    "type": "string"
+                },
+                "prizeKey": {
+                    "type": "string"
+                },
+                "prizes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/DailyCheckinPrizeResponse"
+                    }
+                },
+                "rewardUsd": {
+                    "type": "number"
+                },
+                "streakDays": {
+                    "type": "integer"
+                },
+                "unitPriceUsd": {
+                    "type": "number"
                 }
             }
         },

@@ -148,6 +148,224 @@ page {
   white-space: nowrap;
 }
 
+.checkinCard {
+  background: linear-gradient(145deg, #fffdf8, #f6f1ff);
+  border: 1px solid rgba(110, 82, 255, 0.1);
+  border-radius: 32px;
+  box-shadow: 0 18px 44px rgba(52, 42, 91, 0.09);
+  box-sizing: border-box;
+  margin-bottom: 24px;
+  overflow: hidden;
+  padding: 28px;
+  position: relative;
+}
+
+.checkinCard::after {
+  background: rgba(255, 190, 72, 0.18);
+  border-radius: 50%;
+  content: "";
+  height: 190px;
+  position: absolute;
+  right: -70px;
+  top: -92px;
+  width: 190px;
+}
+
+.checkinCopy,
+.checkinBody {
+  display: flex;
+}
+
+.checkinCopy {
+  align-items: flex-start;
+  justify-content: space-between;
+  position: relative;
+  z-index: 1;
+}
+
+.checkinEyebrow {
+  color: #ef8d19;
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  margin-bottom: 7px;
+}
+
+.checkinTitle {
+  color: #27232f;
+  display: block;
+  font-size: 34px;
+  font-weight: 800;
+}
+
+.checkinSubtitle {
+  color: #79747f;
+  display: block;
+  font-size: 21px;
+  margin-top: 8px;
+}
+
+.checkinStreak {
+  background: #fff2cf;
+  border: 1px solid #f9df9d;
+  border-radius: 999px;
+  color: #a9630c;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 36px;
+  padding: 0 14px;
+  position: relative;
+  white-space: nowrap;
+  z-index: 1;
+}
+
+.checkinBody {
+  align-items: center;
+  gap: 28px;
+  margin-top: 24px;
+}
+
+.wheelStage {
+  flex: 0 0 auto;
+  height: 254px;
+  position: relative;
+  width: 254px;
+}
+
+.wheelPointer {
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-top: 32px solid #332b41;
+  filter: drop-shadow(0 4px 4px rgba(42, 36, 53, 0.2));
+  left: 50%;
+  position: absolute;
+  top: -6px;
+  transform: translateX(-50%);
+  z-index: 4;
+}
+
+.checkinWheel {
+  border: 9px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 8px 28px rgba(66, 52, 105, 0.18), inset 0 0 0 3px rgba(255, 255, 255, 0.45);
+  box-sizing: border-box;
+  height: 254px;
+  position: relative;
+  transition: transform 2.2s cubic-bezier(0.12, 0.72, 0.12, 1);
+  width: 254px;
+}
+
+.wheelLabel {
+  align-items: center;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  text-shadow: 0 1px 3px rgba(59, 42, 20, 0.28);
+  transform-origin: center;
+  white-space: nowrap;
+}
+
+.wheelCalls {
+  font-size: 24px;
+  font-weight: 850;
+  line-height: 1;
+}
+
+.wheelUnit {
+  font-size: 15px;
+  font-weight: 650;
+  margin-top: 3px;
+}
+
+.wheelCenter {
+  align-items: center;
+  background: linear-gradient(145deg, #fff7d9, #fff);
+  border: 5px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  box-shadow: 0 5px 18px rgba(70, 54, 109, 0.22);
+  color: #6e52ff;
+  display: flex;
+  font-size: 30px;
+  font-weight: 900;
+  height: 70px;
+  justify-content: center;
+  left: 50%;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 70px;
+}
+
+.checkinResult {
+  align-items: stretch;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.checkinWinLabel {
+  color: #5f5967;
+  display: block;
+  font-size: 20px;
+}
+
+.checkinWinValue {
+  color: #6e52ff;
+  display: block;
+  font-size: 43px;
+  font-weight: 900;
+  line-height: 1.15;
+  margin-top: 8px;
+}
+
+.checkinReady {
+  color: #2b2731;
+  display: block;
+  font-size: 27px;
+  font-weight: 750;
+  line-height: 1.35;
+  margin-top: 10px;
+}
+
+.checkinMoney {
+  color: #9b720f;
+  display: block;
+  font-size: 19px;
+  margin-top: 4px;
+}
+
+.checkinButton {
+  background: linear-gradient(135deg, #6e52ff, #8e69ff) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  color: #fff !important;
+  font-size: 21px !important;
+  font-weight: 750 !important;
+  line-height: 66px !important;
+  margin: 20px 0 0 !important;
+  padding: 0 18px !important;
+  width: 100%;
+}
+
+.checkinButton[disabled] {
+  background: #d9d5e5 !important;
+  color: #716d79 !important;
+  opacity: 1;
+}
+
+.checkinNotice {
+  border-top: 1px solid rgba(69, 61, 80, 0.08);
+  color: #8c8792;
+  display: block;
+  font-size: 18px;
+  line-height: 1.5;
+  margin-top: 22px;
+  padding-top: 18px;
+}
+
 .quickGrid {
   display: grid;
   gap: 22px;

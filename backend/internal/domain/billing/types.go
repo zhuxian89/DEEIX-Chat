@@ -102,6 +102,8 @@ const (
 	BalanceTransactionTypeRedemption = "redemption"
 	// BalanceTransactionTypeInvitation 表示邀请奖励入账。
 	BalanceTransactionTypeInvitation = "invitation_reward"
+	// BalanceTransactionTypeDailyCheckin 表示每日签到奖励入账。
+	BalanceTransactionTypeDailyCheckin = "daily_checkin_reward"
 
 	// UsageReservationStatusActive 表示用量预算仍被当前请求占用。
 	UsageReservationStatusActive = "active"

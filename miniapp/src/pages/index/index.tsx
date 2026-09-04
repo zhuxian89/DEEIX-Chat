@@ -1,13 +1,15 @@
 import type {
   BillingOverviewResponse,
   ConversationResponse,
+  DailyCheckinStatusResponse,
   MiniAppUserResponse,
   PublicModelResponse,
   UsageMonthlyResponse,
 } from "@deeix/api-contract";
 import { Button, Image, KeyboardAccessory, ScrollView, Text, Textarea, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
+import Taro, { useDidShow } from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { DailyCheckinWheel } from "@/components/daily-checkin-wheel";
 import { Markdown } from "@/components/markdown";
 import { ConversationTrace } from "@/components/conversation-trace";
 import { resolveMiniAppConfig } from "@/product/runtime-config";
@@ -26,6 +28,7 @@ import {
 import { composerKeyboardStyle } from "@/product/keyboard-layout";
 import { MINIAPP_BUILD_VERSION } from "@/product/build-version";
 import { nextChatBottomScrollTop, shouldReleaseChatAutoFollow } from "@/product/chat-auto-scroll";
+import { wheelRotationForPrize } from "@/product/daily-checkin";
 import {
   conversationSwipeOffset,
   conversationRefreshPageSize,
@@ -109,11 +112,17 @@ export default function HomePage() {
   const sessionRef = useRef<MiniAppSession | null>(null);
   const messageCounter = useRef(0);
   const historyLoadCounter = useRef(0);
+  const dailyCheckinRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const isDailyCheckinClaimingRef = useRef(false);
   const [screen, setScreen] = useState<Screen>("home");
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState(runtimeConfigError);
   const [user, setUser] = useState<MiniAppUserResponse | null>(null);
   const [balanceUSD, setBalanceUSD] = useState<number | null>(null);
+  const [dailyCheckin, setDailyCheckin] = useState<DailyCheckinStatusResponse | null>(null);
+  const [isDailyCheckinClaiming, setIsDailyCheckinClaiming] = useState(false);
+  const [showDailyCheckinResult, setShowDailyCheckinResult] = useState(false);
+  const [dailyCheckinRotation, setDailyCheckinRotation] = useState(0);
   const [created, setCreated] = useState(false);
   const [presets, setPresets] = useState<Presets | null>(null);
   const [models, setModels] = useState<PublicModelResponse[]>([]);
@@ -171,6 +180,23 @@ export default function HomePage() {
     enableChatAutoFollow();
   }, [enableChatAutoFollow]);
 
+  const applyDailyCheckinStatus = useCallback((status: DailyCheckinStatusResponse | null) => {
+    setDailyCheckin(status);
+    setShowDailyCheckinResult(Boolean(status?.claimed));
+    if (status?.claimed) {
+      setDailyCheckinRotation((current) =>
+        wheelRotationForPrize(status.prizes, status.prizeKey, current),
+      );
+    }
+  }, []);
+
+  const clearDailyCheckinRevealTimer = useCallback(() => {
+    if (dailyCheckinRevealTimerRef.current !== null) {
+      clearTimeout(dailyCheckinRevealTimerRef.current);
+      dailyCheckinRevealTimerRef.current = null;
+    }
+  }, []);
+
   const bootstrap = useCallback(async () => {
     if (!runtimeConfig) {
       setBooting(false);
@@ -185,6 +211,7 @@ export default function HomePage() {
       const result = await session.bootstrap();
       setUser(result.user);
       setBalanceUSD(result.account?.balanceUSD ?? null);
+      applyDailyCheckinStatus(result.dailyCheckin);
       setCreated(result.created);
       setPresets(result.presets);
       setModels(result.models);
@@ -205,15 +232,16 @@ export default function HomePage() {
     } finally {
       setBooting(false);
     }
-  }, []);
+  }, [applyDailyCheckinStatus]);
 
   useEffect(() => {
     void bootstrap();
     return () => {
+      clearDailyCheckinRevealTimer();
       sessionRef.current?.dispose();
       sessionRef.current = null;
     };
-  }, [bootstrap]);
+  }, [bootstrap, clearDailyCheckinRevealTimer]);
 
   useEffect(() => {
     if (screen === "chat" && chatAutoFollowRef.current) {
@@ -282,6 +310,67 @@ export default function HomePage() {
       }
     } catch {
       // Balance is informational and must not hide a successful model response.
+    }
+  };
+
+  const refreshDailyCheckinStatus = useCallback(async () => {
+    const session = sessionRef.current;
+    if (!session || isDailyCheckinClaimingRef.current) {
+      return;
+    }
+    try {
+      const status = await session.getDailyCheckinStatus();
+      applyDailyCheckinStatus(status);
+    } catch {
+      // Daily benefits must never prevent the core chat workspace from opening.
+    }
+  }, [applyDailyCheckinStatus]);
+
+  useDidShow(() => {
+    void refreshDailyCheckinStatus();
+  });
+
+  const claimDailyCheckin = async () => {
+    const session = sessionRef.current;
+    if (!session || !dailyCheckin || dailyCheckin.claimed || isDailyCheckinClaimingRef.current) {
+      return;
+    }
+    isDailyCheckinClaimingRef.current = true;
+    setIsDailyCheckinClaiming(true);
+    setShowDailyCheckinResult(false);
+    setWorkspaceError("");
+    try {
+      const result = await session.claimDailyCheckin();
+      setDailyCheckinRotation((current) =>
+        wheelRotationForPrize(dailyCheckin.prizes, result.prizeKey, current),
+      );
+      clearDailyCheckinRevealTimer();
+      dailyCheckinRevealTimerRef.current = setTimeout(() => {
+        setDailyCheckin((current) => {
+          if (!current) {
+            return current;
+          }
+          return {
+            ...current,
+            claimed: true,
+            awardedCalls: result.awardedCalls,
+            businessDate: result.businessDate,
+            prizeKey: result.prizeKey,
+            rewardUsd: result.rewardUsd,
+            streakDays: result.streakDays,
+            unitPriceUsd: result.unitPriceUsd,
+          };
+        });
+        setShowDailyCheckinResult(true);
+        isDailyCheckinClaimingRef.current = false;
+        setIsDailyCheckinClaiming(false);
+        dailyCheckinRevealTimerRef.current = null;
+        void refreshBalance();
+      }, 2_300);
+    } catch (error) {
+      isDailyCheckinClaimingRef.current = false;
+      setIsDailyCheckinClaiming(false);
+      setWorkspaceError(error instanceof Error ? error.message : "签到领取失败，请稍后重试");
     }
   };
 
@@ -1403,6 +1492,16 @@ export default function HomePage() {
           <Text className="avatarBadge">我的</Text>
         </View>
       </View>
+
+      {dailyCheckin?.enabled ? (
+        <DailyCheckinWheel
+          status={dailyCheckin}
+          isClaiming={isDailyCheckinClaiming}
+          rotation={dailyCheckinRotation}
+          revealResult={showDailyCheckinResult}
+          onClaim={() => void claimDailyCheckin()}
+        />
+      ) : null}
 
       <View className="quickGrid">
         <View

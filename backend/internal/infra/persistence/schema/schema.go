@@ -83,6 +83,7 @@ func Models() []interface{} {
 		&model.PermissionGroupUserAccess{},
 		&model.InvitationCode{},
 		&model.InvitationRelationship{},
+		&model.DailyCheckinClaim{},
 	}
 }
 

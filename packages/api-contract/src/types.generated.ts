@@ -1339,6 +1339,36 @@ export interface CreateUserResponseDoc {
   errorMsg: string;
 }
 
+export interface DailyCheckinClaimResponse {
+  alreadyClaimed: boolean;
+  awardedCalls: number;
+  businessDate: string;
+  claimedNow: boolean;
+  prizeKey: string;
+  rewardUsd: number;
+  streakDays: number;
+  unitPriceUsd: number;
+}
+
+export interface DailyCheckinPrizeResponse {
+  calls: number;
+  prizeKey: string;
+  weightBps: number;
+}
+
+export interface DailyCheckinStatusResponse {
+  awardedCalls: number;
+  businessDate: string;
+  claimed: boolean;
+  enabled: boolean;
+  nextAvailableAt: string;
+  prizeKey: string;
+  prizes: DailyCheckinPrizeResponse[];
+  rewardUsd: number;
+  streakDays: number;
+  unitPriceUsd: number;
+}
+
 export interface DeleteAccountRequest {
   /**
    * @minLength 6
@@ -8928,6 +8958,40 @@ export namespace Conversations {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = ConversationUpdateResponseDoc;
+  }
+}
+
+export namespace DailyCheckin {
+  /**
+   * No description
+   * @tags daily-checkin
+   * @name ClaimCreate
+   * @summary 领取每日签到转盘奖励
+   * @request POST:/daily-checkin/claim
+   * @secure
+   */
+  export namespace ClaimCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DailyCheckinClaimResponse;
+  }
+
+  /**
+   * No description
+   * @tags daily-checkin
+   * @name StatusList
+   * @summary 获取每日签到状态
+   * @request GET:/daily-checkin/status
+   * @secure
+   */
+  export namespace StatusList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = DailyCheckinStatusResponse;
   }
 }
 

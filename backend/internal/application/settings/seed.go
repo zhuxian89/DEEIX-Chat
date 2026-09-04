@@ -3,6 +3,7 @@ package settings
 import (
 	"strconv"
 
+	domaindailycheckin "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/dailycheckin"
 	domainsettings "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/nativetool"
@@ -206,6 +207,9 @@ func defaultSettings() []domainsettings.SystemSetting {
 		{Namespace: "wechat_miniapp", Key: "app_secret", Value: "", ValueType: "string", Description: "微信小程序 AppSecret"},
 		{Namespace: "wechat_miniapp", Key: "default_chat_model", Value: "", ValueType: "string", Description: "小程序 AI 对话快捷入口模型 platformModelName"},
 		{Namespace: "wechat_miniapp", Key: "default_image_model", Value: "", ValueType: "string", Description: "小程序 AI 生图快捷入口模型 platformModelName"},
+
+		// 每日签到幸运转盘配置（单一 JSON 键保证奖池原子更新）
+		{Namespace: domaindailycheckin.ConfigNamespace, Key: domaindailycheckin.ConfigKey, Value: domaindailycheckin.DefaultConfigJSON(), ValueType: "json", Description: "每日签到转盘配置：开关、标准单价、业务时区及次数奖池概率（weightBps 合计必须为10000）"},
 
 		// 熔断配置
 		{Namespace: "circuit", Key: "channel_failure_threshold", Value: "3", ValueType: "int", Description: "熔断触发次数"},

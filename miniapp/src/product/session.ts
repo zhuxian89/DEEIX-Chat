@@ -6,6 +6,8 @@ import type {
   ConversationDeleteResponse,
   ConversationResponse,
   CreateConversationRequest,
+  DailyCheckinClaimResponse,
+  DailyCheckinStatusResponse,
   FileObjectResponse,
   FileUploadResponse,
   MessageResponse,
@@ -76,6 +78,7 @@ export type BootstrapResult = {
   conversations: ConversationResponse[];
   conversationTotal: number;
   created: boolean;
+  dailyCheckin: DailyCheckinStatusResponse | null;
   models: PublicModelResponse[];
   networkSearchAvailable: boolean;
   presets: { chatModel: PublicModelResponse | null; imageModel: PublicModelResponse | null };
@@ -162,13 +165,17 @@ export class MiniAppSession {
     if (!chatModel && !imageModel) {
       throw new Error("AI 服务暂不可用，请联系管理员检查小程序默认模型和用户权限");
     }
-    const conversationPage = await this.listConversationPage();
-    const account = await this.getBillingAccount().catch(() => null);
+    const [conversationPage, account, dailyCheckin] = await Promise.all([
+      this.listConversationPage(),
+      this.getBillingAccount().catch(() => null),
+      this.getDailyCheckinStatus().catch(() => null),
+    ]);
     return {
       account,
       conversations: conversationPage.results,
       conversationTotal: conversationPage.total,
       created: login.created,
+      dailyCheckin,
       models: this.models,
       networkSearchAvailable: this.exaNetworkToolIDs.length > 0,
       presets: { chatModel, imageModel },
@@ -203,6 +210,14 @@ export class MiniAppSession {
   async listMonthlyUsage(months = 6): Promise<UsageMonthlyResponse[]> {
     const normalizedMonths = Math.min(24, Math.max(1, Math.floor(months)));
     return this.request<UsageMonthlyResponse[]>({ path: `/api/v1/billing/usage/monthly?months=${normalizedMonths}` });
+  }
+
+  async getDailyCheckinStatus(): Promise<DailyCheckinStatusResponse> {
+    return this.request<DailyCheckinStatusResponse>({ path: "/api/v1/daily-checkin/status" });
+  }
+
+  async claimDailyCheckin(): Promise<DailyCheckinClaimResponse> {
+    return this.request<DailyCheckinClaimResponse>({ path: "/api/v1/daily-checkin/claim", method: "POST" });
   }
 
   async createConversation(model: PublicModelResponse, title: string): Promise<ConversationResponse> {

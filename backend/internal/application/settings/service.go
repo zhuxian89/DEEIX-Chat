@@ -10,6 +10,7 @@ import (
 
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/extraction"
 	domainbilling "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/billing"
+	domaindailycheckin "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/dailycheckin"
 	domainsettings "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	extractport "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/ports/extract"
@@ -378,6 +379,7 @@ var validNamespaces = map[string]bool{
 	"notify":         true,
 	"wechat":         true,
 	"wechat_miniapp": true,
+	"daily_checkin":  true,
 }
 
 // IsValidNamespace 判断 namespace 是否允许被动态配置。
@@ -728,6 +730,9 @@ func validatePatchItem(item PatchItem) error {
 		return validateStringMax(value, 512, key)
 	case "wechat_miniapp:default_chat_model", "wechat_miniapp:default_image_model":
 		return validateStringMax(value, 255, key)
+	case "daily_checkin:config":
+		_, err := domaindailycheckin.ParseConfig(value)
+		return err
 	}
 	return nil
 }

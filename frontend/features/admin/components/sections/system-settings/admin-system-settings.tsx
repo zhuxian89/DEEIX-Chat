@@ -74,7 +74,26 @@ type MiniAppModelOptions = {
   image: string[];
 };
 
+type DailyCheckinPrize = {
+  calls: number;
+  weightBps: number;
+};
+
+type DailyCheckinConfig = {
+  enabled: boolean;
+  unitPriceUsd: number;
+  timezone: string;
+  prizes: DailyCheckinPrize[];
+};
+
 const EMPTY_MODEL_VALUE = "__not_configured__";
+const DAILY_CHECKIN_TOTAL_WEIGHT_BPS = 10_000;
+const DAILY_CHECKIN_MAX_PRIZES = 12;
+
+type DailyCheckinConfigFieldProps = {
+  value: string;
+  onChange: (value: string) => void;
+};
 
 function flattenSettings(groups: SettingsGrouped): SettingRow[] {
   return Object.entries(groups)
@@ -233,8 +252,9 @@ export function AdminSystemSettingsPage() {
       setDraft(null);
       await load();
       toast.success(draft.mode === "restore" ? "参数已恢复" : "参数已更新");
-    } catch {
-      toast.error(draft.mode === "restore" ? "参数恢复失败" : "参数更新失败");
+    } catch (error) {
+      const fallback = draft.mode === "restore" ? "参数恢复失败" : "参数更新失败";
+      toast.error(error instanceof Error && error.message ? error.message : fallback);
     } finally {
       setSaving(false);
     }
@@ -459,7 +479,7 @@ function SettingDialog({
 
   return (
     <Dialog open={draft !== null} onOpenChange={(open) => !saving && !open && onChange(null)}>
-      <DialogContent>
+      <DialogContent className={draft?.namespace === "daily_checkin" ? "sm:max-w-2xl" : undefined}>
         <DialogHeader>
           <DialogTitle>{draft?.mode === "restore" ? "恢复参数" : "编辑参数"}</DialogTitle>
           <DialogDescription>
@@ -545,6 +565,9 @@ function SettingValueField({
   }
 
   if (draft.valueType === "json") {
+    if (draft.namespace === "daily_checkin" && draft.key === "config") {
+      return <DailyCheckinConfigField value={draft.value} onChange={onChange} />;
+    }
     return (
       <label className="grid gap-1.5 text-sm">
         <span>参数值</span>
@@ -596,4 +619,168 @@ function SettingValueField({
       />
     </label>
   );
+}
+
+function DailyCheckinConfigField({
+  value,
+  onChange,
+}: DailyCheckinConfigFieldProps) {
+  const config = React.useMemo(() => parseDailyCheckinConfig(value), [value]);
+  if (!config) {
+    return (
+      <label className="grid gap-1.5 text-sm">
+        <span>签到转盘 JSON（当前内容无法结构化，请修正后保存）</span>
+        <Textarea
+          rows={10}
+          className="font-mono text-xs"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </label>
+    );
+  }
+
+  const updateConfig = (next: DailyCheckinConfig) => onChange(JSON.stringify(next));
+  const totalWeightBps = config.prizes.reduce((total, prize) => total + prize.weightBps, 0);
+  const hasValidTotalWeight = totalWeightBps === DAILY_CHECKIN_TOTAL_WEIGHT_BPS;
+  const updatePrize = (index: number, patch: Partial<DailyCheckinPrize>) => {
+    updateConfig({
+      ...config,
+      prizes: config.prizes.map((prize, prizeIndex) =>
+        prizeIndex === index ? { ...prize, ...patch } : prize,
+      ),
+    });
+  };
+  const removePrize = (index: number) => {
+    updateConfig({
+      ...config,
+      prizes: config.prizes.filter((_, prizeIndex) => prizeIndex !== index),
+    });
+  };
+  const addPrize = () => {
+    const calls = Math.max(10, ...config.prizes.map((prize) => prize.calls + 10));
+    updateConfig({
+      ...config,
+      prizes: [...config.prizes, { calls, weightBps: 100 }],
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <label className="flex min-h-10 items-center justify-between gap-4 text-sm">
+        <span>启用每日签到</span>
+        <Switch
+          checked={config.enabled}
+          onCheckedChange={(enabled) => updateConfig({ ...config, enabled })}
+        />
+      </label>
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="grid gap-1.5 text-sm">
+          <span>标准对话单价（美元/次）</span>
+          <Input
+            type="number"
+            min="0.000000001"
+            max="1000"
+            step="0.00001"
+            value={config.unitPriceUsd}
+            onChange={(event) => updateConfig({
+              ...config,
+              unitPriceUsd: Number(event.target.value),
+            })}
+          />
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span>业务时区</span>
+          <Input
+            value={config.timezone}
+            placeholder="Asia/Shanghai"
+            onChange={(event) => updateConfig({ ...config, timezone: event.target.value })}
+          />
+        </label>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-3 text-sm">
+          <span className="font-medium">中奖档位</span>
+          <span className={hasValidTotalWeight ? "text-muted-foreground" : "text-destructive"}>
+            概率合计 {(totalWeightBps / 100).toFixed(2)}%{hasValidTotalWeight ? "" : "（必须为 100%）"}
+          </span>
+        </div>
+        <div className="overflow-hidden rounded-md border">
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 border-b bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+            <span>标准对话次数</span>
+            <span>中奖概率（%）</span>
+            <span className="w-14 text-right">操作</span>
+          </div>
+          {config.prizes.map((prize, index) => (
+            <div
+              className="grid grid-cols-[1fr_1fr_auto] items-center gap-2 border-b px-3 py-2 last:border-b-0"
+              key={`${index}-${prize.calls}`}
+            >
+              <Input
+                type="number"
+                min="1"
+                max="1000000"
+                step="1"
+                value={prize.calls}
+                onChange={(event) => updatePrize(index, { calls: Math.floor(Number(event.target.value)) })}
+              />
+              <Input
+                type="number"
+                min="0.01"
+                max="100"
+                step="0.01"
+                value={prize.weightBps / 100}
+                onChange={(event) => updatePrize(index, {
+                  weightBps: Math.round(Number(event.target.value) * 100),
+                })}
+              />
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                className="w-14 text-destructive hover:text-destructive"
+                disabled={config.prizes.length <= 1}
+                onClick={() => removePrize(index)}
+              >
+                删除
+              </Button>
+            </div>
+          ))}
+        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          disabled={config.prizes.length >= DAILY_CHECKIN_MAX_PRIZES}
+          onClick={addPrize}
+        >
+          <Plus className="mr-2 size-4" />
+          添加档位
+        </Button>
+        <p className="text-xs text-muted-foreground">
+          次数和概率均由服务端判定。保存时会校验次数不重复、概率为正且合计严格等于 100%。
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function parseDailyCheckinConfig(value: string): DailyCheckinConfig | null {
+  try {
+    const parsed = JSON.parse(value) as Partial<DailyCheckinConfig>;
+    if (
+      typeof parsed.enabled !== "boolean" ||
+      typeof parsed.unitPriceUsd !== "number" ||
+      typeof parsed.timezone !== "string" ||
+      !Array.isArray(parsed.prizes) ||
+      parsed.prizes.some((prize) =>
+        typeof prize?.calls !== "number" || typeof prize?.weightBps !== "number"
+      )
+    ) {
+      return null;
+    }
+    return parsed as DailyCheckinConfig;
+  } catch {
+    return null;
+  }
 }
