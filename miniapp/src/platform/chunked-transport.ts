@@ -1,10 +1,19 @@
 import Taro from "@tarojs/taro";
+import { WechatRequestError, type RecoverableStreamHandle } from "./generation-recovery";
 import { ChunkedJSONParser } from "./stream-parser";
+import { classifyStreamTerminal } from "./stream-terminal";
 
 export type StreamEvent = { type: string; seq?: number; [key: string]: unknown };
 export type ChunkedRequestResult = { completedData: unknown; eventCount: number; firstChunkMs: number | null; lastSeq: number; statusCode: number };
-export type ChunkedRequestHandle = { abort(): void; promise: Promise<ChunkedRequestResult> };
-export type ChunkedRequestOptions = { accessToken: string; body: unknown; onEvent?(event: StreamEvent): void; timeoutMs?: number; url: string };
+export type ChunkedRequestHandle = RecoverableStreamHandle<ChunkedRequestResult>;
+export type ChunkedRequestOptions = {
+  accessToken: string;
+  body?: unknown;
+  method?: "GET" | "POST";
+  onEvent?(event: StreamEvent): void;
+  timeoutMs?: number;
+  url: string;
+};
 
 function normalizeEvent(value: unknown): StreamEvent {
   if (!value || typeof value !== "object") {
@@ -15,14 +24,6 @@ function normalizeEvent(value: unknown): StreamEvent {
     throw new Error("stream event type is missing");
   }
   return event as StreamEvent;
-}
-
-function streamError(event: StreamEvent): Error | null {
-  if (event.type !== "error") {
-    return null;
-  }
-  const errorCode = typeof event.errorCode === "string" ? ` / ${event.errorCode}` : "";
-  return new Error(`${typeof event.message === "string" ? event.message : "stream failed"}${errorCode}`);
 }
 
 export function startChunkedJSONRequest(options: ChunkedRequestOptions): ChunkedRequestHandle {
@@ -43,10 +44,12 @@ export function startChunkedJSONRequest(options: ChunkedRequestOptions): Chunked
       if (typeof event.seq === "number" && Number.isFinite(event.seq) && event.seq > lastSeq) {
         lastSeq = event.seq;
       }
-      if (event.type === "completed") {
-        completedData = event.data;
+      const terminal = classifyStreamTerminal(event);
+      if (terminal.kind === "completed") {
+        completedData = terminal.data;
+      } else if (terminal.kind === "error") {
+        observedError = terminal.error;
       }
-      observedError = streamError(event) ?? observedError;
       options.onEvent?.(event);
     }
   };
@@ -54,7 +57,7 @@ export function startChunkedJSONRequest(options: ChunkedRequestOptions): Chunked
   const promise = new Promise<ChunkedRequestResult>((resolve, reject) => {
     task = Taro.request({
       url: options.url,
-      method: "POST",
+      method: options.method ?? "POST",
       header: { Accept: "application/x-ndjson", Authorization: `Bearer ${options.accessToken}`, "Content-Type": "application/json" },
       data: options.body,
       dataType: "json",
@@ -77,7 +80,11 @@ export function startChunkedJSONRequest(options: ChunkedRequestOptions): Chunked
       fail(error) {
         if (!settled) {
           settled = true;
-          reject(new Error(error.errMsg || "chunked request failed"));
+          const errno = Number((error as { errno?: unknown }).errno);
+          reject(new WechatRequestError(
+            error.errMsg || "chunked request failed",
+            Number.isFinite(errno) ? errno : undefined,
+          ));
         }
       },
     });
@@ -93,5 +100,9 @@ export function startChunkedJSONRequest(options: ChunkedRequestOptions): Chunked
       }
     });
   });
-  return { abort() { if (!settled) task?.abort(); }, promise };
+  return {
+    abort() { if (!settled) task?.abort(); },
+    lastSeq: () => lastSeq,
+    promise,
+  };
 }

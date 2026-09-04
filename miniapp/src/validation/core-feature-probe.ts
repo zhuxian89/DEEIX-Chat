@@ -158,6 +158,7 @@ export class CoreFeatureSession {
       body: {
         content: prompt,
         contentType: "text",
+        knowledgeBaseIDs: [],
         model: this.chatModel,
       } satisfies SendMessageRequest,
       onEvent(event) {

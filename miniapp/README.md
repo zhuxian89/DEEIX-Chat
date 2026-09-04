@@ -14,7 +14,7 @@
 
 ```text
 wechat_miniapp:enabled=true
-wechat_miniapp:app_id=wx0123456789abcdef
+wechat_miniapp:app_id=wx59fcdf6143e32cef
 wechat_miniapp:app_secret=从微信公众平台获取的 AppSecret
 wechat_miniapp:default_chat_model=管理员模型页中的 platformModelName
 wechat_miniapp:default_image_model=管理员模型页中的 platformModelName
@@ -41,12 +41,12 @@ pnpm install --reporter=append-only
 配置本机小程序项目和 HTTPS 后端：
 
 ```bash
-pnpm configure:weapp -- wx0123456789abcdef
+pnpm configure:weapp
 pnpm configure:integration -- https://chat.example.com
 pnpm check
 ```
 
-两个配置脚本同时兼容 pnpm 转发的 `--`，不会再把它误解析为 URL。它们只写入已忽略的 `project.config.json` 和 `.env.local`。生产源码只读取 `TARO_APP_API_BASE_URL`，不保存 AppSecret、OpenID、UnionID 或任何令牌。
+小程序 AppID 已固定为正式账号 `wx59fcdf6143e32cef`，`project.config.json` 纳入版本管理，配置脚本拒绝写入其他 AppID。后端地址脚本只写入已忽略的 `.env.local`；生产源码只读取 `TARO_APP_API_BASE_URL`，不保存 AppSecret、OpenID、UnionID 或任何令牌。
 
 也可以持续编译：
 

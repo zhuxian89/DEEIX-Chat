@@ -16,8 +16,20 @@ export default defineConfig<"webpack5">(async (merge) => {
     },
     sourceRoot: "src",
     outputRoot: "dist",
+    copy: {
+      patterns: [
+        {
+          from: "src/native-components/mp-html",
+          to: "dist/native-components/mp-html",
+        },
+      ],
+      options: {},
+    },
     framework: "react",
     compiler: "webpack5",
+    plugins: [
+      ["@tarojs/plugin-platform-weapp", { enablekeyboardAccessory: true }],
+    ],
     cache: {
       enable: false,
     },

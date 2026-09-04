@@ -407,7 +407,7 @@ func TestSeedImportsLegacyWeChatConfigAndEncryptsSecrets(t *testing.T) {
 	cfg := config.Config{
 		WeChatCallbackToken:            "DEEIXWechat13003",
 		WeChatMiniAppEnabled:           true,
-		WeChatMiniAppAppID:             "wxafb49c7fd9b04cf9",
+		WeChatMiniAppAppID:             "wx59fcdf6143e32cef",
 		WeChatMiniAppAppSecret:         "miniapp-secret",
 		WeChatMiniAppDefaultChatModel:  "chat-model",
 		WeChatMiniAppDefaultImageModel: "image-model",

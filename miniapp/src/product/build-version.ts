@@ -1,0 +1,1 @@
+export const MINIAPP_BUILD_VERSION = "0.1.24.20260903";

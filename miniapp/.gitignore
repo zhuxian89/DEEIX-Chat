@@ -2,7 +2,7 @@ dist/
 .temp/
 .swc/
 node_modules/
+src/native-components/mp-html/
 coverage/
 *.local
-project.config.json
 project.private.config.json

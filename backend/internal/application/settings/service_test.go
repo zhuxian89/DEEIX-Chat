@@ -185,7 +185,7 @@ func TestWeChatMiniAppSettingsRequireCompleteConfigurationWhenEnabled(t *testing
 	}
 
 	patches := []PatchItem{
-		{Namespace: "wechat_miniapp", Key: "app_id", Value: "wxafb49c7fd9b04cf9"},
+		{Namespace: "wechat_miniapp", Key: "app_id", Value: "wx59fcdf6143e32cef"},
 		{Namespace: "wechat_miniapp", Key: "app_secret", Value: "miniapp-secret"},
 		{Namespace: "wechat_miniapp", Key: "default_chat_model", Value: "chat-model"},
 		{Namespace: "wechat_miniapp", Key: "default_image_model", Value: "image-model"},
@@ -207,7 +207,7 @@ func TestRuntimeSettingsAppliesWeChatConfiguration(t *testing.T) {
 	items := []domainsettings.SystemSetting{
 		{Namespace: "wechat", Key: "callback_token", Value: "callback-token"},
 		{Namespace: "wechat_miniapp", Key: "enabled", Value: "true"},
-		{Namespace: "wechat_miniapp", Key: "app_id", Value: "wxafb49c7fd9b04cf9"},
+		{Namespace: "wechat_miniapp", Key: "app_id", Value: "wx59fcdf6143e32cef"},
 		{Namespace: "wechat_miniapp", Key: "app_secret", Value: "miniapp-secret"},
 		{Namespace: "wechat_miniapp", Key: "default_chat_model", Value: "chat-model"},
 		{Namespace: "wechat_miniapp", Key: "default_image_model", Value: "image-model"},
@@ -216,7 +216,7 @@ func TestRuntimeSettingsAppliesWeChatConfiguration(t *testing.T) {
 		runtimeSettings.applyItem(&cfg, item)
 	}
 	if cfg.WeChatCallbackToken != "callback-token" || !cfg.WeChatMiniAppEnabled ||
-		cfg.WeChatMiniAppAppID != "wxafb49c7fd9b04cf9" || cfg.WeChatMiniAppAppSecret != "miniapp-secret" ||
+		cfg.WeChatMiniAppAppID != "wx59fcdf6143e32cef" || cfg.WeChatMiniAppAppSecret != "miniapp-secret" ||
 		cfg.WeChatMiniAppDefaultChatModel != "chat-model" || cfg.WeChatMiniAppDefaultImageModel != "image-model" {
 		t.Fatalf("runtime WeChat config = %+v", cfg)
 	}
@@ -226,7 +226,7 @@ func TestRuntimeSettingsDisablesIncompleteWeChatMiniAppConfiguration(t *testing.
 	runtimeSettings := NewRuntimeSettings(nil, nil, "test-data-encryption-key")
 	cfg := config.Config{
 		WeChatMiniAppEnabled:          true,
-		WeChatMiniAppAppID:            "wxafb49c7fd9b04cf9",
+		WeChatMiniAppAppID:            "wx59fcdf6143e32cef",
 		WeChatMiniAppAppSecret:        "miniapp-secret",
 		WeChatMiniAppDefaultChatModel: "chat-model",
 	}
