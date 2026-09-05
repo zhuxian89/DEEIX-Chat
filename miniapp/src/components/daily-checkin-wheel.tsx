@@ -49,14 +49,25 @@ export function DailyCheckinEntry({ status, onOpen }: DailyCheckinEntryProps) {
     : `签到可抽 ${range.min}–${range.max} 次标准对话`;
 
   return (
-    <View className={`checkinEntry ${status.claimed ? "checkinEntryClaimed" : ""}`} onClick={onOpen}>
-      <View className="checkinEntryIcon">签</View>
+    <View
+      className={`checkinEntry ${status.claimed ? "checkinEntryClaimed" : "checkinEntryPending"}`}
+      onClick={onOpen}
+    >
+      {status.claimed ? null : (
+        <>
+          <View className="checkinEntryGlow" />
+          <View className="checkinEntryShimmer" />
+        </>
+      )}
+      <View className="checkinEntryIcon">
+        <Text className="checkinEntryIconText">签</Text>
+      </View>
       <View className="checkinEntryCopy">
         <Text className="checkinEntryEyebrow">每日福利</Text>
         <Text className="checkinEntryTitle">{summary}</Text>
       </View>
       <View className="checkinEntryAction">
-        <Text>{status.claimed ? "查看" : "去签到"}</Text>
+        {status.claimed ? null : <Text className="checkinEntryActionText">今日可领</Text>}
         <Text className="checkinEntryArrow">›</Text>
       </View>
     </View>
@@ -97,9 +108,6 @@ export function DailyCheckinWheel({
           }}
         >
           {segments.map((segment) => {
-            if (!segment.showLabel) {
-              return null;
-            }
             const position = wheelLabelPosition(segment);
             return (
               <View
@@ -118,7 +126,10 @@ export function DailyCheckinWheel({
             );
           })}
         </View>
-        <View className="wheelCenter">
+        <View
+          className={`wheelCenter ${status.claimed ? "wheelCenterClaimed" : ""}`}
+          onClick={onClaim}
+        >
           <Text className="wheelCenterMain">抽</Text>
           <Text className="wheelCenterHint">好运</Text>
         </View>
@@ -166,7 +177,7 @@ export function DailyCheckinWheel({
       </View>
 
       <Text className="checkinNotice">
-        奖励按标准对话单价折算后存入余额，可用于全部模型；实际可用次数会因模型价格不同而变化
+        转盘采用等分展示，实际中奖机会以奖励列表为准。奖励按标准对话单价折算后存入余额，可用于全部模型；实际可用次数会因模型价格不同而变化
       </Text>
     </View>
   );

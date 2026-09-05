@@ -9,7 +9,6 @@ export type DailyCheckinWheelSegment = {
   endPercent: number;
   midpointDegrees: number;
   prize: DailyCheckinPrize;
-  showLabel: boolean;
   startPercent: number;
 };
 
@@ -17,25 +16,20 @@ const WHEEL_COLORS = ["#ff9f43", "#ff6b57", "#8065f5", "#4f86ed", "#2fb795", "#f
 const FULL_TURN_DEGREES = 360;
 const SPIN_TURNS = 5;
 const LABEL_RADIUS_PERCENT = 30;
-const MIN_INLINE_LABEL_PERCENT = 9;
 
 export function wheelSegments(prizes: DailyCheckinPrize[]): DailyCheckinWheelSegment[] {
-  const totalWeight = prizes.reduce((total, prize) => total + prize.weightBps, 0);
-  if (prizes.length === 0 || totalWeight <= 0) {
+  if (prizes.length === 0) {
     return [];
   }
 
-  let cumulativeWeight = 0;
   return prizes.map((prize, index) => {
-    const startPercent = cumulativeWeight / totalWeight * 100;
-    cumulativeWeight += prize.weightBps;
-    const endPercent = cumulativeWeight / totalWeight * 100;
+    const startPercent = index / prizes.length * 100;
+    const endPercent = (index + 1) / prizes.length * 100;
     return {
       color: WHEEL_COLORS[index % WHEEL_COLORS.length],
       endPercent,
       midpointDegrees: (startPercent + endPercent) / 2 / 100 * FULL_TURN_DEGREES,
       prize,
-      showLabel: endPercent - startPercent >= MIN_INLINE_LABEL_PERCENT,
       startPercent,
     };
   });

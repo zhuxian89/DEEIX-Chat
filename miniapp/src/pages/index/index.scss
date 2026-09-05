@@ -16,6 +16,7 @@ page {
 
 .homePage {
   background: radial-gradient(circle at 92% 0%, rgba(110, 82, 255, 0.15), transparent 30%), #f4f5f7;
+  padding-top: 26px;
 }
 
 .centerState {
@@ -52,7 +53,6 @@ page {
 }
 
 .stateHint,
-.welcome,
 .pageLead,
 .conversationMeta,
 .modelDescription,
@@ -90,8 +90,8 @@ page {
 }
 
 .homeHeader {
-  align-items: flex-start;
-  margin-bottom: 42px;
+  align-items: center;
+  margin-bottom: 20px;
 }
 
 .eyebrow {
@@ -100,7 +100,6 @@ page {
   font-size: 21px;
   font-weight: 800;
   letter-spacing: 4px;
-  margin-bottom: 14px;
 }
 
 .homeTitle {
@@ -108,44 +107,23 @@ page {
   font-size: 52px;
   font-weight: 800;
   letter-spacing: -2px;
-}
-
-.welcome {
-  display: block;
-  font-size: 25px;
-  margin-top: 12px;
+  margin-bottom: 30px;
 }
 
 .avatar {
   align-items: center;
   background: #202127;
-  border: 6px solid #fff;
+  border: 5px solid #fff;
   border-radius: 50%;
   box-shadow: 0 9px 25px rgba(23, 24, 29, 0.14);
   color: #fff;
   display: flex;
   flex: 0 0 auto;
-  font-size: 29px;
+  font-size: 25px;
   font-weight: 700;
-  height: 76px;
+  height: 64px;
   justify-content: center;
-  width: 76px;
-  position: relative;
-}
-
-.avatarBadge {
-  background: #6e52ff;
-  border: 3px solid #fff;
-  border-radius: 12px;
-  bottom: -13px;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 650;
-  line-height: 27px;
-  padding: 0 9px;
-  position: absolute;
-  right: -10px;
-  white-space: nowrap;
+  width: 64px;
 }
 
 .checkinEntry {
@@ -156,9 +134,20 @@ page {
   box-shadow: 0 12px 32px rgba(57, 47, 32, 0.07);
   box-sizing: border-box;
   display: flex;
-  margin-bottom: 24px;
-  min-height: 116px;
-  padding: 20px 22px;
+  isolation: isolate;
+  margin-bottom: 22px;
+  min-height: 96px;
+  overflow: hidden;
+  padding: 15px 18px;
+  position: relative;
+}
+
+.checkinEntryPending {
+  animation: checkinEntryGradient 4.8s ease-in-out infinite;
+  background: linear-gradient(115deg, #fff5d8 0%, #fffdf8 30%, #eee8ff 64%, #ffe8cc 100%);
+  background-size: 240% 240%;
+  border-color: rgba(120, 82, 255, 0.24);
+  box-shadow: 0 15px 38px rgba(110, 82, 255, 0.14), 0 6px 22px rgba(255, 137, 50, 0.12);
 }
 
 .checkinEntryClaimed {
@@ -166,19 +155,61 @@ page {
   border-color: rgba(47, 183, 149, 0.16);
 }
 
+.checkinEntryGlow {
+  animation: checkinEntryGlow 2.6s ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(255, 184, 74, 0.4), rgba(133, 96, 255, 0.12) 48%, transparent 72%);
+  border-radius: 50%;
+  height: 180px;
+  pointer-events: none;
+  position: absolute;
+  right: -48px;
+  top: -56px;
+  width: 180px;
+  z-index: 0;
+}
+
+.checkinEntryShimmer {
+  animation: checkinEntryShimmer 3.8s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.72), transparent);
+  bottom: -30px;
+  pointer-events: none;
+  position: absolute;
+  top: -30px;
+  transform: skewX(-18deg) translateX(-220%);
+  width: 32%;
+  z-index: 1;
+}
+
+.checkinEntryIcon,
+.checkinEntryCopy,
+.checkinEntryAction {
+  position: relative;
+  z-index: 2;
+}
+
 .checkinEntryIcon {
   align-items: center;
   background: linear-gradient(145deg, #ffb24a, #ff7a45);
-  border-radius: 22px;
+  border-radius: 19px;
   box-shadow: 0 8px 20px rgba(239, 141, 25, 0.2);
   color: #fff;
   display: flex;
   flex: 0 0 auto;
-  font-size: 25px;
+  font-size: 23px;
   font-weight: 850;
-  height: 72px;
+  height: 62px;
   justify-content: center;
-  width: 72px;
+  width: 62px;
+}
+
+.checkinEntryPending .checkinEntryIcon {
+  animation: checkinEntryIconPulse 2.4s ease-in-out infinite;
+}
+
+.checkinEntryIconText {
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
 }
 
 .checkinEntryClaimed .checkinEntryIcon {
@@ -186,10 +217,17 @@ page {
   box-shadow: 0 8px 20px rgba(47, 183, 149, 0.18);
 }
 
+.checkinEntryClaimed .checkinEntryAction {
+  background: transparent;
+  box-shadow: none;
+  color: #9a9ca3;
+  padding: 0;
+}
+
 .checkinEntryCopy {
   flex: 1;
   min-width: 0;
-  padding: 0 18px;
+  padding: 0 14px;
 }
 
 .checkinEntryEyebrow {
@@ -203,7 +241,7 @@ page {
 .checkinEntryTitle {
   color: #29262f;
   display: block;
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 750;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -212,17 +250,55 @@ page {
 
 .checkinEntryAction {
   align-items: center;
-  color: #7158e8;
+  background: linear-gradient(135deg, #7258f4, #8b65ff);
+  border-radius: 999px;
+  box-shadow: 0 7px 18px rgba(110, 82, 255, 0.23);
+  color: #fff;
   display: flex;
   flex: 0 0 auto;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 750;
+  padding: 8px 10px 8px 14px;
+}
+
+.checkinEntryActionText {
+  white-space: nowrap;
 }
 
 .checkinEntryArrow {
-  font-size: 34px;
+  font-size: 28px;
   line-height: 1;
-  margin-left: 5px;
+  margin-left: 3px;
+}
+
+@keyframes checkinEntryGradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes checkinEntryGlow {
+  from { opacity: 0.48; transform: scale(0.86); }
+  to { opacity: 0.95; transform: scale(1.12); }
+}
+
+@keyframes checkinEntryShimmer {
+  0%, 22% { opacity: 0; transform: skewX(-18deg) translateX(-220%); }
+  42% { opacity: 0.82; }
+  68%, 100% { opacity: 0; transform: skewX(-18deg) translateX(700%); }
+}
+
+@keyframes checkinEntryIconPulse {
+  0%, 100% { box-shadow: 0 8px 20px rgba(239, 141, 25, 0.22); transform: scale(1); }
+  50% { box-shadow: 0 9px 26px rgba(255, 117, 57, 0.4); transform: scale(1.06); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .checkinEntryPending,
+  .checkinEntryGlow,
+  .checkinEntryShimmer,
+  .checkinEntryPending .checkinEntryIcon {
+    animation: none;
+  }
 }
 
 .checkinPage {
@@ -367,6 +443,17 @@ page {
   font-size: 15px;
   font-weight: 700;
   margin-top: 5px;
+}
+
+.wheelCenterClaimed {
+  background: linear-gradient(145deg, #e9e9ed, #f5f5f6);
+  border-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 6px 18px rgba(70, 70, 78, 0.16);
+  color: #92939a;
+}
+
+.wheelCenterClaimed .wheelCenterHint {
+  color: #a9aab0;
 }
 
 .checkinPrizeCard,
@@ -686,7 +773,7 @@ page {
 .emptyHistoryTitle { display: block; font-size: 27px; font-weight: 650; }
 .emptyHistoryHint { color: #96979e; display: block; font-size: 22px; margin-top: 8px; }
 .privacyNote { color: #a2a3aa; display: block; font-size: 20px; margin-top: 38px; text-align: center; }
-.versionNote { color: #96979e; display: block; font-size: 20px; margin-top: 10px; }
+.versionNote { color: #adaeb4; display: block; font-size: 18px; margin-top: 14px; text-align: center; }
 
 .topBar { flex: 0 0 auto; height: 76px; margin-bottom: 22px; }
 .backButton,
@@ -728,7 +815,7 @@ page {
   width: 62px;
   z-index: 20;
 }
-.imageCanvas { padding: 0 2px 24px; }
+.imageCanvas { height: 100%; padding: 0 2px 24px; }
 .message {
   align-items: flex-start;
   display: flex;
@@ -969,8 +1056,7 @@ page {
 .stopSendButton { background: #24232a !important; min-width: 68px; width: auto; }
 .stopSendButton[disabled] { background: #555762 !important; }
 .aiNotice { color: #aaabb1; display: block; font-size: 19px; margin-top: 12px; text-align: center; }
-.legalLinks { color: #777986; display: flex; font-size: 21px; gap: 30px; justify-content: center; margin: 12px 0 28px; }
-.accountSummary { color: #777986; display: block; font-size: 21px; margin-top: 10px; }
+.legalLinks { color: #777986; display: flex; font-size: 21px; gap: 30px; justify-content: center; margin: 12px 0 0; }
 
 .imageModeBadge { background: #eaf5ef; border-radius: 14px; color: #34765f; font-size: 20px; font-weight: 700; padding: 8px 13px; }
 .imageModeBadgeEdit { background: #eeeafe; color: #6249d8; }
@@ -1057,14 +1143,26 @@ page {
 .generatedImage { display: block; width: 100%; }
 .imageStatus { display: block; font-size: 23px; margin: 20px 24px; }
 .imageResultStatus { background: #fff; border-radius: 20px; color: #777986; font-size: 23px; line-height: 1.55; margin-top: 8px; padding: 22px 24px; }
+.imageResultStatusText { display: block; }
+.imageResultActions { display: flex; margin-top: 18px; }
 .imageLoadingCard { margin-top: 8px; }
-.imageLoadingStatus { align-items: center; color: #7f818a; display: flex; font-size: 23px; gap: 13px; margin: 0 4px 16px; }
-.imageSpinner { animation: imageSpin .8s linear infinite; border: 4px solid rgba(110,82,255,.16); border-radius: 50%; border-top-color: #6e52ff; box-sizing: border-box; height: 28px; width: 28px; }
 .imageLoadingFrame { align-items: center; aspect-ratio: 16 / 10; background: linear-gradient(135deg, #bae6fd 0%, #60a5fa 52%, #a78bfa 100%); border-radius: 28px; display: flex; justify-content: center; overflow: hidden; position: relative; }
-.imageLoadingGlow { animation: imageGlow 2.4s ease-in-out infinite alternate; background: radial-gradient(circle, rgba(255,255,255,.7), rgba(255,255,255,0) 68%); height: 140%; position: absolute; transform: translate3d(-25%, -18%, 0); width: 140%; }
-.imageLoadingMark { color: rgba(255,255,255,.34); font-size: 72px; font-weight: 800; letter-spacing: 12px; position: relative; }
+.imageLoadingGlow { border-radius: 50%; position: absolute; }
+.imageLoadingGlowPrimary { animation: imageGlowPrimary 2.2s ease-in-out infinite alternate; background: radial-gradient(circle, rgba(255,255,255,.76), rgba(255,255,255,0) 68%); height: 145%; width: 145%; }
+.imageLoadingGlowSecondary { animation: imageGlowSecondary 3s ease-in-out infinite alternate; background: radial-gradient(circle, rgba(196,181,253,.78), rgba(196,181,253,0) 68%); height: 110%; width: 110%; }
+.imageLoadingOrbit { animation: imageOrbit 4.8s linear infinite; border: 2px solid rgba(255,255,255,.28); border-left-color: transparent; border-radius: 50%; border-right-color: rgba(255,255,255,.08); height: 180px; position: absolute; width: 180px; }
+.imageLoadingContent { align-items: center; display: flex; flex-direction: column; gap: 20px; justify-content: center; padding: 32px; position: relative; z-index: 1; }
+.imageSpinner { animation: imageSpin .9s linear infinite; border: 5px solid rgba(255,255,255,.3); border-radius: 50%; border-top-color: #fff; box-sizing: border-box; height: 38px; width: 38px; }
+.imageLoadingLabel { color: #fff; font-size: 28px; font-weight: 750; letter-spacing: 1px; line-height: 1.4; text-align: center; text-shadow: 0 3px 12px rgba(47,61,126,.24); }
+.imageLoadingFrameQueued .imageLoadingGlowPrimary { animation-duration: 3.2s; }
+.imageLoadingFrameQueued .imageLoadingOrbit { animation-duration: 7s; }
+.imageLoadingFrameRunning .imageLoadingGlowPrimary { animation-duration: 1.8s; }
+.imageLoadingFrameSaving .imageLoadingGlowPrimary { animation-duration: 2.6s; }
+.imageLoadingFrameSaving .imageLoadingOrbit { animation-duration: 3.8s; }
 @keyframes imageSpin { to { transform: rotate(360deg); } }
-@keyframes imageGlow { from { opacity: .35; transform: translate3d(-30%, -22%, 0) scale(.9); } to { opacity: .85; transform: translate3d(8%, 4%, 0) scale(1.08); } }
+@keyframes imageGlowPrimary { from { opacity: .32; transform: translate3d(-30%, -24%, 0) scale(.88); } to { opacity: .9; transform: translate3d(10%, 6%, 0) scale(1.08); } }
+@keyframes imageGlowSecondary { from { opacity: .25; transform: translate3d(34%, 20%, 0) scale(.86); } to { opacity: .75; transform: translate3d(-18%, -12%, 0) scale(1.12); } }
+@keyframes imageOrbit { from { opacity: .38; transform: rotate(0deg) scale(.8); } 50% { opacity: .7; transform: rotate(180deg) scale(1.05); } to { opacity: .38; transform: rotate(360deg) scale(.8); } }
 .primaryButton,
 .secondaryButton { border: 0 !important; border-radius: 19px !important; font-size: 26px !important; font-weight: 700; }
 .primaryButton { background: #6e52ff !important; color: #fff !important; }

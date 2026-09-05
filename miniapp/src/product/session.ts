@@ -56,7 +56,7 @@ import {
   type NativeToolDefinition,
   resolveModelRequestOptions,
 } from "./model-options";
-import type { ImageSubmitTask } from "./image-task";
+import { imageFailureMessageForRun, imageTaskTerminalStatus, type ImageSubmitTask } from "./image-task";
 import { removeNativeWebSearchOptions, resolveExaNetworkToolIDs } from "./network-search";
 import {
   conversationSearchPath,
@@ -423,7 +423,10 @@ export class MiniAppSession {
       throw new Error("请选择本次图片任务使用的模型");
     }
     const editing = task === "image_edit";
-    let streamState = { ...emptyConversationStreamState(), status: editing ? "正在编辑图片" : "正在生成图片" };
+    let streamState = {
+      ...emptyConversationStreamState("", null, undefined, task),
+      status: editing ? "AI 正在编辑图片" : "AI 正在生成图片",
+    };
     const clientRunID = createClientRunID();
     const generationUrl = buildApiUrl(
       this.baseUrl,
@@ -453,33 +456,42 @@ export class MiniAppSession {
         onEvent: consumeEvent,
         onInterrupted: () => {
           streamState.status = this.appForeground
-            ? "连接被微信中断，正在恢复生图进度"
+            ? editing ? "连接被微信中断，正在恢复图片编辑进度" : "连接被微信中断，正在恢复图片生成进度"
             : "已切到后台，返回后继续接收图片";
           onProgress?.({ imageSource: streamState.imageSource, status: streamState.status });
         },
         onResuming: () => {
-          streamState.status = "正在恢复生图进度";
+          streamState.status = editing ? "正在恢复图片编辑进度" : "正在恢复图片生成进度";
           onProgress?.({ imageSource: streamState.imageSource, status: streamState.status });
         },
       });
       const fileID = imageFileIDFromCompleted(stream.completedData);
       if (fileID) {
+        streamState.status = "正在加载图片";
+        onProgress?.({ imageSource: streamState.imageSource, status: streamState.status });
         streamState.imageSource = await this.downloadMessageImage(fileID).catch(() => streamState.imageSource);
       }
+      const assistantMessage = (stream.completedData as CompletedPayload)?.assistantMessage;
       return {
-        assistantMessage: (stream.completedData as CompletedPayload)?.assistantMessage,
+        assistantMessage,
         imageFileID: fileID || undefined,
         imageSource: streamState.imageSource,
-        status: streamState.imageSource
-          ? editing ? "图片编辑完成" : "图片生成完成"
-          : `${streamState.status}，但没有收到可显示的图片`,
+        status: imageTaskTerminalStatus(
+          task,
+          Boolean(streamState.imageSource),
+          assistantMessage?.status,
+          streamState.status,
+          assistantMessage?.errorMessage,
+        ),
         userMessage: (stream.completedData as CompletedPayload)?.userMessage,
       };
     } catch (error) {
       if (this.abortRequested) {
         throw new MiniAppRequestAbortedError();
       }
-      throw error;
+      const fallback = error instanceof Error ? error.message : editing ? "图片编辑失败，请重试" : "图片生成失败，请重试";
+      const messages = await this.listMessages(conversation.publicID).catch(() => []);
+      throw new Error(imageFailureMessageForRun(messages, clientRunID, fallback));
     } finally {
       this.finishRun(clientRunID);
     }
@@ -487,12 +499,17 @@ export class MiniAppSession {
 
   async resumeGeneration(
     runID: string,
-    initial: Pick<ResumeGenerationProgress, "imageSource" | "processTrace" | "text">,
+    initial: Pick<ResumeGenerationProgress, "imageSource" | "imageTask" | "processTrace" | "text">,
     onProgress: (progress: ResumeGenerationProgress) => void,
   ): Promise<ResumeGenerationProgress> {
     await this.ensureAccessToken();
     const normalizedRunID = runID.trim();
-    let streamState = emptyConversationStreamState(initial.text, initial.imageSource, initial.processTrace);
+    let streamState = emptyConversationStreamState(
+      initial.text,
+      initial.imageSource,
+      initial.processTrace,
+      initial.imageTask,
+    );
     const consumeEvent = (event: StreamEvent) => {
       streamState = applyConversationStreamEvent(streamState, event);
       onProgress(streamState);
@@ -509,11 +526,21 @@ export class MiniAppSession {
         }),
         onEvent: consumeEvent,
         onInterrupted: () => {
-          streamState.status = this.appForeground ? "连接被微信中断，正在恢复" : "返回小程序后继续接收";
+          streamState.status = this.appForeground
+            ? streamState.imageTask === "image_edit"
+              ? "连接被微信中断，正在恢复图片编辑进度"
+              : streamState.imageTask === "image_generation"
+                ? "连接被微信中断，正在恢复图片生成进度"
+                : "连接被微信中断，正在恢复"
+            : "返回小程序后继续接收";
           onProgress(streamState);
         },
         onResuming: () => {
-          streamState.status = "正在恢复生成进度";
+          streamState.status = streamState.imageTask === "image_edit"
+            ? "正在恢复图片编辑进度"
+            : streamState.imageTask === "image_generation"
+              ? "正在恢复图片生成进度"
+              : "正在恢复生成进度";
           onProgress(streamState);
         },
       });

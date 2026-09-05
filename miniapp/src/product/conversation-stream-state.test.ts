@@ -29,6 +29,56 @@ test("image stream preserves web media status and preview events", () => {
   assert.equal(state.lastSeq, 4);
 });
 
+test("image stream localizes backend media stages instead of exposing English provider text", () => {
+  let state = emptyConversationStreamState("", null, undefined, "image_generation");
+
+  state = applyConversationStreamEvent(state, {
+    type: "media_status",
+    status: "queued",
+    message: "Queued",
+  });
+  assert.equal(state.status, "图片任务排队中");
+
+  state = applyConversationStreamEvent(state, {
+    type: "media_status",
+    status: "running",
+    message: "Generating",
+  });
+  assert.equal(state.status, "AI 正在生成图片");
+
+  state = applyConversationStreamEvent(state, {
+    type: "media_status",
+    status: "saving_artifact",
+    message: "Saving",
+  });
+  assert.equal(state.status, "正在保存图片");
+});
+
+test("image editing keeps edit-specific wording throughout media progress", () => {
+  let state = emptyConversationStreamState("", null, undefined, "image_edit");
+
+  state = applyConversationStreamEvent(state, {
+    type: "media_status",
+    status: "queued",
+    message: "Queued",
+  });
+  assert.equal(state.status, "图片编辑任务排队中");
+
+  state = applyConversationStreamEvent(state, {
+    type: "media_status",
+    status: "running",
+    message: "Generating",
+  });
+  assert.equal(state.status, "AI 正在编辑图片");
+
+  state = applyConversationStreamEvent(state, {
+    type: "media_status",
+    status: "provider-specific-stage",
+    message: "Enhancing",
+  });
+  assert.equal(state.status, "正在处理图片");
+});
+
 test("chat stream exposes a real Exa search only after the backend tool trace starts", () => {
   let state = applyConversationStreamEvent(emptyConversationStreamState(), {
     type: "process_update",

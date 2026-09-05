@@ -136,6 +136,16 @@ function chatGenerationFailureText(currentText: string, stopped: boolean): strin
     : "回复失败，请重试";
 }
 
+function imageLoadingPhaseClass(status: string | undefined): string {
+  if (status?.includes("排队")) {
+    return "imageLoadingFrameQueued";
+  }
+  if (status?.includes("保存") || status?.includes("加载")) {
+    return "imageLoadingFrameSaving";
+  }
+  return "imageLoadingFrameRunning";
+}
+
 type PendingImage = {
   fileID: string;
   fileName: string;
@@ -213,7 +223,6 @@ export default function HomePage() {
   const [isDailyCheckinClaiming, setIsDailyCheckinClaiming] = useState(false);
   const [showDailyCheckinResult, setShowDailyCheckinResult] = useState(false);
   const [dailyCheckinRotation, setDailyCheckinRotation] = useState(0);
-  const [created, setCreated] = useState(false);
   const [presets, setPresets] = useState<Presets | null>(null);
   const [models, setModels] = useState<PublicModelResponse[]>([]);
   const [selectedChatModel, setSelectedChatModel] = useState<PublicModelResponse | null>(null);
@@ -295,6 +304,12 @@ export default function HomePage() {
     enableChatAutoFollow();
   }, [enableChatAutoFollow]);
 
+  const handleConversationImageLoad = useCallback(() => {
+    if (chatAutoFollowRef.current) {
+      setChatScrollTop(nextChatBottomScrollTop);
+    }
+  }, []);
+
   const applyDailyCheckinStatus = useCallback((status: DailyCheckinStatusResponse | null) => {
     setDailyCheckin(status);
     setShowDailyCheckinResult(Boolean(status?.claimed));
@@ -327,7 +342,6 @@ export default function HomePage() {
       setUser(result.user);
       setBalanceUSD(result.account?.balanceUSD ?? null);
       applyDailyCheckinStatus(result.dailyCheckin);
-      setCreated(result.created);
       setPresets(result.presets);
       setModels(result.models);
       setNetworkSearchAvailable(result.networkSearchAvailable);
@@ -396,7 +410,7 @@ export default function HomePage() {
   }, [bootstrap, clearDailyCheckinRevealTimer]);
 
   useEffect(() => {
-    if (screen === "chat" && chatAutoFollowRef.current) {
+    if ((screen === "chat" || screen === "image") && chatAutoFollowRef.current) {
       setChatScrollTop(nextChatBottomScrollTop);
     }
   }, [messages, screen]);
@@ -800,9 +814,7 @@ export default function HomePage() {
     }
     const historyLoadID = ++historyLoadCounter.current;
     let resolvedMode = mode ?? session.conversationMode(conversation);
-    if (resolvedMode === "chat") {
-      enableChatAutoFollow(true);
-    }
+    enableChatAutoFollow(true);
     if (resolvedMode === "chat") {
       setSelectedChatModel(resolveSelectedModel(
         models,
@@ -884,6 +896,8 @@ export default function HomePage() {
       if (!pending?.runID || historyLoadCounter.current !== historyLoadID) {
         return;
       }
+      const pendingIndex = timeline.findIndex((item) => item.id === pending.id);
+      const pendingParent = timeline.slice(0, pendingIndex).reverse().find((item) => item.role === "user");
       setRunning(true);
       setStopping(false);
       try {
@@ -891,6 +905,9 @@ export default function HomePage() {
           pending.runID,
           {
             imageSource: pending.imageSource ?? null,
+            imageTask: resolvedMode === "image"
+              ? pendingParent?.imageFileID ? "image_edit" : "image_generation"
+              : undefined,
             processTrace: pending.processTrace,
             text: pending.text,
           },
@@ -921,7 +938,9 @@ export default function HomePage() {
             ? applyImageProgress(message, {
                 imageSource: resumed.imageSource,
                 pending: false,
-                status: resumed.imageSource ? "图片生成完成" : resumed.status,
+                status: resumed.imageSource
+                  ? resumed.imageTask === "image_edit" ? "图片编辑完成" : "图片生成完成"
+                  : resumed.status,
               })
             : {
                 ...message,
@@ -968,8 +987,8 @@ export default function HomePage() {
       setPrompt("");
       setPendingImage(null);
       setCurrentConversation(conversation);
+      enableChatAutoFollow(true);
       if (mode === "chat") {
-        enableChatAutoFollow(true);
         setSelectedChatModel(model);
       } else {
         setSelectedImageModel(model);
@@ -1223,6 +1242,7 @@ export default function HomePage() {
     const userID = `local-image-user-${messageCounter.current}`;
     messageCounter.current += 1;
     const assistantID = `local-image-assistant-${messageCounter.current}`;
+    enableChatAutoFollow(true);
     setMessages((items) => [
       ...items,
       ...createPendingImageTurn(
@@ -1230,7 +1250,7 @@ export default function HomePage() {
         userID,
         assistantID,
         attachment?.localPath,
-        decision.task === "image_edit" ? "正在编辑图片" : "正在生成图片",
+        decision.task === "image_edit" ? "AI 正在编辑图片" : "AI 正在生成图片",
       ),
     ]);
     setPrompt("");
@@ -1273,15 +1293,16 @@ export default function HomePage() {
       }
     } catch (error) {
       const stopped = error instanceof MiniAppRequestAbortedError;
+      const failureMessage = error instanceof Error && error.message.trim()
+        ? error.message.trim()
+        : "图片生成失败，请重试";
       setMessages((items) => items.map((item) => item.id === assistantID
         ? applyImageProgress(item, {
             pending: false,
-            status: stopped ? "本次图片生成已停止" : "图片生成失败，请重试",
+            status: stopped ? "本次图片生成已停止" : failureMessage,
           })
         : item));
-      if (!stopped) {
-        setWorkspaceError(error instanceof Error ? error.message : "图片生成失败，请重试");
-      }
+      setWorkspaceError("");
       if (attachment) {
         setPendingImage((current) => current ?? attachment);
       }
@@ -1579,11 +1600,12 @@ export default function HomePage() {
     messageCounter.current += 1;
     const pendingID = `local-image-retry-${messageCounter.current}`;
     setSelectedImageModel(model);
+    enableChatAutoFollow(true);
     setMessages([
       ...messages.slice(0, sourceIndex),
       {
         id: pendingID,
-        imageStatus: editing ? "正在重新编辑图片" : "正在重新生成图片",
+        imageStatus: editing ? "AI 正在编辑图片" : "AI 正在生成图片",
         parentPublicID: parentUser.id,
         pending: true,
         role: "assistant",
@@ -2104,7 +2126,9 @@ export default function HomePage() {
                 <View id={`message-${message.id}`} className={`message message-${message.role}`} key={message.id}>
                   <Text className="messageAuthor">{message.role === "user" ? "你" : "AI"}</Text>
                   <View className="messageContent">
-                    {message.imageSource ? <Image className="messageImage" src={message.imageSource} mode="widthFix" /> : null}
+                    {message.imageSource ? (
+                      <Image className="messageImage" src={message.imageSource} mode="widthFix" onLoad={handleConversationImageLoad} />
+                    ) : null}
                     {message.role === "assistant" ? (
                       <ConversationTrace trace={message.processTrace} pending={Boolean(message.pending)} />
                     ) : null}
@@ -2132,13 +2156,22 @@ export default function HomePage() {
             ) : null}
           </View>
         ) : (
-          <ScrollView
-            className="imageCanvas"
-            scrollY
-            enhanced
-            showScrollbar={false}
-            scrollIntoView={messages.length ? `message-${messages.at(-1)?.id}` : undefined}
-          >
+          <View className="messageListShell">
+            <ScrollView
+              className="imageCanvas"
+              scrollY
+              enhanced
+              bounces={false}
+              lowerThreshold={80}
+              scrollAnchoring
+              showScrollbar={false}
+              scrollTop={chatScrollTop}
+              onScroll={handleChatScroll}
+              onScrollToLower={handleChatScrollToLower}
+              onTouchStart={() => { chatTouchingRef.current = true; }}
+              onTouchEnd={() => { chatTouchingRef.current = false; }}
+              onTouchCancel={() => { chatTouchingRef.current = false; }}
+            >
             {messages.length === 0 ? (
               <View className="emptyWorkspace imageEmpty">
                 <Text className="emptyIcon">◈</Text>
@@ -2154,6 +2187,7 @@ export default function HomePage() {
                       className="messageImage"
                       src={message.imageSource}
                       mode="widthFix"
+                      onLoad={handleConversationImageLoad}
                       onClick={() => void previewImage(message.imageSource)}
                     />
                   ) : null}
@@ -2165,13 +2199,14 @@ export default function HomePage() {
                 <Text className="messageAuthor">AI</Text>
                 {message.pending || (!message.imageSource && Boolean(message.imageFileID)) ? (
                   <View className="imageLoadingCard">
-                    <View className="imageLoadingStatus">
-                      <View className="imageSpinner" />
-                      <Text>{message.imageStatus || "正在生成图片"}</Text>
-                    </View>
-                    <View className="imageLoadingFrame">
-                      <View className="imageLoadingGlow" />
-                      <Text className="imageLoadingMark">AI</Text>
+                    <View className={`imageLoadingFrame ${imageLoadingPhaseClass(message.imageStatus)}`}>
+                      <View className="imageLoadingGlow imageLoadingGlowPrimary" />
+                      <View className="imageLoadingGlow imageLoadingGlowSecondary" />
+                      <View className="imageLoadingOrbit" />
+                      <View className="imageLoadingContent">
+                        <View className="imageSpinner" />
+                        <Text className="imageLoadingLabel">{message.imageStatus || "AI 正在生成图片"}</Text>
+                      </View>
                     </View>
                   </View>
                 ) : message.imageSource ? (
@@ -2180,6 +2215,7 @@ export default function HomePage() {
                       className="generatedImage"
                       src={message.imageSource}
                       mode="widthFix"
+                      onLoad={handleConversationImageLoad}
                       onClick={() => void previewImage(message.imageSource)}
                     />
                     <Text className="imageStatus">{message.imageStatus || "图片生成完成"}</Text>
@@ -2197,12 +2233,25 @@ export default function HomePage() {
                   </View>
                 ) : (
                   <View className="imageResultStatus">
-                    <Text>{message.imageStatus || message.text || "未收到可显示的图片"}</Text>
+                    <Text className="imageResultStatusText">{message.imageStatus || message.text || "未收到可显示的图片"}</Text>
+                    {message.parentPublicID && !message.id.startsWith("local-") ? (
+                      <View className="imageResultActions">
+                        <Button className="imageActionButton" disabled={running} onClick={() => void regenerateImageAnswer(message)}>
+                          重试
+                        </Button>
+                      </View>
+                    ) : null}
                   </View>
                 )}
               </View>
-            ))}
-          </ScrollView>
+              ))}
+            </ScrollView>
+            {!chatAutoFollow && messages.length > 0 ? (
+              <View className="scrollToBottomButton" onClick={() => enableChatAutoFollow(true)}>
+                <Text>↓</Text>
+              </View>
+            ) : null}
+          </View>
         )}
         {workspaceError ? <Text className="errorBanner workspaceError">{workspaceError}</Text> : null}
         <View className="composerSafeArea" style={composerKeyboardStyle(keyboardHeight)}>
@@ -2317,21 +2366,12 @@ export default function HomePage() {
   return (
     <View className="page homePage">
       <View className="homeHeader">
-        <View>
-          <Text className="eyebrow">AI省着用</Text>
-          <Text className="homeTitle">今天想做什么？</Text>
-          <Text className="welcome">{created ? "欢迎第一次来到这里" : `你好，${user.displayName || "朋友"}`}</Text>
-          <Text className="accountSummary" onClick={openAccountCenter}>
-            {user.subscriptionPlanName || user.subscriptionTier || "标准账户"}
-            {balanceUSD === null ? "" : ` · 余额 ${formatUSD(balanceUSD)}`} · 查看账户 ›
-          </Text>
-          <Text className="versionNote">当前版本 {MINIAPP_BUILD_VERSION}</Text>
-        </View>
+        <Text className="eyebrow">AI省着用</Text>
         <View className="avatar" onClick={openAccountCenter}>
           <Text>{(user.displayName || "友").slice(0, 1)}</Text>
-          <Text className="avatarBadge">我的</Text>
         </View>
       </View>
+      <Text className="homeTitle">今天想做什么？</Text>
 
       {dailyCheckin?.enabled ? (
         <DailyCheckinEntry
@@ -2409,6 +2449,7 @@ export default function HomePage() {
         <Text onClick={openPrivacy}>隐私保护指引</Text>
         <Text onClick={openTermsNotice}>用户协议</Text>
       </View>
+      <Text className="versionNote">版本 {MINIAPP_BUILD_VERSION}</Text>
       {shareOverlay}
     </View>
   );

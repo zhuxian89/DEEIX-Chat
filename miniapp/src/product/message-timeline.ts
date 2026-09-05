@@ -65,10 +65,12 @@ export function messageFromAPI(message: MessageResponse | PublicSharedMessageRes
   const text = message.content.trim();
   const attachment = imageAttachment(message.attachments);
   const imageFileID = typeof attachment?.file_id === "string" ? attachment.file_id.trim() : "";
-  const pending = message.role === "assistant" && message.status.trim().toLowerCase() === "pending";
+  const status = message.status.trim().toLowerCase();
+  const pending = message.role === "assistant" && status === "pending";
   const contentType = message.contentType.trim().toLowerCase();
   const imageMessage = contentType === "image" || Boolean(imageFileID);
-  if (!text && !imageFileID && !pending) {
+  const failedImageMessage = message.role === "assistant" && imageMessage && ["canceled", "error", "interrupted"].includes(status);
+  if (!text && !imageFileID && !pending && !failedImageMessage) {
     return null;
   }
   return {
@@ -77,7 +79,15 @@ export function messageFromAPI(message: MessageResponse | PublicSharedMessageRes
     id: message.publicID || ("id" in message ? String(message.id) : ""),
     contentType,
     imageFileID: imageFileID || undefined,
-    imageStatus: imageFileID ? "图片生成完成" : pending && imageMessage ? "正在生成图片" : undefined,
+    imageStatus: imageFileID
+      ? "正在加载图片"
+      : pending && imageMessage
+        ? "AI 正在生成图片"
+        : failedImageMessage
+          ? status === "canceled"
+            ? "本次图片生成已停止"
+            : message.errorMessage.trim() || "图片生成失败，请重试"
+          : undefined,
     modelName: message.platformModelName.trim() || undefined,
     pending,
     parentPublicID: message.parentPublicID.trim() || undefined,
@@ -133,7 +143,7 @@ export function createPendingImageTurn(
   userID: string,
   assistantID: string,
   inputImageSource?: string,
-  pendingStatus = "正在生成图片",
+  pendingStatus = "AI 正在生成图片",
 ): ConversationMessage[] {
   return [
     { id: userID, imageSource: inputImageSource, role: "user", text: prompt },

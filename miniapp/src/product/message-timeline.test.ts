@@ -60,7 +60,23 @@ test("historical image-only assistant messages remain visible", () => {
 
   assert.ok(message);
   assert.equal(message.imageFileID, "file-image-1");
-  assert.equal(message.imageStatus, "图片生成完成");
+  assert.equal(message.imageStatus, "正在加载图片");
+});
+
+test("failed persisted image messages remain visible so the Web-compatible retry branch is available", () => {
+  const upstreamError = "非常抱歉，生成的图片可能违反了关于轻度性暗示或挑逗性主题的防护限制。";
+  const message = messageFromAPI(serverMessage({
+    contentType: "image",
+    errorMessage: upstreamError,
+    parentPublicID: "user-image-1",
+    status: "error",
+  }));
+
+  assert.ok(message);
+  assert.equal(message.id, "assistant-image-1");
+  assert.equal(message.imageStatus, upstreamError);
+  assert.equal(message.parentPublicID, "user-image-1");
+  assert.equal(message.pending, false);
 });
 
 test("image generation creates a visible pending turn before the network completes", () => {
@@ -69,7 +85,7 @@ test("image generation creates a visible pending turn before the network complet
   assert.equal(turn.length, 2);
   assert.deepEqual(turn.map((item) => item.role), ["user", "assistant"]);
   assert.equal(turn[0]?.text, "雨后的未来城市");
-  assert.equal(turn[1]?.imageStatus, "正在生成图片");
+  assert.equal(turn[1]?.imageStatus, "AI 正在生成图片");
   assert.equal(turn[1]?.pending, true);
 });
 
@@ -103,7 +119,7 @@ test("pending history preserves the backend run ID for web-compatible resume", (
   assert.ok(message);
   assert.equal(message.runID, "run_resume_1");
   assert.equal(message.pending, true);
-  assert.equal(message.imageStatus, "正在生成图片");
+  assert.equal(message.imageStatus, "AI 正在生成图片");
 });
 
 test("pending chat history is not mislabeled as image generation", () => {

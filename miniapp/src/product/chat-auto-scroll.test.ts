@@ -21,14 +21,16 @@ test("each streaming update retriggers the proven high scrollTop target", () => 
   assert.equal(third, 999_999);
 });
 
-test("chat uses numeric scrolling and disables iOS boundary bounce", () => {
+test("chat and image workspaces share numeric auto-follow and image load settlement", () => {
   const source = readFileSync(
     resolve(process.cwd(), "src/pages/index/index.tsx"),
     "utf8",
   );
 
-  assert.match(source, /scrollTop=\{chatScrollTop\}/u);
-  assert.match(source, /scrollAnchoring/u);
-  assert.match(source, /bounces=\{false\}/u);
-  assert.doesNotMatch(source, /scrollIntoView=\{chatAutoFollow/u);
+  assert.equal(source.match(/scrollTop=\{chatScrollTop\}/gu)?.length, 2);
+  assert.equal(source.match(/scrollAnchoring/gu)?.length, 2);
+  assert.equal(source.match(/bounces=\{false\}/gu)?.length, 2);
+  assert.match(source, /\(screen === "chat" \|\| screen === "image"\) && chatAutoFollowRef\.current/u);
+  assert.ok((source.match(/onLoad=\{handleConversationImageLoad\}/gu)?.length ?? 0) >= 2);
+  assert.doesNotMatch(source, /scrollIntoView=/u);
 });

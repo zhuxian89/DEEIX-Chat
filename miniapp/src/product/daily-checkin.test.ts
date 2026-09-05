@@ -18,22 +18,22 @@ const prizes = [
   { prizeKey: "calls_200", calls: 200, weightBps: 100 },
 ];
 
-test("daily check-in wheel sizes match configured probabilities", () => {
+test("daily check-in wheel gives every configured prize a readable equal segment", () => {
   const segments = wheelSegments(prizes);
-  assert.deepEqual(
-    segments.map(({ startPercent, endPercent }) => [startPercent, endPercent]),
-    [[0, 35], [35, 65], [65, 85], [85, 95], [95, 99], [99, 100]],
-  );
-  assert.match(wheelGradient(prizes), /#ff9f43 0% 35%/u);
-  assert.match(wheelGradient(prizes), /#ffd15c 99% 100%/u);
+  for (const [index, segment] of segments.entries()) {
+    assert.ok(Math.abs(segment.startPercent - index / prizes.length * 100) < 0.00001);
+    assert.ok(Math.abs(segment.endPercent - (index + 1) / prizes.length * 100) < 0.00001);
+  }
+  assert.match(wheelGradient(prizes), /#ff9f43 0% 16\.666666666666664%/u);
+  assert.match(wheelGradient(prizes), /#ffd15c 83\.33333333333334% 100%/u);
   assert.doesNotMatch(wheelGradient(prizes), /from -90deg/u);
 });
 
 test("daily check-in labels use the same segment midpoint as the wheel", () => {
   const [firstSegment] = wheelSegments(prizes);
   const position = wheelLabelPosition(firstSegment);
-  assert.ok(Math.abs(Number.parseFloat(position.left) - 76.7301957257) < 0.00001);
-  assert.ok(Math.abs(Number.parseFloat(position.top) - 36.3802850078) < 0.00001);
+  assert.ok(Math.abs(Number.parseFloat(position.left) - 65) < 0.00001);
+  assert.ok(Math.abs(Number.parseFloat(position.top) - 24.0192378865) < 0.00001);
 });
 
 test("daily check-in advances several turns and lands the selected prize under the pointer", () => {
@@ -72,4 +72,25 @@ test("home only shows a compact check-in entry and opens the full wheel as a sec
   assert.ok(wheelIndex > checkinScreenIndex && wheelIndex < homeIndex);
   assert.match(homeSource, /<DailyCheckinEntry/u);
   assert.doesNotMatch(homeSource, /<DailyCheckinWheel/u);
+});
+
+test("home check-in entry animates only while today's reward is unclaimed", () => {
+  const componentSource = readFileSync(
+    resolve(process.cwd(), "src/components/daily-checkin-wheel.tsx"),
+    "utf8",
+  );
+  const styleSource = readFileSync(resolve(process.cwd(), "src/pages/index/index.scss"), "utf8");
+
+  assert.match(componentSource, /status\.claimed \? "checkinEntryClaimed" : "checkinEntryPending"/u);
+  assert.match(componentSource, /status\.claimed \? null : \([\s\S]*checkinEntryGlow[\s\S]*checkinEntryShimmer/u);
+  assert.match(styleSource, /\.checkinEntryPending[\s\S]*animation:\s*checkinEntryGradient/u);
+  assert.match(styleSource, /@keyframes checkinEntryShimmer/u);
+  assert.match(styleSource, /@media \(prefers-reduced-motion:\s*reduce\)/u);
+});
+
+test("daily check-in wheel center triggers the same guarded claim action as the button", () => {
+  const source = readFileSync(resolve(process.cwd(), "src/components/daily-checkin-wheel.tsx"), "utf8");
+  assert.match(source, /wheelCenterClaimed/u);
+  assert.match(source, /className=\{`wheelCenter[\s\S]*onClick=\{onClaim\}/u);
+  assert.match(source, /className="checkinButton"[\s\S]*onClick=\{onClaim\}/u);
 });
