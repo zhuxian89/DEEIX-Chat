@@ -815,7 +815,14 @@ page {
   width: 62px;
   z-index: 20;
 }
-.imageCanvas { height: 100%; padding: 0 2px 24px; }
+// Match Web: image height changes must not trigger native scroll anchoring.
+.imageCanvasShell { height: 0; overflow: hidden; }
+// Keep the native viewport inside the flex allocation above the composer.
+// One content block includes every image and its actions in the scroll extent.
+.imageCanvas { height: 100%; left: 0; overflow-anchor: none; position: absolute; top: 0; width: 100%; }
+.imageCanvasContent { box-sizing: border-box; display: flex; flex-direction: column; min-height: 100%; padding: 0 2px 24px; }
+.imageCanvasContent > view { flex-shrink: 0; }
+.imageCanvasContent > .imageEmpty { flex: 1; min-height: 320px; }
 .message {
   align-items: flex-start;
   display: flex;

@@ -2156,14 +2156,15 @@ export default function HomePage() {
             ) : null}
           </View>
         ) : (
-          <View className="messageListShell">
+          <View className="messageListShell imageCanvasShell">
             <ScrollView
               className="imageCanvas"
               scrollY
               enhanced
               bounces={false}
               lowerThreshold={80}
-              scrollAnchoring
+              scrollAnchoring={false}
+              scrollWithAnimation={false}
               showScrollbar={false}
               scrollTop={chatScrollTop}
               onScroll={handleChatScroll}
@@ -2172,6 +2173,7 @@ export default function HomePage() {
               onTouchEnd={() => { chatTouchingRef.current = false; }}
               onTouchCancel={() => { chatTouchingRef.current = false; }}
             >
+            <View className="imageCanvasContent">
             {messages.length === 0 ? (
               <View className="emptyWorkspace imageEmpty">
                 <Text className="emptyIcon">◈</Text>
@@ -2245,12 +2247,17 @@ export default function HomePage() {
                 )}
               </View>
               ))}
+            </View>
             </ScrollView>
-            {!chatAutoFollow && messages.length > 0 ? (
-              <View className="scrollToBottomButton" onClick={() => enableChatAutoFollow(true)}>
-                <Text>↓</Text>
-              </View>
-            ) : null}
+            {/* Keep this sibling mounted: removing it resends the native image
+                scroll-view subtree, including its previous scrollTop target. */}
+            <View
+              className="scrollToBottomButton"
+              style={{ display: !chatAutoFollow && messages.length > 0 ? "flex" : "none" }}
+              onClick={() => enableChatAutoFollow(true)}
+            >
+              <Text>↓</Text>
+            </View>
           </View>
         )}
         {workspaceError ? <Text className="errorBanner workspaceError">{workspaceError}</Text> : null}
