@@ -1721,7 +1721,7 @@ export default function HomePage() {
 
   if (screen === "checkin") {
     return (
-      <ScrollView className="checkinPage" scrollY enhanced showScrollbar={false}>
+      <ScrollView className="checkinPage" scrollY enhanced bounces={false} showScrollbar={false}>
         <Header title="每日签到" onBack={() => setScreen("home")} />
         {dailyCheckin?.enabled ? (
           <DailyCheckinWheel
@@ -1812,7 +1812,7 @@ export default function HomePage() {
             onClick={() => setHistoryFavoritesOnly(true)}
           >★ 我的收藏</View>
         </View>
-        <ScrollView className="historyResults" scrollY enhanced showScrollbar={false}>
+        <ScrollView className="historyResults" scrollY enhanced bounces={false} showScrollbar={false}>
           {historyContent}
           {workspaceError ? <Text className="errorBanner historyError">{workspaceError}</Text> : null}
         </ScrollView>
@@ -1854,7 +1854,7 @@ export default function HomePage() {
       );
     }
     return (
-      <ScrollView className="memoryPage" scrollY enhanced showScrollbar={false}>
+      <ScrollView className="memoryPage" scrollY enhanced bounces={false} showScrollbar={false}>
         <Header title="AI 偏好记忆" onBack={() => setScreen("account")} />
         <View className="memoryHero">
           <Text className="memoryHeroIcon">✦</Text>
@@ -1927,7 +1927,7 @@ export default function HomePage() {
     return (
       <View className="sharedPage">
         <Header title="好友分享" onBack={() => { setPreparedShare(null); setScreen("home"); }} />
-        <ScrollView className="sharedContent" scrollY enhanced showScrollbar={false}>
+        <ScrollView className="sharedContent" scrollY enhanced bounces={false} showScrollbar={false}>
           {sharedContent}
           {workspaceError ? <Text className="errorBanner sharedError">{workspaceError}</Text> : null}
         </ScrollView>
@@ -1949,7 +1949,7 @@ export default function HomePage() {
         ? "已取消"
         : user.subscriptionStatus || "正常";
     return (
-      <ScrollView className="accountPage" scrollY enhanced showScrollbar={false}>
+      <ScrollView className="accountPage" scrollY enhanced bounces={false} showScrollbar={false}>
         <Header title="我的账户" onBack={() => setScreen("home")} />
         <View className="accountHero">
           <View className="accountAvatar">{(user.displayName || "友").slice(0, 1)}</View>
@@ -2107,7 +2107,8 @@ export default function HomePage() {
               enhanced
               bounces={false}
               lowerThreshold={80}
-              scrollAnchoring
+              scrollAnchoring={false}
+              scrollWithAnimation={false}
               showScrollbar={false}
               scrollTop={chatScrollTop}
               onScroll={handleChatScroll}
@@ -2149,11 +2150,14 @@ export default function HomePage() {
                 </View>
               ))}
             </ScrollView>
-            {!chatAutoFollow && messages.length > 0 ? (
-              <View className="scrollToBottomButton" onClick={() => enableChatAutoFollow(true)}>
-                <Text>↓</Text>
-              </View>
-            ) : null}
+            {/* Keep sibling visibility changes from resending the native list. */}
+            <View
+              className="scrollToBottomButton"
+              style={{ display: !chatAutoFollow && messages.length > 0 ? "flex" : "none" }}
+              onClick={() => enableChatAutoFollow(true)}
+            >
+              <Text>↓</Text>
+            </View>
           </View>
         ) : (
           <View className="messageListShell imageCanvasShell">
@@ -2513,7 +2517,7 @@ function ModelPickerSheet({
           </View>
           <Text className="modelPickerClose" onClick={onClose}>×</Text>
         </View>
-        <ScrollView className="modelPickerList" scrollY enhanced showScrollbar={false}>
+        <ScrollView className="modelPickerList" scrollY enhanced bounces={false} showScrollbar={false}>
           {options.map((model) => {
             const selected = model.platformModelName === selectedName;
             return (

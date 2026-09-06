@@ -797,7 +797,7 @@ page {
 .messageList,
 .imageCanvas { box-sizing: border-box; flex: 1; min-height: 0; }
 .messageListShell { flex: 1; min-height: 0; position: relative; }
-.messageList { height: 100%; }
+.messageList { height: 100%; overflow-anchor: none; }
 .scrollToBottomButton {
   align-items: center;
   background: rgba(255,255,255,.96);

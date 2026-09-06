@@ -127,7 +127,7 @@ if ($LASTEXITCODE -ne 0) { throw '微信 CLI 上传失败' }
 
 根因证据来自当前安装的 Taro 4.2.1 运行时：图片滚动区域旁边的“回到底部”按钮采用条件渲染，自动跟随状态变化时会增删这个兄弟节点。实际页面 JSX 经 Taro 渲染后，按钮删除产生了 `root.cn.[0].cn` 整段更新，其中重新包含图片和之前的 `scrollTop=999999`。只看 React 的组件标识、源码中的 `bounces={false}` 或布局属性，无法发现这次原生数据重发。
 
-修复保留按钮节点，只切换 `display`。运行时回归检查覆盖按钮反复显示和隐藏，要求 `setData` 仅更新按钮属性，不重发图片子树和旧滚动目标；维护入口是 `src/product/chat-auto-scroll.test.ts` 的 `manual image scrolling only updates the bottom button, not the native image subtree`。
+修复保留按钮节点，只切换 `display`。运行时回归检查覆盖文字与生图对话的按钮反复显示和隐藏，要求 `setData` 仅更新按钮属性，不重发消息子树和旧滚动目标；维护入口是 `src/product/chat-auto-scroll.test.ts` 的 `manual chat/image scrolling only updates the bottom button, not the native message subtree`。同文件还检查所有 `ScrollView` 显式关闭原生边界弹性，以及两类对话关闭滚动锚定和程序滚动动画。
 
 以后遇到同类闪动或跳位，按以下顺序排查：
 
