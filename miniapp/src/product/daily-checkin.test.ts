@@ -65,10 +65,11 @@ test("home only shows a compact check-in entry and opens the full wheel as a sec
   const source = readFileSync(resolve(process.cwd(), "src/pages/index/index.tsx"), "utf8");
   const checkinScreenIndex = source.indexOf('if (screen === "checkin")');
   const wheelIndex = source.indexOf("<DailyCheckinWheel");
-  const homeIndex = source.lastIndexOf('<View className="page homePage">');
+  const homeIndex = source.lastIndexOf('<View className="page homePage"');
   const homeSource = source.slice(homeIndex);
 
   assert.ok(checkinScreenIndex >= 0);
+  assert.ok(homeIndex >= 0);
   assert.ok(wheelIndex > checkinScreenIndex && wheelIndex < homeIndex);
   assert.match(homeSource, /<DailyCheckinEntry/u);
   assert.doesNotMatch(homeSource, /<DailyCheckinWheel/u);

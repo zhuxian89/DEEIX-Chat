@@ -649,6 +649,30 @@ export interface CodeResponse {
   usedByUserID: number;
 }
 
+export interface CompanionChatRequest {
+  branchReason?: "default" | "retry" | "edit";
+  /** @maxLength 64 */
+  clientRunID?: string;
+  content: string;
+  contentType: "text" | "markdown" | "image" | "file" | "mixed";
+  /** @maxItems 20 */
+  fileIDs?: string[];
+  htmlVisualPrompt?: boolean;
+  /** @maxItems 8 */
+  knowledgeBaseIDs: string[];
+  /** @maxLength 128 */
+  model?: string;
+  options?: Record<string, any>;
+  /** @maxLength 32 */
+  parentMessagePublicID?: string;
+  /** @maxItems 128 */
+  selectedToolIDs?: number[];
+  /** @maxItems 128 */
+  skillIDs?: number[];
+  /** @maxLength 32 */
+  sourceMessagePublicID?: string;
+}
+
 export interface ContentModerationCategoryCatalogResponse {
   image: string[];
   text: string[];
@@ -1433,6 +1457,11 @@ export interface DeleteUserResponseDoc {
   errorMsg: string;
 }
 
+export interface EditMemoryRequest {
+  /** @maxLength 120 */
+  value: string;
+}
+
 export interface EmailRegistrationCompleteRequest {
   code?: string;
   /** @maxLength 128 */
@@ -1956,6 +1985,15 @@ export interface MediaVideoExtensionRequest {
   sourceMessagePublicID?: string;
   /** @maxLength 128 */
   sourceVideoFileID: string;
+}
+
+export interface Memory {
+  evidence: string;
+  expiresAt: string;
+  id: string;
+  key: string;
+  updatedAt: string;
+  value: string;
 }
 
 export interface MemoryErrorDoc {
@@ -2490,6 +2528,10 @@ export interface NativeToolPricingResponse {
   unit: string;
 }
 
+export interface OpenRequest {
+  allowGreeting: boolean;
+}
+
 export interface OpenRouterOfficialPricingDataResponse {
   cached: boolean;
   fetchedAt: string;
@@ -2798,6 +2840,10 @@ export interface PlatformFileDeleteResponseDoc {
   errorMsg: string;
 }
 
+export interface PreferencesRequest {
+  quiet: boolean;
+}
+
 export interface PromptPresetDataResponse {
   promptPreset: PromptPresetResponse;
 }
@@ -2983,6 +3029,10 @@ export interface PublicSharedMessageResponse {
   tokenUsage: number;
   updatedAt: string;
   upstreamModelName: string;
+}
+
+export interface ReadRequest {
+  messageID: number;
 }
 
 export interface RedeemCodeRequest {
@@ -3447,6 +3497,23 @@ export interface SkillSummaryResponse {
   title: string;
   trigger: string;
   updatedAt: string;
+}
+
+export interface State {
+  conversationPublicID: string;
+  greeting: string;
+  greetingAt: string;
+  greetingID: string;
+  greetingOffered: boolean;
+  memories: Memory[];
+  model: string;
+  name: string;
+  quiet: boolean;
+}
+
+export interface StateResponse {
+  data: State;
+  errorMsg: string;
 }
 
 export interface StorageQuotaResponse {
@@ -8230,6 +8297,147 @@ export namespace Branding {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = BrandingManifestResponse;
+  }
+}
+
+export namespace Companion {
+  /**
+   * No description
+   * @tags companion
+   * @name CompanionList
+   * @summary 获取固定助手及专属记忆
+   * @request GET:/companion
+   * @secure
+   */
+  export namespace CompanionList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = StateResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name ConversationsMessagesStreamCreate
+   * @summary 与固定助手聊天，沿用聊天事件、任务恢复和计费契约
+   * @request POST:/companion/conversations/{id}/messages/stream
+   * @secure
+   */
+  export namespace ConversationsMessagesStreamCreate {
+    export type RequestParams = {
+      /** 助手会话 public_id */
+      id: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = CompanionChatRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = string;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name MemoriesDelete
+   * @summary 删除助手记忆，并阻止旧上下文再次提取
+   * @request DELETE:/companion/memories
+   * @secure
+   */
+  export namespace MemoriesDelete {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name MemoriesDelete2
+   * @summary 删除助手记忆，并阻止旧上下文再次提取
+   * @request DELETE:/companion/memories/{id}
+   * @originalName memoriesDelete
+   * @duplicate
+   * @secure
+   */
+  export namespace MemoriesDelete2 {
+    export type RequestParams = {
+      /** 记忆 ID；集合接口删除全部 */
+      id?: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name MemoriesPartialUpdate
+   * @summary 纠正助手的一条记忆
+   * @request PATCH:/companion/memories/{id}
+   * @secure
+   */
+  export namespace MemoriesPartialUpdate {
+    export type RequestParams = {
+      /** 记忆 ID */
+      id: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = EditMemoryRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name OpenCreate
+   * @summary 打开助手，仅在前台空闲时允许一次适度开场
+   * @request POST:/companion/open
+   * @secure
+   */
+  export namespace OpenCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = OpenRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = StateResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name PreferencesPartialUpdate
+   * @summary 开关助手主动开场
+   * @request PATCH:/companion/preferences
+   * @secure
+   */
+  export namespace PreferencesPartialUpdate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = PreferencesRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name ReadCreate
+   * @summary 记录前台已阅读的助手消息，抑制未读时的主动开场
+   * @request POST:/companion/read
+   * @secure
+   */
+  export namespace ReadCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ReadRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
   }
 }
 

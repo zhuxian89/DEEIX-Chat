@@ -34,7 +34,7 @@ export function createChatRunRequest(
   return {
     branchReason: branch.branchReason,
     clientRunID,
-    content,
+    content: fileIDs.length > 0 && !content.trim() ? "请参考附件" : content,
     contentType: fileIDs.length > 0 ? "mixed" : "text",
     ...(fileIDs.length > 0 ? { fileIDs: [...fileIDs] } : {}),
     knowledgeBaseIDs: [],

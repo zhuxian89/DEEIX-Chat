@@ -9874,6 +9874,294 @@ const docTemplate = `{
                 }
             }
         },
+        "/companion": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "获取固定助手及专属记忆",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/StateResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/conversations/{id}/messages/stream": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/x-ndjson"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "与固定助手聊天，沿用聊天事件、任务恢复和计费契约",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "助手会话 public_id",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "标准聊天请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CompanionChatRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "NDJSON stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/memories": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "删除助手记忆，并阻止旧上下文再次提取",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/memories/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "删除助手记忆，并阻止旧上下文再次提取",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "记忆 ID；集合接口删除全部",
+                        "name": "id",
+                        "in": "path"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "纠正助手的一条记忆",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "记忆 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "纠正后的事实",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/EditMemoryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/open": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "打开助手，仅在前台空闲时允许一次适度开场",
+                "parameters": [
+                    {
+                        "description": "前台状态",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/OpenRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/StateResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/preferences": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "开关助手主动开场",
+                "parameters": [
+                    {
+                        "description": "开场偏好",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/PreferencesRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/read": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "记录前台已阅读的助手消息，抑制未读时的主动开场",
+                "parameters": [
+                    {
+                        "description": "已读消息",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReadRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
         "/context-artifacts/{id}": {
             "get": {
                 "security": [
@@ -17022,6 +17310,88 @@ const docTemplate = `{
                 }
             }
         },
+        "CompanionChatRequest": {
+            "type": "object",
+            "required": [
+                "content",
+                "contentType",
+                "knowledgeBaseIDs"
+            ],
+            "properties": {
+                "branchReason": {
+                    "type": "string",
+                    "enum": [
+                        "default",
+                        "retry",
+                        "edit"
+                    ]
+                },
+                "clientRunID": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "content": {
+                    "type": "string"
+                },
+                "contentType": {
+                    "type": "string",
+                    "enum": [
+                        "text",
+                        "markdown",
+                        "image",
+                        "file",
+                        "mixed"
+                    ]
+                },
+                "fileIDs": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "htmlVisualPrompt": {
+                    "type": "boolean"
+                },
+                "knowledgeBaseIDs": {
+                    "type": "array",
+                    "maxItems": 8,
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "model": {
+                    "type": "string",
+                    "maxLength": 128
+                },
+                "options": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "parentMessagePublicID": {
+                    "type": "string",
+                    "maxLength": 32
+                },
+                "selectedToolIDs": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "skillIDs": {
+                    "type": "array",
+                    "maxItems": 128,
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "sourceMessagePublicID": {
+                    "type": "string",
+                    "maxLength": 32
+                }
+            }
+        },
         "ContentModerationCategoryCatalogResponse": {
             "type": "object",
             "required": [
@@ -19430,6 +19800,18 @@ const docTemplate = `{
                 }
             }
         },
+        "EditMemoryRequest": {
+            "type": "object",
+            "required": [
+                "value"
+            ],
+            "properties": {
+                "value": {
+                    "type": "string",
+                    "maxLength": 120
+                }
+            }
+        },
         "EmailRegistrationCompleteRequest": {
             "type": "object",
             "required": [
@@ -21123,6 +21505,37 @@ const docTemplate = `{
                 "sourceVideoFileID": {
                     "type": "string",
                     "maxLength": 128
+                }
+            }
+        },
+        "Memory": {
+            "type": "object",
+            "required": [
+                "evidence",
+                "expiresAt",
+                "id",
+                "key",
+                "updatedAt",
+                "value"
+            ],
+            "properties": {
+                "evidence": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "key": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
                 }
             }
         },
@@ -22974,6 +23387,17 @@ const docTemplate = `{
                 }
             }
         },
+        "OpenRequest": {
+            "type": "object",
+            "required": [
+                "allowGreeting"
+            ],
+            "properties": {
+                "allowGreeting": {
+                    "type": "boolean"
+                }
+            }
+        },
         "OpenRouterOfficialPricingDataResponse": {
             "type": "object",
             "required": [
@@ -23826,6 +24250,17 @@ const docTemplate = `{
                 }
             }
         },
+        "PreferencesRequest": {
+            "type": "object",
+            "required": [
+                "quiet"
+            ],
+            "properties": {
+                "quiet": {
+                    "type": "boolean"
+                }
+            }
+        },
         "PromptPresetDataResponse": {
             "type": "object",
             "required": [
@@ -24434,6 +24869,17 @@ const docTemplate = `{
                 },
                 "upstreamModelName": {
                     "type": "string"
+                }
+            }
+        },
+        "ReadRequest": {
+            "type": "object",
+            "required": [
+                "messageID"
+            ],
+            "properties": {
+                "messageID": {
+                    "type": "integer"
                 }
             }
         },
@@ -25913,6 +26359,67 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "State": {
+            "type": "object",
+            "required": [
+                "conversationPublicID",
+                "greeting",
+                "greetingAt",
+                "greetingID",
+                "greetingOffered",
+                "memories",
+                "model",
+                "name",
+                "quiet"
+            ],
+            "properties": {
+                "conversationPublicID": {
+                    "type": "string"
+                },
+                "greeting": {
+                    "type": "string"
+                },
+                "greetingAt": {
+                    "type": "string"
+                },
+                "greetingID": {
+                    "type": "string"
+                },
+                "greetingOffered": {
+                    "type": "boolean"
+                },
+                "memories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Memory"
+                    }
+                },
+                "model": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "quiet": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "StateResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/State"
+                },
+                "errorMsg": {
                     "type": "string"
                 }
             }

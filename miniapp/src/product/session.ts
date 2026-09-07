@@ -57,6 +57,7 @@ import {
   resolveModelRequestOptions,
 } from "./model-options";
 import { imageFailureMessageForRun, imageTaskTerminalStatus, type ImageSubmitTask } from "./image-task";
+import { CompanionClient, companionImageIDs, companionStreamPath } from "./companion-client";
 import { removeNativeWebSearchOptions, resolveExaNetworkToolIDs } from "./network-search";
 import {
   conversationSearchPath,
@@ -97,12 +98,13 @@ export type BootstrapResult = {
 
 export type ChatStreamResult = {
   assistantMessage?: MessageResponse;
+  imageSource?: string | null;
   processTrace?: ConversationProcessTrace;
   text: string;
   userMessage?: MessageResponse;
 };
 
-export type ChatGenerationProgress = Pick<ConversationStreamState, "processTrace" | "status" | "text">;
+export type ChatGenerationProgress = Pick<ConversationStreamState, "imageSource" | "processTrace" | "status" | "text">;
 
 export type ImageGenerationResult = {
   assistantMessage?: MessageResponse;
@@ -124,6 +126,7 @@ export class MiniAppRequestAbortedError extends Error {
 }
 
 export class MiniAppSession {
+  readonly companion = new CompanionClient(<T>(request: ApiRequest) => this.request<T>(request));
   private accessToken = "";
   private accessExpiresAt = 0;
   private activeRequest: ChunkedRequestHandle | null = null;
@@ -336,6 +339,7 @@ export class MiniAppSession {
     fileIDs: readonly string[] = [],
     useNetworkSearch = false,
     branch: MessageBranchRequest = { branchReason: "default" },
+    companion = false,
   ): Promise<ChatStreamResult> {
     await this.ensureAccessToken();
     const model = selectedModelName.trim();
@@ -358,7 +362,7 @@ export class MiniAppSession {
       const stream = await this.runConversationStream({
         runID: clientRunID,
         start: (onEvent) => startChunkedJSONRequest({
-          url: buildApiUrl(this.baseUrl, chatMessageStreamPath(conversation.publicID)),
+          url: buildApiUrl(this.baseUrl, companion ? companionStreamPath(conversation.publicID) : chatMessageStreamPath(conversation.publicID)),
           accessToken: this.accessToken,
           body,
           onEvent,
@@ -372,6 +376,7 @@ export class MiniAppSession {
             "process_update",
             "rag_search",
             "upstream_think_delta",
+            "media_image_delta",
           ].includes(event.type)) {
             onProgress(streamState);
           }
@@ -389,11 +394,12 @@ export class MiniAppSession {
       });
       const completed = stream.completedData as CompletedPayload;
       const text = completed.assistantMessage?.content?.trim() || streamState.text;
-      if (!text) {
+      if (!text && (!companion || (!streamState.imageSource && companionImageIDs(completed.assistantMessage?.attachments).length === 0))) {
         throw new Error("AI 已完成响应，但没有返回文本");
       }
       return {
         assistantMessage: completed.assistantMessage,
+        imageSource: streamState.imageSource,
         processTrace: normalizeConversationProcessTrace(completed.assistantMessage?.processTrace) ?? streamState.processTrace,
         text,
         userMessage: completed.userMessage,

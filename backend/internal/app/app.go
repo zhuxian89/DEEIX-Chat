@@ -500,6 +500,9 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, err
 	}
+	if err := registerCompanion(engine, db, runtimeCfg, authService, conversationService, rateLimiter, shutdownSignal, log); err != nil {
+		return nil, err
+	}
 
 	backgroundCtx, backgroundCancel := context.WithCancel(context.Background())
 	if _, reconcileErr := embeddingService.ReconcileIndex(backgroundCtx); reconcileErr != nil {

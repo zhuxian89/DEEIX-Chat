@@ -1557,6 +1557,66 @@ definitions:
     - usedAt
     - usedByUserID
     type: object
+  CompanionChatRequest:
+    properties:
+      branchReason:
+        enum:
+        - default
+        - retry
+        - edit
+        type: string
+      clientRunID:
+        maxLength: 64
+        type: string
+      content:
+        type: string
+      contentType:
+        enum:
+        - text
+        - markdown
+        - image
+        - file
+        - mixed
+        type: string
+      fileIDs:
+        items:
+          type: string
+        maxItems: 20
+        type: array
+      htmlVisualPrompt:
+        type: boolean
+      knowledgeBaseIDs:
+        items:
+          type: string
+        maxItems: 8
+        type: array
+      model:
+        maxLength: 128
+        type: string
+      options:
+        additionalProperties: true
+        type: object
+      parentMessagePublicID:
+        maxLength: 32
+        type: string
+      selectedToolIDs:
+        items:
+          type: integer
+        maxItems: 128
+        type: array
+      skillIDs:
+        items:
+          type: integer
+        maxItems: 128
+        type: array
+      sourceMessagePublicID:
+        maxLength: 32
+        type: string
+    required:
+    - content
+    - contentType
+    - knowledgeBaseIDs
+    type: object
   ContentModerationCategoryCatalogResponse:
     properties:
       image:
@@ -3251,6 +3311,14 @@ definitions:
     - data
     - errorMsg
     type: object
+  EditMemoryRequest:
+    properties:
+      value:
+        maxLength: 120
+        type: string
+    required:
+    - value
+    type: object
   EmailRegistrationCompleteRequest:
     properties:
       code:
@@ -4432,6 +4500,28 @@ definitions:
     required:
     - prompt
     - sourceVideoFileID
+    type: object
+  Memory:
+    properties:
+      evidence:
+        type: string
+      expiresAt:
+        type: string
+      id:
+        type: string
+      key:
+        type: string
+      updatedAt:
+        type: string
+      value:
+        type: string
+    required:
+    - evidence
+    - expiresAt
+    - id
+    - key
+    - updatedAt
+    - value
     type: object
   MemoryErrorDoc:
     properties:
@@ -5733,6 +5823,13 @@ definitions:
     - type
     - unit
     type: object
+  OpenRequest:
+    properties:
+      allowGreeting:
+        type: boolean
+    required:
+    - allowGreeting
+    type: object
   OpenRouterOfficialPricingDataResponse:
     properties:
       cached:
@@ -6331,6 +6428,13 @@ definitions:
     - data
     - errorMsg
     type: object
+  PreferencesRequest:
+    properties:
+      quiet:
+        type: boolean
+    required:
+    - quiet
+    type: object
   PromptPresetDataResponse:
     properties:
       promptPreset:
@@ -6765,6 +6869,13 @@ definitions:
     - tokenUsage
     - updatedAt
     - upstreamModelName
+    type: object
+  ReadRequest:
+    properties:
+      messageID:
+        type: integer
+    required:
+    - messageID
     type: object
   RedeemCodeRequest:
     properties:
@@ -7795,6 +7906,49 @@ definitions:
     - title
     - trigger
     - updatedAt
+    type: object
+  State:
+    properties:
+      conversationPublicID:
+        type: string
+      greeting:
+        type: string
+      greetingAt:
+        type: string
+      greetingID:
+        type: string
+      greetingOffered:
+        type: boolean
+      memories:
+        items:
+          $ref: '#/definitions/Memory'
+        type: array
+      model:
+        type: string
+      name:
+        type: string
+      quiet:
+        type: boolean
+    required:
+    - conversationPublicID
+    - greeting
+    - greetingAt
+    - greetingID
+    - greetingOffered
+    - memories
+    - model
+    - name
+    - quiet
+    type: object
+  StateResponse:
+    properties:
+      data:
+        $ref: '#/definitions/State'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
     type: object
   StorageQuotaResponse:
     properties:
@@ -16370,6 +16524,181 @@ paths:
       summary: 查询品牌 Web App Manifest
       tags:
       - settings
+  /companion:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/StateResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 获取固定助手及专属记忆
+      tags:
+      - companion
+  /companion/conversations/{id}/messages/stream:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 助手会话 public_id
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 标准聊天请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CompanionChatRequest'
+      produces:
+      - application/x-ndjson
+      responses:
+        "200":
+          description: NDJSON stream
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: 与固定助手聊天，沿用聊天事件、任务恢复和计费契约
+      tags:
+      - companion
+  /companion/memories:
+    delete:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 删除助手记忆，并阻止旧上下文再次提取
+      tags:
+      - companion
+  /companion/memories/{id}:
+    delete:
+      parameters:
+      - description: 记忆 ID；集合接口删除全部
+        in: path
+        name: id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 删除助手记忆，并阻止旧上下文再次提取
+      tags:
+      - companion
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: 记忆 ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: 纠正后的事实
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/EditMemoryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 纠正助手的一条记忆
+      tags:
+      - companion
+  /companion/open:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 前台状态
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/OpenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/StateResponse'
+      security:
+      - BearerAuth: []
+      summary: 打开助手，仅在前台空闲时允许一次适度开场
+      tags:
+      - companion
+  /companion/preferences:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: 开场偏好
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/PreferencesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 开关助手主动开场
+      tags:
+      - companion
+  /companion/read:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 已读消息
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/ReadRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 记录前台已阅读的助手消息，抑制未读时的主动开场
+      tags:
+      - companion
   /context-artifacts/{id}:
     get:
       consumes:

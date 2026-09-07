@@ -94,6 +94,24 @@ test("regeneration keeps the mature Web message branch contract", () => {
   );
 });
 
+test("image-only chat supplies the Web attachment prompt for sending and regeneration", () => {
+  for (const content of ["", " \n\t"]) {
+    for (const branchReason of ["default", "retry"] as const) {
+      const request = createChatRunRequest(content, "chat-model", "image-only-run", ["file-1"], undefined, [], {
+        branchReason,
+        ...(branchReason === "retry" ? { sourceMessagePublicID: "assistant-1" } : {}),
+      });
+      assert.equal(request.content, "请参考附件");
+      assert.equal(request.contentType, "mixed");
+      assert.deepEqual(request.fileIDs, ["file-1"]);
+      assert.equal(request.branchReason, branchReason);
+    }
+  }
+  const question = "  这张图片里有什么？  ";
+  assert.equal(createChatRunRequest(question, "chat-model", "run-1", ["file-1"]).content, question);
+  assert.equal(createChatRunRequest("", "chat-model", "run-2").content, "");
+});
+
 test("generation resume and cancel paths match the mature web API contract", () => {
   assert.equal(
     resumeConversationRunPath("run/a", 0),

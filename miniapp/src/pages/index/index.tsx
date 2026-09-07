@@ -14,6 +14,8 @@ import { type ComponentProps, type ReactNode, useCallback, useEffect, useRef, us
 import { DailyCheckinEntry, DailyCheckinWheel } from "@/components/daily-checkin-wheel";
 import { Markdown } from "@/components/markdown";
 import { ConversationTrace } from "@/components/conversation-trace";
+import { CompanionEntry, CompanionPanel } from "@/components/companion/companion";
+import type { CompanionState } from "@/product/companion-client";
 import { resolveMiniAppConfig } from "@/product/runtime-config";
 import {
   MiniAppSession,
@@ -52,7 +54,7 @@ import {
 } from "@/product/message-timeline";
 import "./index.scss";
 
-type Screen = "home" | "chat" | "image" | "account" | "checkin" | "history" | "memories" | "shared";
+type Screen = "home" | "chat" | "image" | "account" | "checkin" | "history" | "memories" | "shared" | "companion";
 
 type ConversationListItem = Pick<
   ConversationResponse,
@@ -210,6 +212,8 @@ export default function HomePage() {
   const router = useRouter();
   const incomingShareID = typeof router.params.share === "string" ? router.params.share.trim() : "";
   const sessionRef = useRef<MiniAppSession | null>(null);
+  const companionInteraction = useRef(Date.now());
+  const [companionState, setCompanionState] = useState<CompanionState | null>(null);
   const messageCounter = useRef(0);
   const historyLoadCounter = useRef(0);
   const dailyCheckinRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -334,6 +338,7 @@ export default function HomePage() {
     }
     setBootError("");
     setBooting(true);
+    setCompanionState(null);
     sessionRef.current?.dispose();
     const session = new MiniAppSession(runtimeConfig.apiBaseUrl);
     sessionRef.current = session;
@@ -810,6 +815,12 @@ export default function HomePage() {
   const enterConversation = async (conversation: ConversationResponse, mode?: ConversationMode) => {
     const session = sessionRef.current;
     if (!session) {
+      return;
+    }
+    const companion = companionState ?? await session.companion.state().catch(() => null);
+    if (companion?.conversationPublicID === conversation.publicID) {
+      setCompanionState(companion);
+      setScreen("companion");
       return;
     }
     const historyLoadID = ++historyLoadCounter.current;
@@ -1698,6 +1709,15 @@ export default function HomePage() {
     />
   ) : null;
 
+  if (screen === "companion" && sessionRef.current && !booting && !bootError) {
+    return <CompanionPanel session={sessionRef.current} initial={companionState} onState={setCompanionState} onBack={() => {
+      setScreen("home");
+      companionInteraction.current = Date.now();
+      void refreshConversations();
+      void refreshBalance();
+    }} />;
+  }
+
   if (booting) {
     return (
       <View className="centerState">
@@ -2375,7 +2395,7 @@ export default function HomePage() {
   }
 
   return (
-    <View className="page homePage">
+    <View className="page homePage" onTouchMove={() => { companionInteraction.current = Date.now(); }}>
       <View className="homeHeader">
         <Text className="eyebrow">AI省着用</Text>
         <View className="avatar" onClick={openAccountCenter}>
@@ -2383,6 +2403,9 @@ export default function HomePage() {
         </View>
       </View>
       <Text className="homeTitle">今天想做什么？</Text>
+
+      {sessionRef.current && presets.chatModel && <CompanionEntry session={sessionRef.current}
+        lastInteraction={companionInteraction} onState={setCompanionState} onOpen={() => setScreen("companion")} />}
 
       {dailyCheckin?.enabled ? (
         <DailyCheckinEntry
