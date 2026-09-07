@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { CompanionClient, canOfferCompanionGreeting, companionImageIDs, companionStreamPath } from "./companion-client";
+import { CompanionClient, canOfferCompanionGreeting, companionBeijingDate, companionImageIDs, companionStreamPath } from "./companion-client";
 import type { ApiRequest } from "@/platform/transport";
 
 test("companion only greets when foreground and idle", () => {
@@ -39,4 +39,18 @@ test("memory management uses tenant-authenticated requests and preserves values"
     { path: "/api/v1/companion/memories", method: "DELETE" },
     { path: "/api/v1/companion/read", method: "POST", body: { messageID: 42 } },
   ]);
+});
+
+test("topic dates use Beijing's calendar across midnight regardless of device timezone", () => {
+  assert.equal(companionBeijingDate("2026-09-07T16:00:00Z"), "2026-09-08");
+  assert.equal(companionBeijingDate("2026-09-07T15:59:59Z"), "2026-09-07");
+  assert.equal(companionBeijingDate("2026-09-08T00:00:00+08:00"), "2026-09-08");
+  assert.equal(companionBeijingDate("invalid"), "日期未知");
+});
+
+test("topic preferences refer to the displayed source and preserve the rejection signal", async () => {
+  const requests: ApiRequest[] = [];
+  const client = new CompanionClient(async <T>(request: ApiRequest): Promise<T> => { requests.push(request); return {} as T; });
+  await client.topicFeedback("https://www.bbc.com/news/topic", "avoid");
+  assert.deepEqual(requests, [{ path: "/api/v1/companion/topics/feedback", method: "POST", body: { topicURL: "https://www.bbc.com/news/topic", preference: "avoid" } }]);
 });

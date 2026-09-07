@@ -3,7 +3,9 @@ package conversation
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/conversation"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
@@ -62,5 +64,29 @@ func TestCompanionHistoryStopsAt24Messages(t *testing.T) {
 	}
 	if repo.messages[576].ParentMessageID == nil {
 		t.Fatal("stored ancestry was modified")
+	}
+}
+
+func TestCompanionHistoryDatesDoNotMutateStoredContent(t *testing.T) {
+	repo := &companionRepoFixture{branchContextRepositoryStub: branchContextRepositoryStub{messages: buildBranchContextMessages(3)}}
+	at := time.Date(2026, 9, 7, 16, 5, 0, 0, time.UTC)
+	for i := range repo.messages {
+		repo.messages[i].CreatedAt = at
+		repo.messages[i].Content = "我明天要面试"
+	}
+	wrapped := &companionConversationRepository{ConversationRepository: repo, conversationID: 7}
+	for attempt := 0; attempt < 2; attempt++ {
+		items, err := wrapped.ListMessageAncestors(t.Context(), 7, 3, 24)
+		if err != nil || len(items) != 3 {
+			t.Fatalf("history error: %v", err)
+		}
+		for _, item := range items {
+			if !strings.HasPrefix(item.Content, "[历史消息时间：北京时间 2026-09-08 00:05:00]\n") || strings.Count(item.Content, "历史消息时间") != 1 {
+				t.Fatalf("incorrect timestamp: %s", item.Content)
+			}
+		}
+	}
+	if repo.messages[0].Content != "我明天要面试" {
+		t.Fatal("stored text changed")
 	}
 }

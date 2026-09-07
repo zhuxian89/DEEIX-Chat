@@ -26,10 +26,11 @@ type Handler struct {
 	shutdown     *lifecycle.Shutdown
 	logger       *zap.Logger
 	refreshSlots chan struct{}
+	topicSlots   chan struct{}
 }
 
 func NewHandler(service *app.Service, cfg *config.Runtime, shutdown *lifecycle.Shutdown, logger *zap.Logger) *Handler {
-	return &Handler{service: service, cfg: cfg, shutdown: shutdown, logger: logger, refreshSlots: make(chan struct{}, 2)}
+	return &Handler{service: service, cfg: cfg, shutdown: shutdown, logger: logger, refreshSlots: make(chan struct{}, 2), topicSlots: make(chan struct{}, 1)}
 }
 
 func (h *Handler) Register(group *gin.RouterGroup) {
@@ -41,12 +42,13 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	g.DELETE("/memories", h.Forget)
 	g.DELETE("/memories/:id", h.Forget)
 	g.PATCH("/memories/:id", h.EditMemory)
+	g.POST("/topics/feedback", h.TopicFeedback)
 	g.POST("/conversations/:id/messages/stream", h.Stream)
 }
 
 type StateResponse struct {
-	ErrorMsg string     `json:"errorMsg"`
-	Data     *app.State `json:"data"`
+	ErrorMsg string `json:"errorMsg"`
+	Data     *State `json:"data"`
 }
 type OpenRequest struct {
 	AllowGreeting bool `json:"allowGreeting"`
@@ -64,6 +66,33 @@ type EditMemoryRequest struct {
 }
 type ReadRequest struct {
 	MessageID uint `json:"messageID" binding:"required"`
+}
+
+type TopicFeedbackRequest struct {
+	TopicURL   string `json:"topicURL" binding:"required,max=1500"`
+	Preference string `json:"preference" binding:"required,oneof=like avoid"`
+}
+
+// TopicFeedback godoc
+// @Summary 调整主动话题偏好，保存为可删除的助手记忆
+// @Tags companion
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param body body TopicFeedbackRequest true "已展示话题的反馈"
+// @Success 200 {object} response.SuccessDoc
+// @Router /companion/topics/feedback [post]
+func (h *Handler) TopicFeedback(c *gin.Context) {
+	var req TopicFeedbackRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.InvalidRequestBody(c, err)
+		return
+	}
+	if err := h.service.TopicFeedback(c.Request.Context(), middleware.MustUserID(c), req.TopicURL, req.Preference); err != nil {
+		fail(c, err)
+		return
+	}
+	response.Success(c, gin.H{"saved": true})
 }
 
 // Read godoc
@@ -116,7 +145,7 @@ func (h *Handler) State(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	response.Success(c, state)
+	response.Success(c, stateDTO(state))
 }
 
 // Open godoc
@@ -143,8 +172,9 @@ func (h *Handler) Open(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	response.Success(c, state)
+	response.Success(c, stateDTO(state))
 	h.refresh(middleware.MustUserID(c))
+	h.refreshTopics(middleware.MustUserID(c))
 }
 
 // Preferences godoc
@@ -243,9 +273,12 @@ func (h *Handler) Stream(c *gin.Context) {
 		fail(c, err)
 		return
 	}
-	// V1 exposes a fixed persona/model, without client-selected skills or tools.
+	// The server chooses Exa tools; caller-selected tools/skills remain unavailable.
 	req.Model = profile.Model
 	req.SelectedToolIDs, req.SkillIDs, req.KnowledgeBaseIDs = nil, nil, nil
+	if toolIDs, toolErr := service.CompanionWebToolIDs(c.Request.Context()); toolErr == nil {
+		req.SelectedToolIDs = toolIDs
+	}
 	req.BranchReason, req.ParentMessagePublicID, req.SourceMessagePublicID = "default", "", ""
 	req.HTMLVisualPromptEnabled = false
 	body, err = json.Marshal(req)
@@ -279,6 +312,26 @@ func (h *Handler) Stream(c *gin.Context) {
 	}()
 	conversation.NewHandler(service, h.cfg, h.shutdown).StreamMessage(c)
 	h.refresh(userID)
+	h.refreshTopics(userID)
+}
+
+func (h *Handler) refreshTopics(userID uint) {
+	if h.service.TopicProvider == nil {
+		return
+	}
+	select {
+	case h.topicSlots <- struct{}{}:
+	default:
+		return
+	}
+	go func() {
+		defer func() { <-h.topicSlots }()
+		ctx, cancel := context.WithTimeout(context.Background(), 22*time.Second)
+		defer cancel()
+		if err := h.service.RefreshTopics(ctx, userID); err != nil && h.logger != nil {
+			h.logger.Debug("companion_topics_unavailable")
+		}
+	}()
 }
 
 func (h *Handler) refresh(userID uint) {

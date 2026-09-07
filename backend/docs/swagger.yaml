@@ -7929,6 +7929,8 @@ definitions:
         type: string
       quiet:
         type: boolean
+      topic:
+        $ref: '#/definitions/Topic'
     required:
     - conversationPublicID
     - greeting
@@ -8352,6 +8354,42 @@ definitions:
     required:
     - data
     - errorMsg
+    type: object
+  Topic:
+    properties:
+      category:
+        type: string
+      fetchedAt:
+        type: string
+      opener:
+        type: string
+      publishedAt:
+        type: string
+      title:
+        type: string
+      url:
+        type: string
+    required:
+    - category
+    - fetchedAt
+    - opener
+    - publishedAt
+    - title
+    - url
+    type: object
+  TopicFeedbackRequest:
+    properties:
+      preference:
+        enum:
+        - like
+        - avoid
+        type: string
+      topicURL:
+        maxLength: 1500
+        type: string
+    required:
+    - preference
+    - topicURL
     type: object
   UpdateBillingAccountBalanceRequest:
     properties:
@@ -16697,6 +16735,29 @@ paths:
       security:
       - BearerAuth: []
       summary: 记录前台已阅读的助手消息，抑制未读时的主动开场
+      tags:
+      - companion
+  /companion/topics/feedback:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 已展示话题的反馈
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/TopicFeedbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 调整主动话题偏好，保存为可删除的助手记忆
       tags:
       - companion
   /context-artifacts/{id}:

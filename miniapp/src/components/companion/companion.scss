@@ -44,3 +44,5 @@
 .companionMemoryActions button { padding: 0 22px; margin: 0; font-size: 23px; color: #758a6e; line-height: 2.4; background: #f6f8f1; }
 .companionForgetAll { margin: 40px 28px; font-size: 26px; color: #ae6859; background: #f4eee7; }
 .companionFollow { text-align: center; font-size: 24px; color: #5b816a; padding: 12px; background: #edf2e8; }
+.companionTopicSource { display: flex; flex-direction: column; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid #e9ece3; font-size: 22px; color: #81907f; }
+.companionSourceLink { color: #52795e; text-decoration: underline; }

@@ -10,6 +10,7 @@ import (
 
 	app "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/companion"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
+	companionstore "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/companion"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/sqlite"
@@ -24,7 +25,7 @@ func TestCompanionRoutesIsolateStateAndBoundRequestBodies(t *testing.T) {
 	}
 	sqlDB, _ := db.DB()
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	store, err := app.NewStore(db)
+	store, err := companionstore.NewStore(db)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +35,7 @@ func TestCompanionRoutesIsolateStateAndBoundRequestBodies(t *testing.T) {
 	if _, err := store.Ensure(t.Context(), 2); err != nil {
 		t.Fatal(err)
 	}
-	db.Create(&app.Memory{ID: "private", UserID: 2, Key: "name", Value: "another user secret", ExpiresAt: time.Now().Add(time.Hour)})
+	db.Table("companion_memories").Create(&app.Memory{ID: "private", UserID: 2, Key: "name", Value: "another user secret", ExpiresAt: time.Now().Add(time.Hour)})
 	h := NewHandler(&app.Service{Store: store}, config.NewRuntime(config.Config{}), nil, nil)
 	engine := gin.New()
 	group := engine.Group("/api/v1", func(c *gin.Context) { c.Set(middleware.ContextKeyUserID, uint(1)) })
@@ -46,6 +47,8 @@ func TestCompanionRoutesIsolateStateAndBoundRequestBodies(t *testing.T) {
 		{"GET", "/api/v1/companion", "", 200},
 		{"PATCH", "/api/v1/companion/preferences", `{"quiet":true}`, 200},
 		{"PATCH", "/api/v1/companion/preferences", `{}`, 400},
+		{"POST", "/api/v1/companion/topics/feedback", `{"topicURL":"https://www.bbc.com/news/foreign","preference":"like"}`, 404},
+		{"POST", "/api/v1/companion/topics/feedback", `{"topicURL":"https://www.bbc.com/news/foreign","preference":"invalid"}`, 400},
 		{"POST", "/api/v1/companion/conversations/foreign/messages/stream", `{"content":"hello"}`, 404},
 		{"POST", "/api/v1/companion/conversations/foreign/messages/stream", strings.Repeat("x", 65537), 400},
 	} {

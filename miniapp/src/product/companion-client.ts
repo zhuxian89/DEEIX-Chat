@@ -33,6 +33,17 @@ export class CompanionClient {
   async markRead(messageID: number): Promise<void> {
     await this.request({ path: "/api/v1/companion/read", method: "POST", body: { messageID } });
   }
+
+  async topicFeedback(topicURL: string, preference: "like" | "avoid"): Promise<void> {
+    await this.request({ path: "/api/v1/companion/topics/feedback", method: "POST", body: { topicURL, preference } });
+  }
+}
+
+export function companionBeijingDate(value: string): string {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return "日期未知";
+  const local = new Date(timestamp + 8 * 60 * 60 * 1000);
+  return `${local.getUTCFullYear()}-${String(local.getUTCMonth() + 1).padStart(2, "0")}-${String(local.getUTCDate()).padStart(2, "0")}`;
 }
 
 export function companionStreamPath(conversationID: string): string {

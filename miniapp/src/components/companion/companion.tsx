@@ -3,7 +3,7 @@ import { Button, Image, ScrollView, Switch, Text, Textarea, View } from "@tarojs
 import Taro from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
-import { canOfferCompanionGreeting, companionImageIDs, type CompanionMemory, type CompanionState } from "@/product/companion-client";
+import { canOfferCompanionGreeting, companionBeijingDate, companionImageIDs, type CompanionMemory, type CompanionState } from "@/product/companion-client";
 import { composerKeyboardStyle } from "@/product/keyboard-layout";
 import { nextChatBottomScrollTop, shouldReleaseChatAutoFollow } from "@/product/chat-auto-scroll";
 import { latestVisibleMessages, messageFromAPI, type ConversationMessage } from "@/product/message-timeline";
@@ -373,6 +373,16 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
     });
   };
 
+  const topicFeedback = async (preference: "like" | "avoid") => {
+    if (!state?.topic || memoryBusy || busyRef.current) return;
+    const topicURL = state.topic.url;
+    await runMemoryAction(async () => {
+      await session.companion.topicFeedback(topicURL, preference);
+      updateState(await session.companion.state());
+      void Taro.showToast({ title: preference === "like" ? "记下了，可以在记忆里修改" : "以后少聊这类", icon: "none" });
+    });
+  };
+
   const timeline: DisplayMessage[] = [...messages];
   if (state?.greetingID && state.greeting) {
     const greetingAt = Date.parse(state.greetingAt);
@@ -425,6 +435,18 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
           {timeline.map((message) => <View className={`companionRow ${message.role === "user" ? "companionUserRow" : ""}`} key={message.id}>
             <View className={`companionBubble ${message.role === "user" ? "companionUser" : "companionAssistant"}`}>
               {message.text && <Markdown>{message.text}</Markdown>}
+              {state?.topic && message.id === `greeting-${state.greetingID}` && (
+                <View className="companionTopicSource">
+                  <Text className="companionSourceLink" onClick={() => void Taro.setClipboardData({ data: state.topic!.url })}>
+                    来源：{state.topic.title}（点此复制链接）
+                  </Text>
+                  <Text>报道日期：{companionBeijingDate(state.topic.publishedAt)} · 北京时间</Text>
+                  <View className="companionMemoryActions">
+                    <Button disabled={memoryBusy || busy} onClick={() => void topicFeedback("like")}>喜欢这类</Button>
+                    <Button disabled={memoryBusy || busy} onClick={() => void topicFeedback("avoid")}>少聊这类</Button>
+                  </View>
+                </View>
+              )}
               {message.images?.map((source, index) => <Image key={`${message.id}-${index}`} className="companionImage" src={source} mode="widthFix" onLoad={() => { if (autoFollow.current) setScrollTop(nextChatBottomScrollTop); }} onClick={() => void Taro.previewImage({ current: source, urls: message.images! })} />)}
               {!message.images?.length && Boolean(message.fileIDs?.length) && <Text className="companionImageRetry" onClick={() => void loadImages([message])}>{message.imageStatus || "正在加载图片…"}</Text>}
               {message.pending && <Text className="companionActivity">{message.activityStatus || "小伴正在回复…"}</Text>}
@@ -440,7 +462,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
             <Textarea className="companionInput" value={draft} placeholder="随口说点什么…" maxlength={8000} autoHeight adjustPosition={false} showConfirmBar={false} disabled={busy || loading} onInput={(event) => setDraft(event.detail.value)} />
             <Button className="companionSend" disabled={loading || uploading || (!busy && !draft.trim() && !attachment)} onClick={() => busy ? void session.cancelActiveGeneration().catch((cause) => setError(errorMessage(cause))) : void send()}>{busy ? "停止" : "发送"}</Button>
           </View>
-          {!keyboard && <Text className="companionFootnote">聊天按平台用量计费 · 主动招呼不扣余额</Text>}
+          {!keyboard && <Text className="companionFootnote">聊天及联网按平台用量计费 · 主动招呼不扣余额</Text>}
         </View>
       </>}
     </View>

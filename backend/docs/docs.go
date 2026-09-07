@@ -10162,6 +10162,44 @@ const docTemplate = `{
                 }
             }
         },
+        "/companion/topics/feedback": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "调整主动话题偏好，保存为可删除的助手记忆",
+                "parameters": [
+                    {
+                        "description": "已展示话题的反馈",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/TopicFeedbackRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
         "/context-artifacts/{id}": {
             "get": {
                 "security": [
@@ -26406,6 +26444,9 @@ const docTemplate = `{
                 },
                 "quiet": {
                     "type": "boolean"
+                },
+                "topic": {
+                    "$ref": "#/definitions/Topic"
                 }
             }
         },
@@ -26985,6 +27026,57 @@ const docTemplate = `{
                 },
                 "errorMsg": {
                     "type": "string"
+                }
+            }
+        },
+        "Topic": {
+            "type": "object",
+            "required": [
+                "category",
+                "fetchedAt",
+                "opener",
+                "publishedAt",
+                "title",
+                "url"
+            ],
+            "properties": {
+                "category": {
+                    "type": "string"
+                },
+                "fetchedAt": {
+                    "type": "string"
+                },
+                "opener": {
+                    "type": "string"
+                },
+                "publishedAt": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "url": {
+                    "type": "string"
+                }
+            }
+        },
+        "TopicFeedbackRequest": {
+            "type": "object",
+            "required": [
+                "preference",
+                "topicURL"
+            ],
+            "properties": {
+                "preference": {
+                    "type": "string",
+                    "enum": [
+                        "like",
+                        "avoid"
+                    ]
+                },
+                "topicURL": {
+                    "type": "string",
+                    "maxLength": 1500
                 }
             }
         },

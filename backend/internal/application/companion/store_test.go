@@ -11,12 +11,20 @@ import (
 	"testing"
 	"time"
 
+	companionstore "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/persistence/companion"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-func testStore(t *testing.T) *Store {
+type testRepository struct {
+	*companionstore.Store
+	db *gorm.DB
+}
+
+var _ Store = (*companionstore.Store)(nil)
+
+func testStore(t *testing.T) *testRepository {
 	t.Helper()
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "companion.db")), &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)})
 	if err != nil {
@@ -28,11 +36,11 @@ func testStore(t *testing.T) *Store {
 	}
 	sqlDB.SetMaxOpenConns(1)
 	t.Cleanup(func() { _ = sqlDB.Close() })
-	store, err := NewStore(db)
+	store, err := companionstore.NewStore(db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return store
+	return &testRepository{Store: store, db: db}
 }
 
 func TestCompanionLeaseSerializesConcurrentDevices(t *testing.T) {
@@ -75,7 +83,7 @@ func TestCompanionLeaseSerializesConcurrentDevices(t *testing.T) {
 		t.Fatal(err)
 	}
 	var count int64
-	s.db.Model(&Profile{}).Count(&count)
+	s.db.Table("companion_profiles").Count(&count)
 	if count != 1 {
 		t.Fatalf("created duplicate profiles: %d", count)
 	}
@@ -90,11 +98,11 @@ func TestCompanionForgetCannotBeUndoneByStaleExtraction(t *testing.T) {
 		{ID: "mine", UserID: 1, Key: "interest", Value: "旧事实", ExpiresAt: now.Add(time.Hour)},
 		{ID: "other", UserID: 2, Key: "interest", Value: "另一位用户", ExpiresAt: now.Add(time.Hour)},
 	} {
-		if err := s.db.Create(&m).Error; err != nil {
+		if err := s.db.Table("companion_memories").Create(&m).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
-	s.db.Model(&Profile{}).Where("user_id = ?", 1).Updates(map[string]interface{}{"summary": "旧摘要", "refresh_token": "old"})
+	s.db.Table("companion_profiles").Where("user_id = ?", 1).Updates(map[string]interface{}{"summary": "旧摘要", "refresh_token": "old"})
 	if err := s.Forget(t.Context(), 1, 100, "other"); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross-user forget accepted: %v", err)
 	}
@@ -104,7 +112,7 @@ func TestCompanionForgetCannotBeUndoneByStaleExtraction(t *testing.T) {
 	service := &Service{Store: s}
 	err := service.saveExtraction(t.Context(), p, "old", 99, extractedMemory{Summary: "旧摘要回来", Memories: []extractedFact{
 		{Key: "interest", Value: "旧事实", Evidence: "我喜欢旧事实", SourceMessageID: 90, Days: 30},
-	}}, map[uint]string{90: "我喜欢旧事实"})
+	}}, map[uint]extractionSource{90: {Text: "我喜欢旧事实"}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -125,7 +133,7 @@ func TestCompanionExtractionRequiresUserEvidenceAndBoundsMemory(t *testing.T) {
 	now := time.Now()
 	for i := 0; i < 60; i++ {
 		m := Memory{ID: fmt.Sprint(i), UserID: 1, Key: fmt.Sprint(i), Value: "fact", ExpiresAt: now.Add(time.Hour), UpdatedAt: now.Add(-time.Hour)}
-		if err := s.db.Create(&m).Error; err != nil {
+		if err := s.db.Table("companion_memories").Create(&m).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -135,8 +143,8 @@ func TestCompanionExtractionRequiresUserEvidenceAndBoundsMemory(t *testing.T) {
 		{Key: "music", Value: "喜欢爵士音乐", Evidence: "我喜欢爵士音乐", SourceMessageID: 10, Days: 90},
 		{Key: "music", Value: "重复", Evidence: "我喜欢爵士音乐", SourceMessageID: 10},
 	}
-	s.db.Model(&Profile{}).Where("user_id = 1").Update("refresh_token", "new")
-	if err := (&Service{Store: s}).saveExtraction(t.Context(), p, "new", 11, extractedMemory{Summary: strings.Repeat("长", 3000), Memories: facts}, map[uint]string{10: "最近发现我喜欢爵士音乐"}); err != nil {
+	s.db.Table("companion_profiles").Where("user_id = 1").Update("refresh_token", "new")
+	if err := (&Service{Store: s}).saveExtraction(t.Context(), p, "new", 11, extractedMemory{Summary: strings.Repeat("长", 3000), Memories: facts}, map[uint]extractionSource{10: {Text: "最近发现我喜欢爵士音乐"}}); err != nil {
 		t.Fatal(err)
 	}
 	memories, _ := s.Memories(t.Context(), 1)
@@ -152,7 +160,7 @@ func TestCompanionExtractionRequiresUserEvidenceAndBoundsMemory(t *testing.T) {
 func TestCompanionCorrectionClearsOldContextAndPreservesMemoryID(t *testing.T) {
 	s := testStore(t)
 	_, _ = s.Ensure(t.Context(), 1)
-	s.db.Create(&Memory{ID: "mine", UserID: 1, Key: "name", Value: "旧名字", ExpiresAt: time.Now().Add(time.Hour)})
+	s.db.Table("companion_memories").Create(&Memory{ID: "mine", UserID: 1, Key: "name", Value: "旧名字", ExpiresAt: time.Now().Add(time.Hour)})
 	if err := s.Edit(t.Context(), 2, 100, "mine", "别人的修改"); !errors.Is(err, ErrNotFound) {
 		t.Fatal(err)
 	}
@@ -220,7 +228,7 @@ func TestCompanionDeletedAccountCleanupOnlyTouchesOwnTables(t *testing.T) {
 	s.db.Exec("INSERT INTO identity_users (id) VALUES (2)")
 	_, _ = s.Ensure(t.Context(), 1)
 	_, _ = s.Ensure(t.Context(), 2)
-	s.db.Create(&Memory{ID: "orphan", UserID: 1, Key: "old", Value: "removed", ExpiresAt: time.Now().Add(time.Hour)})
+	s.db.Table("companion_memories").Create(&Memory{ID: "orphan", UserID: 1, Key: "old", Value: "removed", ExpiresAt: time.Now().Add(time.Hour)})
 	if err := s.PurgeDeletedUsers(t.Context()); err != nil {
 		t.Fatal(err)
 	}
@@ -232,7 +240,7 @@ func TestCompanionDeletedAccountCleanupOnlyTouchesOwnTables(t *testing.T) {
 	}
 	var users, memories int64
 	s.db.Table("identity_users").Count(&users)
-	s.db.Model(&Memory{}).Count(&memories)
+	s.db.Table("companion_memories").Count(&memories)
 	if users != 1 || memories != 0 {
 		t.Fatalf("cleanup affected wrong data: users=%d memories=%d", users, memories)
 	}

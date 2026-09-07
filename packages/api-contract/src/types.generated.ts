@@ -3509,6 +3509,7 @@ export interface State {
   model: string;
   name: string;
   quiet: boolean;
+  topic?: Topic;
 }
 
 export interface StateResponse {
@@ -3685,6 +3686,21 @@ export interface ToolResponse {
 export interface ToolResponseDoc {
   data: ToolResponse;
   errorMsg: string;
+}
+
+export interface Topic {
+  category: string;
+  fetchedAt: string;
+  opener: string;
+  publishedAt: string;
+  title: string;
+  url: string;
+}
+
+export interface TopicFeedbackRequest {
+  preference: "like" | "avoid";
+  /** @maxLength 1500 */
+  topicURL: string;
 }
 
 export interface UpdateBillingAccountBalanceRequest {
@@ -8436,6 +8452,22 @@ export namespace Companion {
     export type RequestParams = {};
     export type RequestQuery = {};
     export type RequestBody = ReadRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name TopicsFeedbackCreate
+   * @summary 调整主动话题偏好，保存为可删除的助手记忆
+   * @request POST:/companion/topics/feedback
+   * @secure
+   */
+  export namespace TopicsFeedbackCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = TopicFeedbackRequest;
     export type RequestHeaders = {};
     export type ResponseBody = SuccessDoc;
   }

@@ -27,7 +27,7 @@ func TestCompanionRegistrationIsAdditiveAndAuthenticated(t *testing.T) {
 	if err := registerCompanion(engine, db, config.NewRuntime(config.Config{JWTSecret: "test-companion-secret"}), nil, nil, nil, shutdown, nil); err != nil {
 		t.Fatal(err)
 	}
-	if !db.Migrator().HasTable("companion_profiles") || !db.Migrator().HasTable("companion_memories") {
+	if !db.Migrator().HasTable("companion_profiles") || !db.Migrator().HasTable("companion_memories") || !db.Migrator().HasTable("companion_topic_caches") {
 		t.Fatal("missing companion tables")
 	}
 	if db.Migrator().HasTable("identity_users") || db.Migrator().HasTable("chat_messages") {
