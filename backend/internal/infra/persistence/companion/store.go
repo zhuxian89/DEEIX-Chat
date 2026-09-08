@@ -78,7 +78,7 @@ func trimMemories(tx *gorm.DB, userID uint) error {
 type Store struct{ db *gorm.DB }
 
 func NewStore(db *gorm.DB) (*Store, error) {
-	if err := db.AutoMigrate(&profileRecord{}, &memoryRecord{}, &topicCacheRecord{}); err != nil {
+	if err := db.AutoMigrate(&profileRecord{}, &memoryRecord{}, &topicCacheRecord{}, &initiativeStateRecord{}, &initiativeRecord{}); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil
@@ -187,6 +187,9 @@ func (s *Store) Edit(ctx context.Context, userID, through uint, memoryID, value 
 
 // Both memory edits and deletions invalidate context within the same transaction.
 func resetMemoryContext(tx *gorm.DB, userID, through uint) error {
+	if err := tx.Where("user_id = ?", userID).Delete(&initiativeRecord{}).Error; err != nil {
+		return err
+	}
 	return tx.Model(&profileRecord{}).Where("user_id = ?", userID).Updates(map[string]interface{}{
 		"summary":           "",
 		"forget_through_id": through,

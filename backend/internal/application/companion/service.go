@@ -31,6 +31,9 @@ type State struct {
 	GreetingOffered      bool
 	Memories             []Memory
 	Topic                *Topic
+	Proactivity          string
+	InitiativeVersion    int
+	Initiatives          []Initiative
 }
 
 func (s *Service) State(ctx context.Context, userID uint) (*State, error) {
@@ -42,8 +45,17 @@ func (s *Service) State(ctx context.Context, userID uint) (*State, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &State{Name: "小伴", Model: p.Model, ConversationPublicID: p.ConversationPublicID, Quiet: p.Quiet,
-		Greeting: p.LastGreeting, GreetingID: p.GreetingID, GreetingAt: p.GreetingAt, Memories: memories, Topic: storedTopic(p.LastTopicJSON)}, nil
+	pace, err := s.Store.InitiativeState(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	initiatives, err := s.Store.Initiatives(ctx, userID, p.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+	return &State{Name: Name, Model: p.Model, ConversationPublicID: p.ConversationPublicID, Quiet: p.Quiet,
+		Greeting: currentGreeting(p.LastGreeting), GreetingID: p.GreetingID, GreetingAt: p.GreetingAt, Memories: memories, Topic: storedTopic(p.LastTopicJSON),
+		Proactivity: proactivityMode(p, pace), InitiativeVersion: 1, Initiatives: initiatives}, nil
 }
 
 func (s *Service) Open(ctx context.Context, userID uint, model string, allowGreeting bool) (*State, error) {
@@ -71,7 +83,7 @@ func (s *Service) Open(ctx context.Context, userID uint, model string, allowGree
 		}
 	}
 	if p.ConversationID == 0 {
-		conversation, createErr := s.Chat.CreateConversation(ctx, userID, "和小伴聊聊", model, "")
+		conversation, createErr := s.Chat.CreateConversation(ctx, userID, "和"+Name+"聊聊", model, "")
 		if createErr != nil {
 			return nil, createErr
 		}
@@ -157,12 +169,21 @@ func (s *Service) Conversation(ctx context.Context, userID uint, publicID, query
 	if len(topics) > 2 {
 		topics = topics[:2]
 	}
-	prompt := BuildPrompt(p, memories, now, query) + continuityPrompt(now, lastUser.CreatedAt, topics)
+	prompt := BuildPrompt(p, memories, now, query) + continuityPrompt(now, lastUser.CreatedAt, topics) + chat.CompanionHistoryTimePrompt(items, p.ForgetThroughID)
+	initiatives, err := s.Store.Initiatives(ctx, userID, p.ConversationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	prompt += initiativeContext(initiatives, now)
 	return s.Chat.ForCompanion(p.ConversationID, userID, p.ForgetThroughID, prompt), p, nil
 }
 
 func (s *Service) SetQuiet(ctx context.Context, userID uint, quiet bool) error {
-	return s.Store.SetQuiet(ctx, userID, quiet)
+	mode := "normal"
+	if quiet {
+		mode = "off"
+	}
+	return s.SetProactivity(ctx, userID, mode)
 }
 
 func (s *Service) MarkRead(ctx context.Context, userID, messageID uint) error {

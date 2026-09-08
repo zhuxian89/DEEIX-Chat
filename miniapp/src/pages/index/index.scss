@@ -1112,6 +1112,8 @@ page {
 .accountLinkTitle { color: #29272f; display: block; font-size: 24px; font-weight: 720; }
 .accountLinkHint { color: #999aa2; display: block; font-size: 19px; margin-top: 5px; }
 .accountLinkArrow { color: #aaa8b2; font-size: 38px; }
+.accountCheckinCard { background: linear-gradient(135deg, #fff, #f8f5ff); }
+.accountCheckinAction { color: #6249d8; flex-shrink: 0; font-size: 21px; font-weight: 650; }
 .accountRefreshButton { background: #ece9fa !important; border: 0 !important; border-radius: 19px !important; color: #614bd0 !important; font-size: 23px !important; font-weight: 700; margin: 34px 0 0 !important; }
 .accountLegal { color: #9a9ba3; display: flex; flex-wrap: wrap; font-size: 19px; gap: 24px; justify-content: center; padding: 26px 0 50px; }
 

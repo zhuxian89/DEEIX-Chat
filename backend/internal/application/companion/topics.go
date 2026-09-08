@@ -287,7 +287,20 @@ func (s *Service) TopicFeedback(ctx context.Context, userID uint, topicURL, pref
 	}
 	topic := storedTopic(p.LastTopicJSON)
 	if topic == nil || topic.URL != topicURL {
-		return ErrNotFound
+		items, err := s.Store.Initiatives(ctx, userID, p.ConversationID)
+		if err != nil {
+			return err
+		}
+		topic = nil
+		for _, item := range items {
+			if candidate := storedTopic(item.TopicJSON); candidate != nil && candidate.URL == topicURL {
+				topic = candidate
+				break
+			}
+		}
+		if topic == nil {
+			return ErrNotFound
+		}
 	}
 	category, ok := categoryByID(topic.Category)
 	if !ok {

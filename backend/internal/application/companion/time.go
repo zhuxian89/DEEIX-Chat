@@ -74,7 +74,7 @@ func timeGreeting(now time.Time) string {
 func greetingForTime(p *Profile, now time.Time) string {
 	opening := timeGreeting(now)
 	if p.GreetingAt.IsZero() {
-		return opening + "我是小伴，一个 AI 聊天伙伴。不用想好问题，随口说点什么也可以。"
+		return opening + "我是" + Name + "，一个 AI 聊天伙伴。不用想好问题，随口说点什么也可以。"
 	}
 	choices := map[string][]string{
 		"早晨": {"新的一天，想从一件小事聊起吗？", "今天想慢慢来，还是已经有期待的事了？"},

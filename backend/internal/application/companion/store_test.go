@@ -43,6 +43,41 @@ func testStore(t *testing.T) *testRepository {
 	return &testRepository{Store: store, db: db}
 }
 
+func TestCompanionRenameReadsLegacyGreetingWithoutRewritingStoredContext(t *testing.T) {
+	store := testStore(t)
+	ctx := t.Context()
+	if _, err := store.Ensure(ctx, 7); err != nil {
+		t.Fatal(err)
+	}
+	const oldGreeting = "早呀。我是小伴，一个 AI 聊天伙伴。不用想好问题，随口说点什么也可以。"
+	const summary = "用户说自己的宠物叫小伴。"
+	now := time.Now()
+	if err := store.db.Table("companion_profiles").Where("user_id = ?", 7).Updates(map[string]interface{}{
+		"last_greeting": oldGreeting, "summary": summary, "summary_at": now,
+		"model": "configured-model", "conversation_public_id": "existing-conversation",
+	}).Error; err != nil {
+		t.Fatal(err)
+	}
+	state, err := (&Service{Store: store}).State(ctx, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if state.Name != Name || state.Model != "configured-model" || state.ConversationPublicID != "existing-conversation" || state.Greeting != strings.Replace(oldGreeting, "我是小伴", "我是"+Name, 1) {
+		t.Fatalf("legacy state lost identity or conversation continuity: %+v", state)
+	}
+	profile, err := store.Profile(ctx, 7)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if profile.LastGreeting != oldGreeting || profile.Summary != summary {
+		t.Fatal("reading legacy state rewrote stored context")
+	}
+	prompt := BuildPrompt(profile, nil, now)
+	if !strings.Contains(prompt, state.Greeting) || !strings.Contains(prompt, summary) {
+		t.Fatal("prompt did not preserve user context alongside the current greeting")
+	}
+}
+
 func TestCompanionLeaseSerializesConcurrentDevices(t *testing.T) {
 	s := testStore(t)
 	if _, err := s.Ensure(t.Context(), 7); err != nil {

@@ -218,6 +218,7 @@ export default function HomePage() {
   const historyLoadCounter = useRef(0);
   const dailyCheckinRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDailyCheckinClaimingRef = useRef(false);
+  const dailyCheckinReturnScreenRef = useRef<"home" | "account">("home");
   const [screen, setScreen] = useState<Screen>("home");
   const [booting, setBooting] = useState(true);
   const [bootError, setBootError] = useState(runtimeConfigError);
@@ -593,6 +594,7 @@ export default function HomePage() {
     const [overviewResult, monthlyResult] = await Promise.allSettled([
       session.getBillingOverview(),
       session.listMonthlyUsage(6),
+      refreshDailyCheckinStatus(),
     ]);
     if (overviewResult.status === "fulfilled") {
       setBillingOverview(overviewResult.value);
@@ -616,10 +618,19 @@ export default function HomePage() {
     void loadAccountCenter();
   };
 
-  const openDailyCheckin = () => {
+  const openDailyCheckin = (from: "home" | "account") => {
+    dailyCheckinReturnScreenRef.current = from;
     setWorkspaceError("");
     setScreen("checkin");
     void refreshDailyCheckinStatus();
+  };
+
+  const closeDailyCheckin = () => {
+    if (dailyCheckinReturnScreenRef.current === "account") {
+      openAccountCenter();
+    } else {
+      setScreen("home");
+    }
   };
 
   const openHistory = () => {
@@ -1742,7 +1753,7 @@ export default function HomePage() {
   if (screen === "checkin") {
     return (
       <ScrollView className="checkinPage" scrollY enhanced bounces={false} showScrollbar={false}>
-        <Header title="每日签到" onBack={() => setScreen("home")} />
+        <Header title="每日签到" onBack={closeDailyCheckin} />
         {dailyCheckin?.enabled ? (
           <DailyCheckinWheel
             status={dailyCheckin}
@@ -1992,10 +2003,38 @@ export default function HomePage() {
           <Text className="accountSectionTitle">账户资产</Text>
           <View className="balanceCard">
             <Text className="accountCardLabel">可用余额</Text>
-            <Text className="balanceValue">{formatUSD(billingOverview?.account?.balanceUSD ?? balanceUSD ?? 0)}</Text>
+            <Text className="balanceValue">{formatUSD(balanceUSD ?? billingOverview?.account?.balanceUSD ?? 0)}</Text>
             <Text className="accountCardHint">模型调用结算后自动更新</Text>
           </View>
         </View>
+
+        {dailyCheckin?.enabled ? (
+          <View className="accountSection">
+            <Text className="accountSectionTitle">每日签到</Text>
+            <View className="accountLinkCard accountCheckinCard" onClick={() => openDailyCheckin("account")}>
+              <View className="accountLinkIcon">签</View>
+              <View className="accountLinkBody">
+                <Text className="accountLinkTitle">
+                  {isDailyCheckinClaiming ? "奖励正在揭晓" : dailyCheckin.claimed ? "今日已签到" : "今日未签到"}
+                </Text>
+                <Text className="accountLinkHint">
+                  {dailyCheckin.claimed
+                    ? `今日获得 ${dailyCheckin.awardedCalls} 次标准对话`
+                    : "每天签到，领取对话奖励"}
+                </Text>
+                {dailyCheckin.claimed ? (
+                  <Text className="accountLinkHint">
+                    {dailyCheckin.streakDays > 0 ? `连续 ${dailyCheckin.streakDays} 天 · ` : ""}
+                    余额 +${dailyCheckin.rewardUsd.toFixed(5)}
+                  </Text>
+                ) : null}
+              </View>
+              <Text className="accountCheckinAction">
+                {isDailyCheckinClaiming ? "查看进度" : dailyCheckin.claimed ? "查看奖励" : "去签到"} ›
+              </Text>
+            </View>
+          </View>
+        ) : null}
 
         <View className="accountSection">
           <Text className="accountSectionTitle">订阅使用情况</Text>
@@ -2395,7 +2434,7 @@ export default function HomePage() {
   }
 
   return (
-    <View className="page homePage" onTouchMove={() => { companionInteraction.current = Date.now(); }}>
+    <View className="page homePage" onTouchStart={() => { companionInteraction.current = Date.now(); }} onTouchMove={() => { companionInteraction.current = Date.now(); }}>
       <View className="homeHeader">
         <Text className="eyebrow">AI省着用</Text>
         <View className="avatar" onClick={openAccountCenter}>
@@ -2407,10 +2446,10 @@ export default function HomePage() {
       {sessionRef.current && presets.chatModel && <CompanionEntry session={sessionRef.current}
         lastInteraction={companionInteraction} onState={setCompanionState} onOpen={() => setScreen("companion")} />}
 
-      {dailyCheckin?.enabled ? (
+      {dailyCheckin?.enabled && !dailyCheckin.claimed ? (
         <DailyCheckinEntry
           status={dailyCheckin}
-          onOpen={openDailyCheckin}
+          onOpen={() => openDailyCheckin("home")}
         />
       ) : null}
 

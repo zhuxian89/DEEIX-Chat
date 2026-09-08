@@ -21,16 +21,17 @@ import (
 )
 
 type Handler struct {
-	service      *app.Service
-	cfg          *config.Runtime
-	shutdown     *lifecycle.Shutdown
-	logger       *zap.Logger
-	refreshSlots chan struct{}
-	topicSlots   chan struct{}
+	service         *app.Service
+	cfg             *config.Runtime
+	shutdown        *lifecycle.Shutdown
+	logger          *zap.Logger
+	refreshSlots    chan struct{}
+	topicSlots      chan struct{}
+	initiativeSlots chan struct{}
 }
 
 func NewHandler(service *app.Service, cfg *config.Runtime, shutdown *lifecycle.Shutdown, logger *zap.Logger) *Handler {
-	return &Handler{service: service, cfg: cfg, shutdown: shutdown, logger: logger, refreshSlots: make(chan struct{}, 2), topicSlots: make(chan struct{}, 1)}
+	return &Handler{service: service, cfg: cfg, shutdown: shutdown, logger: logger, refreshSlots: make(chan struct{}, 2), topicSlots: make(chan struct{}, 1), initiativeSlots: make(chan struct{}, 2)}
 }
 
 func (h *Handler) Register(group *gin.RouterGroup) {
@@ -43,6 +44,8 @@ func (h *Handler) Register(group *gin.RouterGroup) {
 	g.DELETE("/memories/:id", h.Forget)
 	g.PATCH("/memories/:id", h.EditMemory)
 	g.POST("/topics/feedback", h.TopicFeedback)
+	g.POST("/initiatives", h.PrepareInitiative)
+	g.POST("/initiatives/:id/accept", h.AcceptInitiative)
 	g.POST("/conversations/:id/messages/stream", h.Stream)
 }
 
@@ -54,7 +57,8 @@ type OpenRequest struct {
 	AllowGreeting bool `json:"allowGreeting"`
 }
 type PreferencesRequest struct {
-	Quiet *bool `json:"quiet" binding:"required"`
+	Quiet       *bool   `json:"quiet"`
+	Proactivity *string `json:"proactivity" binding:"omitempty,oneof=normal less off"`
 }
 
 // CompanionChatRequest preserves the upstream wire contract under a unique
@@ -178,7 +182,7 @@ func (h *Handler) Open(c *gin.Context) {
 }
 
 // Preferences godoc
-// @Summary 开关助手主动开场
+// @Summary 调整助手主动程度，兼容旧版开场开关
 // @Tags companion
 // @Accept json
 // @Produce json
@@ -192,7 +196,17 @@ func (h *Handler) Preferences(c *gin.Context) {
 		response.InvalidRequestBody(c, err)
 		return
 	}
-	if err := h.service.SetQuiet(c.Request.Context(), middleware.MustUserID(c), *req.Quiet); err != nil {
+	if (req.Quiet == nil) == (req.Proactivity == nil) {
+		fail(c, app.ErrInvalid)
+		return
+	}
+	var err error
+	if req.Proactivity != nil {
+		err = h.service.SetProactivity(c.Request.Context(), middleware.MustUserID(c), *req.Proactivity)
+	} else {
+		err = h.service.SetQuiet(c.Request.Context(), middleware.MustUserID(c), *req.Quiet)
+	}
+	if err != nil {
 		fail(c, err)
 		return
 	}

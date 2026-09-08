@@ -11,6 +11,14 @@
  * ---------------------------------------------------------------
  */
 
+export interface AcceptInitiativeRequest {
+  /**
+   * @minLength 8
+   * @maxLength 64
+   */
+  visitID: string;
+}
+
 export interface ActiveMessageGenerationEventResponse {
   conversationPublicID?: string;
   runID?: string;
@@ -1771,6 +1779,36 @@ export interface ImportUpstreamModelsResponseDoc {
   errorMsg: string;
 }
 
+export interface Initiative {
+  acceptedAt: string;
+  afterMessageID: number;
+  createdAt: string;
+  expiresAt: string;
+  id: string;
+  kind: string;
+  text: string;
+  topic?: Topic;
+}
+
+export interface InitiativeRequest {
+  afterMessageID: number;
+  kind: "home" | "idle";
+  /**
+   * @minLength 8
+   * @maxLength 64
+   */
+  visitID: string;
+}
+
+export interface InitiativeResponse {
+  data: InitiativeResult;
+  errorMsg: string;
+}
+
+export interface InitiativeResult {
+  message: Initiative | null;
+}
+
 export interface InvitationPanelResponse {
   invitationCode: string;
   inviteCount: number;
@@ -2841,6 +2879,7 @@ export interface PlatformFileDeleteResponseDoc {
 }
 
 export interface PreferencesRequest {
+  proactivity: "normal" | "less" | "off";
   quiet: boolean;
 }
 
@@ -3505,9 +3544,12 @@ export interface State {
   greetingAt: string;
   greetingID: string;
   greetingOffered: boolean;
+  initiativeVersion: number;
+  initiatives: Initiative[];
   memories: Memory[];
   model: string;
   name: string;
+  proactivity: string;
   quiet: boolean;
   topic?: Topic;
 }
@@ -8355,6 +8397,41 @@ export namespace Companion {
   /**
    * No description
    * @tags companion
+   * @name InitiativesCreate
+   * @summary 为前台空闲准备一条候选主动消息，不立即展示、不扣用户余额
+   * @request POST:/companion/initiatives
+   * @secure
+   */
+  export namespace InitiativesCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = InitiativeRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = InitiativeResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name InitiativesAcceptCreate
+   * @summary 前台仍空闲时确认展示候选，拒绝过期或会话已变化的消息
+   * @request POST:/companion/initiatives/{id}/accept
+   * @secure
+   */
+  export namespace InitiativesAcceptCreate {
+    export type RequestParams = {
+      /** 候选消息 ID */
+      id: string;
+    };
+    export type RequestQuery = {};
+    export type RequestBody = AcceptInitiativeRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = InitiativeResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
    * @name MemoriesDelete
    * @summary 删除助手记忆，并阻止旧上下文再次提取
    * @request DELETE:/companion/memories
@@ -8428,7 +8505,7 @@ export namespace Companion {
    * No description
    * @tags companion
    * @name PreferencesPartialUpdate
-   * @summary 开关助手主动开场
+   * @summary 调整助手主动程度，兼容旧版开场开关
    * @request PATCH:/companion/preferences
    * @secure
    */

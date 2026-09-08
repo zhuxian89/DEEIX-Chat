@@ -9949,6 +9949,89 @@ const docTemplate = `{
                 }
             }
         },
+        "/companion/initiatives": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "为前台空闲准备一条候选主动消息，不立即展示、不扣用户余额",
+                "parameters": [
+                    {
+                        "description": "触发场景与页面停留标识",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/InitiativeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/InitiativeResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/initiatives/{id}/accept": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "前台仍空闲时确认展示候选，拒绝过期或会话已变化的消息",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "候选消息 ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "原页面停留标识",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/AcceptInitiativeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/InitiativeResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/companion/memories": {
             "delete": {
                 "security": [
@@ -10102,7 +10185,7 @@ const docTemplate = `{
                 "tags": [
                     "companion"
                 ],
-                "summary": "开关助手主动开场",
+                "summary": "调整助手主动程度，兼容旧版开场开关",
                 "parameters": [
                     {
                         "description": "开场偏好",
@@ -15157,6 +15240,19 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "AcceptInitiativeRequest": {
+            "type": "object",
+            "required": [
+                "visitID"
+            ],
+            "properties": {
+                "visitID": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "minLength": 8
+                }
+            }
+        },
         "ActiveMessageGenerationEventResponse": {
             "type": "object",
             "required": [
@@ -20823,6 +20919,101 @@ const docTemplate = `{
                 }
             }
         },
+        "Initiative": {
+            "type": "object",
+            "required": [
+                "acceptedAt",
+                "afterMessageID",
+                "createdAt",
+                "expiresAt",
+                "id",
+                "kind",
+                "text"
+            ],
+            "properties": {
+                "acceptedAt": {
+                    "type": "string"
+                },
+                "afterMessageID": {
+                    "type": "integer"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "expiresAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "topic": {
+                    "$ref": "#/definitions/Topic"
+                }
+            }
+        },
+        "InitiativeRequest": {
+            "type": "object",
+            "required": [
+                "afterMessageID",
+                "kind",
+                "visitID"
+            ],
+            "properties": {
+                "afterMessageID": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string",
+                    "enum": [
+                        "home",
+                        "idle"
+                    ]
+                },
+                "visitID": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "minLength": 8
+                }
+            }
+        },
+        "InitiativeResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/InitiativeResult"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "InitiativeResult": {
+            "type": "object",
+            "required": [
+                "message"
+            ],
+            "properties": {
+                "message": {
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/Initiative"
+                        }
+                    ],
+                    "x-nullable": true,
+                    "x-omitempty": false
+                }
+            }
+        },
         "InvitationPanelResponse": {
             "type": "object",
             "required": [
@@ -24291,9 +24482,18 @@ const docTemplate = `{
         "PreferencesRequest": {
             "type": "object",
             "required": [
+                "proactivity",
                 "quiet"
             ],
             "properties": {
+                "proactivity": {
+                    "type": "string",
+                    "enum": [
+                        "normal",
+                        "less",
+                        "off"
+                    ]
+                },
                 "quiet": {
                     "type": "boolean"
                 }
@@ -26409,9 +26609,12 @@ const docTemplate = `{
                 "greetingAt",
                 "greetingID",
                 "greetingOffered",
+                "initiativeVersion",
+                "initiatives",
                 "memories",
                 "model",
                 "name",
+                "proactivity",
                 "quiet"
             ],
             "properties": {
@@ -26430,6 +26633,15 @@ const docTemplate = `{
                 "greetingOffered": {
                     "type": "boolean"
                 },
+                "initiativeVersion": {
+                    "type": "integer"
+                },
+                "initiatives": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/Initiative"
+                    }
+                },
                 "memories": {
                     "type": "array",
                     "items": {
@@ -26440,6 +26652,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "proactivity": {
                     "type": "string"
                 },
                 "quiet": {

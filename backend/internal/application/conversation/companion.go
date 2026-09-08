@@ -5,7 +5,6 @@ package conversation
 import (
 	"context"
 	"errors"
-	"time"
 
 	appcompact "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/compact"
 	model "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/conversation"
@@ -113,9 +112,8 @@ func (r *companionConversationRepository) ListMessageAncestors(ctx context.Conte
 	for _, item := range items {
 		if item.ID > r.forgetThrough && item.Status != "blocked" {
 			item.ReasoningContent = ""
-			if !item.CreatedAt.IsZero() {
-				at := item.CreatedAt.In(time.FixedZone("Asia/Shanghai", 8*60*60))
-				item.Content = "[历史消息时间：北京时间 " + at.Format("2006-01-02 15:04:05") + "]\n" + item.Content
+			if item.Role == "assistant" {
+				item.Content = cleanCompanionTimeMarkers(item.Content)
 			}
 			kept = append(kept, item)
 		}

@@ -38,4 +38,11 @@ type Store interface {
 	ClaimTopics(ctx context.Context, category, token string, now time.Time) (bool, error)
 	SaveTopics(ctx context.Context, category, token, topicsJSON string, now time.Time) error
 	SaveTopicFeedback(ctx context.Context, userID uint, token string, memory Memory) error
+	InitiativeState(ctx context.Context, userID uint) (*domain.InitiativeState, error)
+	SetProactivity(ctx context.Context, userID uint, mode string) error
+	ReserveInitiative(ctx context.Context, item domain.Initiative, token string) error
+	CompleteInitiative(ctx context.Context, item domain.Initiative) error
+	Initiative(ctx context.Context, userID uint, id string) (*domain.Initiative, error)
+	Initiatives(ctx context.Context, userID, conversationID uint) ([]domain.Initiative, error)
+	AcceptInitiative(ctx context.Context, item domain.Initiative, token string, pace domain.InitiativeState) error
 }

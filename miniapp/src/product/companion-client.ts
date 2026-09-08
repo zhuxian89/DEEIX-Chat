@@ -1,7 +1,9 @@
-import type { State as CompanionState } from "@deeix/api-contract";
+import type { Initiative as CompanionInitiative, InitiativeResult, State as CompanionState } from "@deeix/api-contract";
 import type { ApiRequest } from "@/platform/transport";
 
-export type { State as CompanionState, Memory as CompanionMemory } from "@deeix/api-contract";
+export type { State as CompanionState, Memory as CompanionMemory, Initiative as CompanionInitiative } from "@deeix/api-contract";
+
+export type CompanionProactivity = "normal" | "less" | "off";
 
 // Authentication, refresh cookies and error envelopes stay in MiniAppSession.
 export class CompanionClient {
@@ -17,6 +19,24 @@ export class CompanionClient {
 
   async setQuiet(quiet: boolean): Promise<void> {
     await this.request({ path: "/api/v1/companion/preferences", method: "PATCH", body: { quiet } });
+  }
+
+  async setProactivity(proactivity: CompanionProactivity): Promise<void> {
+    await this.request({ path: "/api/v1/companion/preferences", method: "PATCH", body: { proactivity } });
+  }
+
+  async prepareInitiative(kind: "home" | "idle", visitID: string, afterMessageID: number): Promise<CompanionInitiative | null> {
+    const result = await this.request<InitiativeResult>({
+      path: "/api/v1/companion/initiatives", method: "POST", body: { kind, visitID, afterMessageID },
+    });
+    return result.message;
+  }
+
+  async acceptInitiative(id: string, visitID: string): Promise<CompanionInitiative | null> {
+    const result = await this.request<InitiativeResult>({
+      path: `/api/v1/companion/initiatives/${encodeURIComponent(id)}/accept`, method: "POST", body: { visitID },
+    });
+    return result.message;
   }
 
   async forget(id?: string): Promise<void> {

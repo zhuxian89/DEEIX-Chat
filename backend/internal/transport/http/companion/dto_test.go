@@ -33,6 +33,7 @@ func TestCompanionStateWireContractPreservesFieldsAndHidesInternalData(t *testin
 	if err := json.Unmarshal([]byte(`{"name":"小伴","model":"configured-model","conversationPublicID":"conversation","quiet":false,"greeting":"你好","greetingID":"greeting","greetingAt":"2026-09-08T00:00:00Z","greetingOffered":true,"memories":[{"id":"memory","key":"music","value":"喜欢爵士","evidence":"我喜欢爵士","expiresAt":"2026-09-08T00:00:00Z","updatedAt":"2026-09-08T00:00:00Z"}],"topic":{"category":"music","title":"报道","url":"https://www.bbc.com/news/music","opener":"聊聊音乐","publishedAt":"2026-09-08T00:00:00Z","fetchedAt":"2026-09-08T00:00:00Z"}}`), &expected); err != nil {
 		t.Fatal(err)
 	}
+	expected["proactivity"], expected["initiativeVersion"], expected["initiatives"] = "", float64(0), []interface{}{}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("public state contract changed or exposed internal fields: %s", encoded)
 	}

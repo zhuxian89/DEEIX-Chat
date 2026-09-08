@@ -7,16 +7,19 @@ import (
 )
 
 type State struct {
-	Name                 string    `json:"name"`
-	Model                string    `json:"model"`
-	ConversationPublicID string    `json:"conversationPublicID"`
-	Quiet                bool      `json:"quiet"`
-	Greeting             string    `json:"greeting"`
-	GreetingID           string    `json:"greetingID"`
-	GreetingAt           time.Time `json:"greetingAt"`
-	GreetingOffered      bool      `json:"greetingOffered"`
-	Memories             []Memory  `json:"memories"`
-	Topic                *Topic    `json:"topic,omitempty"`
+	Name                 string       `json:"name"`
+	Model                string       `json:"model"`
+	ConversationPublicID string       `json:"conversationPublicID"`
+	Quiet                bool         `json:"quiet"`
+	Greeting             string       `json:"greeting"`
+	GreetingID           string       `json:"greetingID"`
+	GreetingAt           time.Time    `json:"greetingAt"`
+	GreetingOffered      bool         `json:"greetingOffered"`
+	Memories             []Memory     `json:"memories"`
+	Topic                *Topic       `json:"topic,omitempty"`
+	Proactivity          string       `json:"proactivity"`
+	InitiativeVersion    int          `json:"initiativeVersion"`
+	Initiatives          []Initiative `json:"initiatives"`
 }
 
 type Memory struct {
@@ -62,6 +65,12 @@ func stateDTO(state *app.State) *State {
 		GreetingAt:           state.GreetingAt,
 		GreetingOffered:      state.GreetingOffered,
 		Memories:             memories,
+		Proactivity:          state.Proactivity,
+		InitiativeVersion:    state.InitiativeVersion,
+		Initiatives:          make([]Initiative, 0, len(state.Initiatives)),
+	}
+	for _, item := range state.Initiatives {
+		result.Initiatives = append(result.Initiatives, *initiativeDTO(&item))
 	}
 	if state.Topic != nil {
 		topic := Topic(*state.Topic)

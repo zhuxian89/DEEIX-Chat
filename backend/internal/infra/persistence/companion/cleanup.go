@@ -22,6 +22,12 @@ func (s *Store) PurgeDeletedUsers(ctx context.Context) error {
 		return nil
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("user_id IN ?", ids).Delete(&initiativeRecord{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("user_id IN ?", ids).Delete(&initiativeStateRecord{}).Error; err != nil {
+			return err
+		}
 		if err := tx.Where("user_id IN ?", ids).Delete(&memoryRecord{}).Error; err != nil {
 			return err
 		}

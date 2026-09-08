@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -67,7 +68,7 @@ func TestCompanionHistoryStopsAt24Messages(t *testing.T) {
 	}
 }
 
-func TestCompanionHistoryDatesDoNotMutateStoredContent(t *testing.T) {
+func TestCompanionHistoryKeepsDatesOutOfDialogueText(t *testing.T) {
 	repo := &companionRepoFixture{branchContextRepositoryStub: branchContextRepositoryStub{messages: buildBranchContextMessages(3)}}
 	at := time.Date(2026, 9, 7, 16, 5, 0, 0, time.UTC)
 	for i := range repo.messages {
@@ -81,12 +82,62 @@ func TestCompanionHistoryDatesDoNotMutateStoredContent(t *testing.T) {
 			t.Fatalf("history error: %v", err)
 		}
 		for _, item := range items {
-			if !strings.HasPrefix(item.Content, "[历史消息时间：北京时间 2026-09-08 00:05:00]\n") || strings.Count(item.Content, "历史消息时间") != 1 {
-				t.Fatalf("incorrect timestamp: %s", item.Content)
+			if item.Content != "我明天要面试" || !item.CreatedAt.Equal(at) {
+				t.Fatalf("history body or source timestamp changed: %+v", item)
 			}
 		}
 	}
 	if repo.messages[0].Content != "我明天要面试" {
 		t.Fatal("stored text changed")
+	}
+}
+
+func TestCompanionHistoryDoesNotRepeatLeakedAssistantTimeMarkers(t *testing.T) {
+	const leaked = "[历史消息时间：北京时间 2026-09-08 07:17:21] “不认真”这个标签背后"
+	repo := &companionRepoFixture{branchContextRepositoryStub: branchContextRepositoryStub{messages: buildBranchContextMessages(2)}}
+	repo.messages[0].Role, repo.messages[0].Content = "user", leaked
+	repo.messages[1].Role, repo.messages[1].Content = "assistant", leaked
+	wrapped := &companionConversationRepository{ConversationRepository: repo, conversationID: 7}
+	items, err := wrapped.ListMessageAncestors(t.Context(), 7, 2, 24)
+	if err != nil || len(items) != 2 {
+		t.Fatalf("history error: %v", err)
+	}
+	if items[0].Content != leaked || items[1].Content != "“不认真”这个标签背后" {
+		t.Fatalf("assistant marker was retained or user quotation was changed: %+v", items)
+	}
+	if repo.messages[1].Content != leaked {
+		t.Fatal("stored assistant message was rewritten")
+	}
+}
+
+func TestCompanionHistoryTimePromptPreservesDatesAndMemoryBoundary(t *testing.T) {
+	at := time.Date(2026, 9, 7, 16, 5, 0, 0, time.UTC)
+	messages := []model.Message{
+		{ID: 1, Role: "user", Content: "forgotten", CreatedAt: at},
+		{ID: 2, Role: "user", Content: "blocked", Status: "blocked", CreatedAt: at},
+		{ID: 3, Role: "user", Content: "undated"},
+		{ID: 4, Role: "tool", Content: "tool output", CreatedAt: at},
+		{ID: 5, Role: "user", Content: "我明天要面试", CreatedAt: at},
+		{ID: 6, Role: "assistant", Content: "[历史消息时间：北京时间 2026-09-08 00:05:00]\n想聊聊面试吗？", CreatedAt: at.Add(time.Minute)},
+		{ID: 7, Role: "user", Content: strings.Repeat("聊", 140), CreatedAt: at},
+	}
+	prompt := CompanionHistoryTimePrompt(messages, 1)
+	raw := strings.TrimSuffix(strings.TrimPrefix(prompt, "\n<history_message_times>\n"), "\n</history_message_times>")
+	var entries []companionHistoryTime
+	if err := json.Unmarshal([]byte(raw), &entries); err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 3 || entries[0].Role != "user" || entries[0].TextExcerpt != "我明天要面试" || entries[0].AtBeijing != "2026-09-08T00:05:00+08:00" || entries[1].TextExcerpt != "想聊聊面试吗？" || entries[1].AtBeijing != "2026-09-08T00:06:00+08:00" || len([]rune(entries[2].TextExcerpt)) != 120 {
+		t.Fatalf("incorrect dated context: %+v", entries)
+	}
+	if CompanionHistoryTimePrompt(messages, 7) != "" {
+		t.Fatal("forgotten messages leaked through the timestamp index")
+	}
+	longHistory := make([]model.Message, CompanionRecentMessageLimit+10)
+	for i := range longHistory {
+		longHistory[i] = model.Message{ID: uint(i + 1), Role: "user", CreatedAt: at}
+	}
+	if count := strings.Count(CompanionHistoryTimePrompt(longHistory, 0), `"at_beijing"`); count != CompanionRecentMessageLimit {
+		t.Fatalf("unbounded timestamp index: %d", count)
 	}
 }
