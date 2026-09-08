@@ -17,6 +17,7 @@ import (
 
 	domainspeech "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/speech"
 	speechport "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/ports/speech"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/security"
 )
 
 const endpoint = "asr.tencentcloudapi.com"
@@ -24,12 +25,12 @@ const endpoint = "asr.tencentcloudapi.com"
 type Tencent struct{ client *http.Client }
 
 func NewTencent() *Tencent {
-	return &Tencent{client: &http.Client{
-		Timeout: 20 * time.Second,
-		CheckRedirect: func(*http.Request, []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}}
+	// Tencent uses a fixed public endpoint; private targets and proxies are not trusted.
+	client := security.NewOutboundHTTPClient(security.NewStrictOutboundPolicy(true), 20*time.Second)
+	client.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
+	return &Tencent{client: client}
 }
 
 func (t *Tencent) Recognize(ctx context.Context, cfg domainspeech.Config, audio []byte) (speechport.Transcript, error) {
