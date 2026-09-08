@@ -1,13 +1,111 @@
-.companionEntry { display: flex; align-items: center; gap: 22px; padding: 28px; margin: 24px 0; border: 1px solid #d8e5d9; border-radius: 28px; background: #f1f6ef; color: #263e32; }
+.companionEntryFrame {
+  position: relative;
+  padding: 3px;
+  margin: 24px 0;
+  overflow: hidden;
+  border-radius: 28px;
+  background: #bad5bc;
+  box-shadow: 0 8px 28px rgba(94, 126, 91, 0.07);
+}
+
+// The opaque inner card covers this rotating light, leaving only a thin rim.
+.companionEntryFrame::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 200%;
+  height: 0;
+  padding-top: 200%;
+  background: linear-gradient(90deg, transparent 38%, #6dab83 46%, #fff3b0 50%, #6dab83 54%, transparent 62%);
+  transform: translate(-50%, -50%) rotate(30deg);
+  pointer-events: none;
+  animation: companionEntryBorderFlow 10s linear infinite;
+}
+
+.companionEntry {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 26px;
+  overflow: hidden;
+  border-radius: 25px;
+  background: linear-gradient(120deg, #eaf4e8 0%, #f5f3e1 55%, #f7eae3 100%);
+  color: #263e32;
+}
+
+// Move a decorative layer so the text and card geometry remain still.
+.companionEntry::before {
+  content: "";
+  position: absolute;
+  top: -45%;
+  right: -30%;
+  bottom: -45%;
+  left: -30%;
+  background:
+    radial-gradient(ellipse at 22% 35%, rgba(145, 202, 164, 0.58) 0%, rgba(145, 202, 164, 0) 52%),
+    radial-gradient(ellipse at 78% 60%, rgba(242, 183, 164, 0.46) 0%, rgba(242, 183, 164, 0) 48%),
+    radial-gradient(ellipse at 52% 25%, rgba(255, 246, 192, 0.7) 0%, rgba(255, 246, 192, 0) 50%);
+  pointer-events: none;
+  animation: companionEntryFlow 12s ease-in-out infinite alternate;
+}
+
+.companionEntryPortrait {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+.companionEntryPortrait::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  bottom: -8px;
+  left: -8px;
+  border: 2px solid #faffed;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #fff9d5, #a5d8b0);
+  box-shadow: 0 0 0 3px rgba(87, 152, 100, 0.46), 0 0 20px 5px rgba(123, 192, 126, 0.48);
+  opacity: 0.75;
+  pointer-events: none;
+  animation: companionEntryBreathe 4s ease-in-out infinite;
+}
+
+.companionEntryPortrait .companionAvatar { position: relative; }
+
+@keyframes companionEntryBorderFlow {
+  from { transform: translate(-50%, -50%) rotate(30deg); }
+  to { transform: translate(-50%, -50%) rotate(390deg); }
+}
+
+@keyframes companionEntryFlow {
+  from { transform: translate3d(-7%, -3%, 0) rotate(-5deg); opacity: 0.68; }
+  to { transform: translate3d(7%, 3%, 0) rotate(5deg); opacity: 1; }
+}
+
+@keyframes companionEntryBreathe {
+  0%, 100% { transform: scale(0.96); opacity: 0.3; }
+  50% { transform: scale(1.14); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .companionEntryFrame::before,
+  .companionEntry::before,
+  .companionEntryPortrait::before { animation: none; }
+}
+
 .companionAvatar { display: block; flex-shrink: 0; border-radius: 50%; background: #e5efda; }
 .companionAvatar--entry { width: 144px; height: 144px; }
 .companionAvatar--header { width: 84px; height: 84px; }
 .companionAvatar--message { width: 72px; height: 72px; margin-top: 8px; }
-.companionEntryBody { min-width: 0; display: flex; flex-direction: column; gap: 12px; }
+.companionEntryBody { position: relative; z-index: 1; flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; }
 .companionEntryTitle { font-size: 30px; font-weight: 600; }
 .companionTag { font-size: 21px; color: #667c69; margin-left: 8px; font-weight: 400; }
 .companionEntryText { font-size: 27px; line-height: 1.65; }
-.companionEntryAction { font-size: 24px; color: #52795e; margin-top: 5px; }
+.companionEntryAction { align-self: flex-start; padding: 8px 18px; border: 1px solid rgba(255, 255, 255, 0.72); border-radius: 999px; background: rgba(255, 255, 255, 0.5); font-size: 24px; color: #466b50; margin-top: 5px; }
 .companionPage { height: 100vh; height: 100dvh; box-sizing: border-box; display: flex; flex-direction: column; background: #f8f8f2; color: #26382e; overflow: hidden; }
 .companionHeader { flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; min-height: 112px; padding: 20px 28px; gap: 16px; background: #f8f8f2; border-bottom: 1px solid #e4e9de; }
 .companionBack { font-size: 28px; padding: 10px 0; }

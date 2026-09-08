@@ -3,6 +3,7 @@ import { Button, Image, ScrollView, Switch, Text, Textarea, View } from "@tarojs
 import Taro from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
+import { SpeechInputButton } from "@/components/speech-input/speech-input";
 import { canOfferCompanionGreeting, companionBeijingDate, companionImageIDs, type CompanionMemory, type CompanionProactivity, type CompanionState } from "@/product/companion-client";
 import { canOfferCompanionContinuation, CompanionInitiativeVisit, withCompanionInitiative } from "@/product/companion-initiative";
 import { composerKeyboardStyle } from "@/product/keyboard-layout";
@@ -94,12 +95,16 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
   if (!state) return null;
 
   return (
-    <View className="companionEntry" onClick={onOpen}>
-      <CompanionAvatar size="entry" />
-      <View className="companionEntryBody">
-        <Text className="companionEntryTitle">{COMPANION_NAME} <Text className="companionTag">AI 聊天伙伴</Text></Text>
-        <Text className="companionEntryText">{state.greetingOffered && !state.quiet ? state.greeting : "不用想好问题，随口聊聊也可以。"}</Text>
-        <Text className="companionEntryAction">和{COMPANION_NAME}聊聊 ›</Text>
+    <View className="companionEntryFrame" onClick={onOpen}>
+      <View className="companionEntry">
+        <View className="companionEntryPortrait">
+          <CompanionAvatar size="entry" />
+        </View>
+        <View className="companionEntryBody">
+          <Text className="companionEntryTitle">{COMPANION_NAME} <Text className="companionTag">AI 聊天伙伴</Text></Text>
+          <Text className="companionEntryText">{state.greetingOffered && !state.quiet ? state.greeting : "不用想好问题，随口聊聊也可以。"}</Text>
+          <Text className="companionEntryAction">和{COMPANION_NAME}聊聊 ›</Text>
+        </View>
       </View>
     </View>
   );
@@ -144,6 +149,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   const [conversation, setConversation] = useState<ConversationResponse | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [draft, setDraft] = useState("");
+  const [speechActive, setSpeechActive] = useState(false);
   const [attachment, setAttachment] = useState<{ path: string; fileID: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -168,8 +174,8 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   const initiativeForeground = useRef(true);
   const lastInteractionAt = useRef(Date.now());
   const replyVisible = useRef({ id: 0, at: 0 });
-  const initiativeContext = useRef({ state, messages, draft, attachment, busy, uploading, loading, memoryOpen });
-  initiativeContext.current = { state, messages, draft, attachment, busy, uploading, loading, memoryOpen };
+  const initiativeContext = useRef({ state, messages, draft, attachment, busy, uploading, loading, memoryOpen, speechActive });
+  initiativeContext.current = { state, messages, draft, attachment, busy, uploading, loading, memoryOpen, speechActive };
 
   const recordCompanionInteraction = useCallback(() => {
     lastInteractionAt.current = Date.now();
@@ -310,7 +316,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
         if (!mounted.current || !current.state?.initiativeVersion || current.messages.at(-1)?.serverID !== after) return false;
         return canOfferCompanionContinuation({
           foreground: initiativeForeground.current,
-          typing: Boolean(current.draft.length || current.attachment),
+          typing: Boolean(current.draft.length || current.attachment || current.speechActive),
           replying: current.busy || busyRef.current,
           readingHistory: !autoFollow.current || touching.current,
           unavailable: current.loading || current.uploading || current.memoryOpen,
@@ -339,7 +345,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
 
   const send = async () => {
     const content = draft.trim();
-    if (!conversation || !state || busyRef.current || uploading || (!content && !attachment)) return;
+    if (!conversation || !state || busyRef.current || uploading || speechActive || (!content && !attachment)) return;
     recordCompanionInteraction();
     busyRef.current = true;
     setBusy(true);
@@ -593,9 +599,12 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
         <View className="companionComposer" style={composerKeyboardStyle(keyboard)}>
           {attachment && <View className="companionAttachment"><Image src={attachment.path} mode="aspectFill" /><Text onClick={() => setAttachment(null)}>移除图片</Text></View>}
           <View className="companionInputRow">
-            <Button className="companionPhoto" disabled={busy || uploading || loading} onClick={() => void chooseImage()}>{uploading ? "…" : "图片"}</Button>
-            <Textarea className="companionInput" value={draft} placeholder="随口说点什么…" maxlength={8000} autoHeight adjustPosition={false} showConfirmBar={false} disabled={busy || loading} onLineChange={measureHistory} onInput={(event) => { recordCompanionInteraction(); setDraft(event.detail.value); }} />
-            <Button className="companionSend" disabled={loading || uploading || (!busy && !draft.trim() && !attachment)} onClick={() => busy ? void session.cancelActiveGeneration().catch((cause) => setError(errorMessage(cause))) : void send()}>{busy ? "停止" : "发送"}</Button>
+            <Button className="companionPhoto" disabled={busy || uploading || loading || speechActive} onClick={() => void chooseImage()}>{uploading ? "…" : "图片"}</Button>
+            <Textarea className="companionInput" value={draft} placeholder="随口说点什么…" maxlength={8000} autoHeight adjustPosition={false} showConfirmBar={false} disabled={busy || loading || speechActive} onLineChange={measureHistory} onInput={(event) => { recordCompanionInteraction(); setDraft(event.detail.value); }} />
+            <SpeechInputButton client={session.speech} draft={draft} disabled={busy || uploading || loading || memoryOpen}
+              onDraft={(value) => { recordCompanionInteraction(); setDraft(value); }}
+              onActive={(active) => { recordCompanionInteraction(); setSpeechActive(active); }} onError={setError} />
+            <Button className="companionSend" disabled={loading || uploading || speechActive || (!busy && !draft.trim() && !attachment)} onClick={() => busy ? void session.cancelActiveGeneration().catch((cause) => setError(errorMessage(cause))) : void send()}>{busy ? "停止" : "发送"}</Button>
           </View>
           {!keyboard && <Text className="companionFootnote">聊天及联网按平台用量计费 · 主动招呼不扣余额</Text>}
         </View>

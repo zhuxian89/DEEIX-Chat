@@ -403,6 +403,10 @@ type Config struct {
 	WeChatMiniAppDefaultChatModel  string
 	WeChatMiniAppDefaultImageModel string
 
+	// Speech credentials are only used to seed missing system settings at startup.
+	SpeechTencentSecretID  string
+	SpeechTencentSecretKey string
+
 	OTelEnabled              *bool
 	OTelExporterOTLPEndpoint string
 	OTelExporterOTLPHeaders  string
@@ -655,6 +659,9 @@ func Load() Config {
 		WeChatMiniAppAppSecret:         strings.TrimSpace(os.Getenv("WECHAT_MINIAPP_APP_SECRET")),
 		WeChatMiniAppDefaultChatModel:  strings.TrimSpace(os.Getenv("WECHAT_MINIAPP_DEFAULT_CHAT_MODEL")),
 		WeChatMiniAppDefaultImageModel: strings.TrimSpace(os.Getenv("WECHAT_MINIAPP_DEFAULT_IMAGE_MODEL")),
+
+		SpeechTencentSecretID:  strings.TrimSpace(os.Getenv("SPEECH_TENCENT_SECRET_ID")),
+		SpeechTencentSecretKey: strings.TrimSpace(os.Getenv("SPEECH_TENCENT_SECRET_KEY")),
 
 		OTelEnabled:              envOrBoolOptional("OTEL_ENABLED", yc.Observability.Tracing.Enabled),
 		OTelExporterOTLPEndpoint: envOr("OTEL_EXPORTER_OTLP_ENDPOINT", yc.Observability.Tracing.Endpoint, ""),

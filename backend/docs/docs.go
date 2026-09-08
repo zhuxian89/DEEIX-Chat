@@ -15058,6 +15058,98 @@ const docTemplate = `{
                 }
             }
         },
+        "/speech/capabilities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "speech"
+                ],
+                "summary": "查询语音输入是否可用",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SpeechCapabilitiesResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/speech/transcriptions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "speech"
+                ],
+                "summary": "将短录音转为输入框草稿，不发送聊天消息",
+                "parameters": [
+                    {
+                        "description": "Base64 MP3 audio",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/SpeechTranscriptionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SpeechTranscriptResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/temporary-chat/messages/stream": {
             "post": {
                 "security": [
@@ -26597,6 +26689,78 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "updatedAt": {
+                    "type": "string"
+                }
+            }
+        },
+        "SpeechCapabilities": {
+            "type": "object",
+            "required": [
+                "enabled",
+                "maxDurationMs"
+            ],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "maxDurationMs": {
+                    "type": "integer"
+                }
+            }
+        },
+        "SpeechCapabilitiesResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/SpeechCapabilities"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "SpeechTranscript": {
+            "type": "object",
+            "required": [
+                "durationMs",
+                "text"
+            ],
+            "properties": {
+                "durationMs": {
+                    "type": "integer"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "SpeechTranscriptResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/SpeechTranscript"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "SpeechTranscriptionRequest": {
+            "type": "object",
+            "required": [
+                "audio"
+            ],
+            "properties": {
+                "audio": {
+                    "description": "Base64-encoded MP3, 16 kHz, mono, up to 60 seconds and 512 KiB decoded.",
                     "type": "string"
                 }
             }

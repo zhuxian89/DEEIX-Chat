@@ -2,6 +2,7 @@ package settings
 
 import (
 	"strconv"
+	"strings"
 
 	domaindailycheckin "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/dailycheckin"
 	domainsettings "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/settings"
@@ -18,6 +19,10 @@ const (
 // defaultSettings 返回所有动态配置的默认种子数据。
 func defaultSettings() []domainsettings.SystemSetting {
 	return []domainsettings.SystemSetting{
+		{Namespace: "speech", Key: "enabled", Value: "false", ValueType: "bool", Description: "启用小禾、AI 对话和 AI 生图的语音输入；请先填写腾讯云凭据"},
+		{Namespace: "speech", Key: "tencent_secret_id", Value: "", ValueType: "string", Description: "腾讯云语音识别 SecretId（加密保存）"},
+		{Namespace: "speech", Key: "tencent_secret_key", Value: "", ValueType: "string", Description: "腾讯云语音识别 SecretKey（加密保存，留空保留原值）"},
+		{Namespace: "speech", Key: "engine", Value: "16k_zh", ValueType: "string", Description: "一句话识别引擎：16k_zh 普通话；16k_zh-PY 中英粤；16k_zh_dialect 多方言"},
 		// 认证配置
 		{Namespace: "auth", Key: "token_ttl_hours", Value: "24", ValueType: "int", Description: "Access Token 有效期(小时)"},
 		{Namespace: "auth", Key: "refresh_token_ttl_hours", Value: "720", ValueType: "int", Description: "Refresh Token 有效期(小时)"},
@@ -220,6 +225,8 @@ func defaultSettings() []domainsettings.SystemSetting {
 
 func defaultSettingsWithConfig(cfg config.Config) []domainsettings.SystemSetting {
 	items := defaultSettings()
+	speechSecretID := strings.TrimSpace(cfg.SpeechTencentSecretID)
+	speechSecretKey := strings.TrimSpace(cfg.SpeechTencentSecretKey)
 	legacyValues := map[string]string{
 		"wechat:callback_token":              cfg.WeChatCallbackToken,
 		"wechat_miniapp:enabled":             strconv.FormatBool(cfg.WeChatMiniAppEnabled),
@@ -227,6 +234,9 @@ func defaultSettingsWithConfig(cfg config.Config) []domainsettings.SystemSetting
 		"wechat_miniapp:app_secret":          cfg.WeChatMiniAppAppSecret,
 		"wechat_miniapp:default_chat_model":  cfg.WeChatMiniAppDefaultChatModel,
 		"wechat_miniapp:default_image_model": cfg.WeChatMiniAppDefaultImageModel,
+		"speech:tencent_secret_id":           speechSecretID,
+		"speech:tencent_secret_key":          speechSecretKey,
+		"speech:enabled":                     strconv.FormatBool(speechSecretID != "" && speechSecretKey != ""),
 	}
 	for index := range items {
 		if value, ok := legacyValues[items[index].Namespace+":"+items[index].Key]; ok {

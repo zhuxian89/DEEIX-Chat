@@ -368,6 +368,7 @@ func csvSet(raw string) map[string]struct{} {
 
 // validNamespaces 合法的 namespace 集合。
 var validNamespaces = map[string]bool{
+	"speech":         true,
 	"auth":           true,
 	"billing":        true,
 	"chat":           true,
@@ -422,6 +423,9 @@ func (s *Service) BatchUpdate(ctx context.Context, patches []PatchItem) (map[str
 	if err := s.validateWeChatSettings(ctx, patches); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidSetting, err)
 	}
+	if err := s.validateSpeechSettings(ctx, patches); err != nil {
+		return nil, fmt.Errorf("%w: %v", ErrInvalidSetting, err)
+	}
 	items, err := s.preparePatchItemsForStorage(patches)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrInvalidSetting, err)
@@ -470,6 +474,9 @@ func validatePatchItem(item PatchItem) error {
 		return nil
 	}
 	value := strings.TrimSpace(item.Value)
+	if item.Namespace == "speech" {
+		return validateSpeechSetting(item.Key, value)
+	}
 	switch key {
 	case "billing:mode":
 		switch value {

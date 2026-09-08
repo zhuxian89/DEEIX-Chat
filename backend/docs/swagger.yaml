@@ -7988,6 +7988,55 @@ definitions:
     - trigger
     - updatedAt
     type: object
+  SpeechCapabilities:
+    properties:
+      enabled:
+        type: boolean
+      maxDurationMs:
+        type: integer
+    required:
+    - enabled
+    - maxDurationMs
+    type: object
+  SpeechCapabilitiesResponse:
+    properties:
+      data:
+        $ref: '#/definitions/SpeechCapabilities'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  SpeechTranscript:
+    properties:
+      durationMs:
+        type: integer
+      text:
+        type: string
+    required:
+    - durationMs
+    - text
+    type: object
+  SpeechTranscriptResponse:
+    properties:
+      data:
+        $ref: '#/definitions/SpeechTranscript'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  SpeechTranscriptionRequest:
+    properties:
+      audio:
+        description: Base64-encoded MP3, 16 kHz, mono, up to 60 seconds and 512 KiB
+          decoded.
+        type: string
+    required:
+    - audio
+    type: object
   State:
     properties:
       conversationPublicID:
@@ -19932,6 +19981,63 @@ paths:
       summary: 更新我的自定义技能
       tags:
       - skills
+  /speech/capabilities:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SpeechCapabilitiesResponse'
+      security:
+      - BearerAuth: []
+      summary: 查询语音输入是否可用
+      tags:
+      - speech
+  /speech/transcriptions:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Base64 MP3 audio
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/SpeechTranscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SpeechTranscriptResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/Envelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/Envelope'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/Envelope'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/Envelope'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/Envelope'
+      security:
+      - BearerAuth: []
+      summary: 将短录音转为输入框草稿，不发送聊天消息
+      tags:
+      - speech
   /temporary-chat/messages/stream:
     post:
       consumes:

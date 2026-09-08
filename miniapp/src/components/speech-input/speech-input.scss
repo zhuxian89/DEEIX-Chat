@@ -1,0 +1,21 @@
+.speechControl { flex-shrink: 0; }
+.speechButton { width: 64px; height: 72px; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 0; border-radius: 18px; background: #edf4f1; color: #237967; }
+.speechButton::after, .speechActions button::after { border: 0; }
+.speechButton[disabled] { opacity: .4; }
+.speechMic { position: relative; width: 15px; height: 26px; border: 3px solid currentColor; border-radius: 12px; margin-top: -10px; }
+.speechMic::before { content: ""; position: absolute; left: -9px; top: 10px; width: 27px; height: 23px; border: 3px solid currentColor; border-top: 0; border-radius: 0 0 18px 18px; }
+.speechMic::after { content: ""; position: absolute; left: 6px; top: 36px; width: 3px; height: 8px; background: currentColor; }
+.speechOverlay { position: fixed; inset: 0; z-index: 2500; display: flex; align-items: center; justify-content: center; background: rgba(22, 43, 35, .32); }
+.speechDialog { box-sizing: border-box; width: 620px; max-width: 90vw; padding: 40px 32px 30px; border-radius: 32px; background: #f9fcf9; box-shadow: 0 18px 70px rgba(20, 53, 40, .15); text-align: center; }
+.speechTitle { display: block; color: #263e32; font-size: 34px; font-weight: 600; }
+.speechWave { height: 100px; display: flex; gap: 12px; justify-content: center; align-items: center; margin: 24px 0; }
+.speechWaveBar { width: 10px; height: 36px; border-radius: 8px; background: #469c78; }
+.speechWave--active .speechWaveBar { animation: speechWave 1s ease-in-out infinite alternate; }
+.speechTime { display: block; color: #335a47; font-size: 28px; }
+.speechHint { display: block; margin-top: 18px; color: #738579; font-size: 24px; line-height: 1.6; }
+.speechActions { display: flex; gap: 20px; margin-top: 32px; }
+.speechActions button { flex: 1; margin: 0; border-radius: 18px; font-size: 28px; }
+.speechCancel { background: #eaf0ec; color: #52675b; }
+.speechFinish { background: #237967; color: #fff; }
+@keyframes speechWave { from { transform: scaleY(.5); } to { transform: scaleY(1.8); } }
+@media (prefers-reduced-motion: reduce) { .speechWave--active .speechWaveBar { animation: none; } }

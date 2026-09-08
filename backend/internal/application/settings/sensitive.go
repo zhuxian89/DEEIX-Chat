@@ -9,6 +9,8 @@ import (
 )
 
 var sensitiveSettingKeys = map[string]struct{}{
+	"speech:tencent_secret_id":             {},
+	"speech:tencent_secret_key":            {},
 	"auth:smtp_password":                   {},
 	"auth:turnstile_secret_key":            {},
 	"billing:stripe_secret_key":            {},

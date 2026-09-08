@@ -58,6 +58,7 @@ import {
 } from "./model-options";
 import { imageFailureMessageForRun, imageTaskTerminalStatus, type ImageSubmitTask } from "./image-task";
 import { CompanionClient, companionImageIDs, companionStreamPath } from "./companion-client";
+import { SpeechClient } from "./speech-client";
 import { removeNativeWebSearchOptions, resolveExaNetworkToolIDs } from "./network-search";
 import {
   conversationSearchPath,
@@ -127,6 +128,7 @@ export class MiniAppRequestAbortedError extends Error {
 
 export class MiniAppSession {
   readonly companion = new CompanionClient(<T>(request: ApiRequest) => this.request<T>(request));
+  readonly speech = new SpeechClient(<T>(request: ApiRequest) => this.request<T>(request));
   private accessToken = "";
   private accessExpiresAt = 0;
   private activeRequest: ChunkedRequestHandle | null = null;

@@ -30,6 +30,7 @@ import {
   resolveImageSubmitDecision,
 } from "@/product/image-task";
 import { composerKeyboardStyle } from "@/product/keyboard-layout";
+import { SpeechInputButton } from "@/components/speech-input/speech-input";
 import { MINIAPP_BUILD_VERSION } from "@/product/build-version";
 import { nextChatBottomScrollTop, shouldReleaseChatAutoFollow } from "@/product/chat-auto-scroll";
 import { wheelRotationForPrize } from "@/product/daily-checkin";
@@ -238,6 +239,7 @@ export default function HomePage() {
   const [currentConversation, setCurrentConversation] = useState<ConversationResponse | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [prompt, setPrompt] = useState("");
+  const [speechActive, setSpeechActive] = useState(false);
   const [running, setRunning] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -2374,7 +2376,7 @@ export default function HomePage() {
           <View className="composer">
             <Button
               className="attachButton"
-              disabled={running || uploading}
+              disabled={running || uploading || speechActive}
               onClick={screen === "chat" ? chooseChatImage : chooseImageEditInput}
             >
               {uploading ? "…" : "＋"}
@@ -2392,14 +2394,17 @@ export default function HomePage() {
               adjustPosition={false}
               cursorSpacing={0}
               showConfirmBar={false}
-              disabled={running || uploading}
+              disabled={running || uploading || speechActive}
               onInput={(event) => setPrompt(event.detail.value)}
             >
               <KeyboardAccessory style={{ height: "1px" }} />
             </Textarea>
+            {sessionRef.current && <SpeechInputButton key={currentConversation.publicID}
+              client={sessionRef.current.speech} draft={prompt} disabled={running || uploading}
+              onDraft={setPrompt} onActive={setSpeechActive} onError={setWorkspaceError} />}
             <Button
               className={`sendButton ${running ? "stopSendButton" : ""}`}
-              disabled={stopping || (!running && (
+              disabled={speechActive || stopping || (!running && (
                 uploading ||
                 (screen === "chat" && (!selectedChatModel || (!prompt.trim() && !pendingImage))) ||
                 (screen === "image" && (!selectedImageModel || !prompt.trim()))

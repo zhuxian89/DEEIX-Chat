@@ -3538,6 +3538,31 @@ export interface SkillSummaryResponse {
   updatedAt: string;
 }
 
+export interface SpeechCapabilities {
+  enabled: boolean;
+  maxDurationMs: number;
+}
+
+export interface SpeechCapabilitiesResponse {
+  data: SpeechCapabilities;
+  errorMsg: string;
+}
+
+export interface SpeechTranscript {
+  durationMs: number;
+  text: string;
+}
+
+export interface SpeechTranscriptResponse {
+  data: SpeechTranscript;
+  errorMsg: string;
+}
+
+export interface SpeechTranscriptionRequest {
+  /** Base64-encoded MP3, 16 kHz, mono, up to 60 seconds and 512 KiB decoded. */
+  audio: string;
+}
+
 export interface State {
   conversationPublicID: string;
   greeting: string;
@@ -10355,6 +10380,40 @@ export namespace Skills {
     export type RequestBody = never;
     export type RequestHeaders = {};
     export type ResponseBody = SkillResponseDoc;
+  }
+}
+
+export namespace Speech {
+  /**
+   * No description
+   * @tags speech
+   * @name CapabilitiesList
+   * @summary 查询语音输入是否可用
+   * @request GET:/speech/capabilities
+   * @secure
+   */
+  export namespace CapabilitiesList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SpeechCapabilitiesResponse;
+  }
+
+  /**
+   * No description
+   * @tags speech
+   * @name TranscriptionsCreate
+   * @summary 将短录音转为输入框草稿，不发送聊天消息
+   * @request POST:/speech/transcriptions
+   * @secure
+   */
+  export namespace TranscriptionsCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = SpeechTranscriptionRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SpeechTranscriptResponse;
   }
 }
 

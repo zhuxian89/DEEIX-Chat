@@ -1,3 +1,5 @@
+$chat-entry-background: linear-gradient(145deg, #168174, #20846a);
+
 page {
   background: #f4f5f7;
   color: #18191c;
@@ -620,7 +622,14 @@ page {
   opacity: 0.62;
 }
 
-.chatQuick { background: linear-gradient(145deg, #24232a, #51446f); }
+.chatQuick {
+  background: $chat-entry-background;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 12px 32px rgba(26, 118, 96, 0.16);
+  color: #fff;
+}
+.chatQuick .quickIcon { background: rgba(255, 255, 255, 0.2); }
+.chatQuick .quickDescription { color: #fff; }
 .imageQuick { background: linear-gradient(145deg, #6250f5, #956aff); }
 
 .quickIcon {
@@ -693,7 +702,8 @@ page {
 }
 
 .conversationIcon-chat {
-  box-shadow: 0 8px 20px rgba(38, 35, 48, 0.16);
+  background: $chat-entry-background;
+  box-shadow: 0 8px 20px rgba(26, 118, 96, 0.16);
 }
 
 .conversationBody,
