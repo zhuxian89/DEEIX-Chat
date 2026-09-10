@@ -22,6 +22,9 @@ import (
 // belong to this feature; disabling it leaves the ordinary application intact.
 func registerCompanion(engine *gin.Engine, db *gorm.DB, cfg *config.Runtime, auth middleware.SessionValidator, chat *conversation.Service, limiter middleware.RateLimiter, shutdown *lifecycle.Shutdown, log *zap.Logger) error {
 	registerSpeech(engine, db, cfg, auth, limiter)
+	if err := registerMiniappTodo(engine, db, cfg, auth, limiter); err != nil {
+		return err
+	}
 	if strings.EqualFold(strings.TrimSpace(os.Getenv("DEEIX_COMPANION_ENABLED")), "false") {
 		return nil
 	}

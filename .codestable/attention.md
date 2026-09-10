@@ -3,6 +3,8 @@
 
 ## 必须遵守
 
+- 提交文案约束（owner 于 2026-09-10 明确要求，持续生效）：本仓库后续所有 Git commit 标题、正文，以及微信小程序上传时的提交说明、版本描述，只允许描述 TODO 相关内容；不得包含 `AI`（不区分大小写），也不得描述切换、解锁或进入其他界面的功能。生成实际提交或上传文案时先核对此约束。本条只约束文案，不授权执行 commit、push 或上传。
+
 1. 新增或移动 `/admin/*` 页面前，先核对当前仓库中 `admin/layout.tsx` 所在的 route group；页面必须放在同一棵 `admin` 路由树下才能继承 `AdminShell` 和左侧菜单。不要只看最终 URL：不同 route group 可以生成相同 URL，但不会共享 layout。当前 canonical 位置是 `frontend/app/(project)/admin/`。
 2. 任何 commit 或 push 都必须在执行前取得用户当次明确同意；实现、测试、方案批准或历史上的提交授权均不自动延续。未获同意时只保留本地改动并报告状态。
 3. 部署与 CI：新增或修改后端 HTTP 接口、DTO 或 Swagger 注解后，提交前必须运行 `pnpm api:generate`，纳入 `backend/docs/{docs.go,swagger.json,swagger.yaml}` 与 `packages/api-contract/src/types.generated.ts`，并以 `pnpm api:check` 通过为准。Docker Hub 出现 `Username and password required` 时优先核对仓库 Secrets `DOCKERHUB_USERNAME` / `DOCKERHUB_TOKEN`；该凭证错误与 GHCR 是否成功相互独立，不要误改业务代码。

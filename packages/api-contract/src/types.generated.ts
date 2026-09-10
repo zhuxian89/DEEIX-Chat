@@ -1516,12 +1516,29 @@ export interface EmailVerificationStartResponseDoc {
   errorMsg: string;
 }
 
+export interface EntryStatusResponse {
+  ownerKey: string;
+  unlocked: boolean;
+  unlockedAt?: string;
+}
+
 export interface Envelope {
   data: any;
   details?: any;
   errorCode?: string;
   errorMsg: string;
   requestId?: string;
+}
+
+export interface ExportResponse {
+  content: string;
+  filename: string;
+  mimeType: string;
+}
+
+export interface FeedbackRequest {
+  /** @maxLength 2000 */
+  content: string;
 }
 
 export interface FileListResponse {
@@ -1959,13 +1976,14 @@ export interface KnowledgebaseErrorDoc {
   errorMsg: string;
 }
 
-export interface ListResponse {
-  results: CodeResponse[];
-  total: number;
+export interface ListDraftRequest {
+  id: string;
+  name: string;
+  position: number;
 }
 
 export interface ListResponseDoc {
-  data: ListResponse;
+  data: RegistrationcodeListResponse;
   errorMsg: string;
 }
 
@@ -2225,6 +2243,14 @@ export interface MiniAppUserResponse {
   subscriptionStatus: string;
   subscriptionTier: string;
   username: string;
+}
+
+export interface MiniapptodoListResponse {
+  deletedAt?: string;
+  id: string;
+  name: string;
+  position: number;
+  version: number;
 }
 
 export interface ModelDataResponse {
@@ -2596,6 +2622,22 @@ export interface OpenRouterOfficialPricingUnitPricingResponse {
   inputCacheRead: string;
   inputCacheWrite: string;
   prompt: string;
+}
+
+export interface OperationRequest {
+  baseVersion: number;
+  completed?: boolean;
+  entityID: string;
+  id: string;
+  kind: string;
+  list?: ListDraftRequest;
+  task?: TaskDraftRequest;
+}
+
+export interface OperationResultResponse {
+  id: string;
+  message?: string;
+  status: string;
 }
 
 export interface PasswordResetCompleteRequest {
@@ -3214,6 +3256,11 @@ export interface RegistrationcodeErrorDoc {
   requestId?: string;
 }
 
+export interface RegistrationcodeListResponse {
+  results: CodeResponse[];
+  total: number;
+}
+
 export interface RenameConversationRequest {
   /** @maxLength 255 */
   title: string;
@@ -3321,6 +3368,10 @@ export interface RunResponse {
   upstreamModelID: number;
   upstreamModelName: string;
   userID: number;
+}
+
+export interface SavedResponse {
+  saved: boolean;
 }
 
 export interface SecurityVerificationStartRequest {
@@ -3538,6 +3589,11 @@ export interface SkillSummaryResponse {
   updatedAt: string;
 }
 
+export interface SnapshotResponse {
+  lists: MiniapptodoListResponse[];
+  tasks: TaskResponse[];
+}
+
 export interface SpeechCapabilities {
   enabled: boolean;
   maxDurationMs: number;
@@ -3652,6 +3708,19 @@ export interface SuccessDoc {
   requestId?: string;
 }
 
+export interface SyncRequest {
+  /**
+   * @maxItems 50
+   * @minItems 1
+   */
+  operations: OperationRequest[];
+}
+
+export interface SyncResponse {
+  results: OperationResultResponse[];
+  snapshot: SnapshotResponse;
+}
+
 export interface SyncUpstreamModelsResponse {
   createdUpstreamModels: number;
   existingUpstreamModels: number;
@@ -3692,6 +3761,48 @@ export interface SystemEventResponse {
   source: string;
   traceID: string;
   updatedAt: string;
+}
+
+export interface TaskDraftRequest {
+  dueDate: string;
+  dueTime: string;
+  id: string;
+  important: boolean;
+  listID: string;
+  notes: string;
+  parentID: string;
+  position: number;
+  repeatDay: number;
+  repeatKind: string;
+  timezone: string;
+  title: string;
+}
+
+export interface TaskPageResponse {
+  results: TaskResponse[];
+  total: number;
+}
+
+export interface TaskResponse {
+  completedAt?: string;
+  createdAt: string;
+  deletedAt?: string;
+  dueDate: string;
+  dueTime: string;
+  id: string;
+  important: boolean;
+  listID: string;
+  notes: string;
+  occurrence: number;
+  parentID: string;
+  position: number;
+  repeatDay: number;
+  repeatKind: string;
+  seriesID: string;
+  timezone: string;
+  title: string;
+  updatedAt: string;
+  version: number;
 }
 
 export interface TemporaryChatHistoryMessage {
@@ -3768,6 +3879,11 @@ export interface TopicFeedbackRequest {
   preference: "like" | "avoid";
   /** @maxLength 1500 */
   topicURL: string;
+}
+
+export interface UnlockRequest {
+  /** @maxLength 64 */
+  code: string;
 }
 
 export interface UpdateBillingAccountBalanceRequest {
@@ -10009,6 +10125,140 @@ export namespace Messages {
     export type RequestBody = SetMessageFeedbackRequest;
     export type RequestHeaders = {};
     export type ResponseBody = MessageFeedbackResponseDoc;
+  }
+}
+
+export namespace MiniappEntry {
+  /**
+   * No description
+   * @tags miniapp-todo
+   * @name StatusList
+   * @summary 查询当前微信身份的默认入口
+   * @request GET:/miniapp-entry/status
+   * @secure
+   */
+  export namespace StatusList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = EntryStatusResponse;
+  }
+
+  /**
+   * No description
+   * @tags miniapp-todo
+   * @name UnlockCreate
+   * @summary 使用共享体验码永久记住当前微信身份
+   * @request POST:/miniapp-entry/unlock
+   * @secure
+   */
+  export namespace UnlockCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = UnlockRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = EntryStatusResponse;
+  }
+}
+
+export namespace MiniappTodo {
+  /**
+   * No description
+   * @tags miniapp-todo
+   * @name ExportList
+   * @summary 导出当前用户的待办
+   * @request GET:/miniapp-todo/export
+   * @secure
+   */
+  export namespace ExportList {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** 完成状态 true 或 false */
+      completed?: string;
+      /** text 或 csv */
+      format: string;
+      /** 清单 ID */
+      listID?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ExportResponse;
+  }
+
+  /**
+   * No description
+   * @tags miniapp-todo
+   * @name FeedbackCreate
+   * @summary 保存普通反馈
+   * @request POST:/miniapp-todo/feedback
+   * @secure
+   */
+  export namespace FeedbackCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = FeedbackRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SavedResponse;
+  }
+
+  /**
+   * No description
+   * @tags miniapp-todo
+   * @name SnapshotList
+   * @summary 获取当前用户的待办与近期记录
+   * @request GET:/miniapp-todo/snapshot
+   * @secure
+   */
+  export namespace SnapshotList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = SnapshotResponse;
+  }
+
+  /**
+   * No description
+   * @tags miniapp-todo
+   * @name SyncCreate
+   * @summary 按操作标识和版本同步待办
+   * @request POST:/miniapp-todo/sync
+   * @secure
+   */
+  export namespace SyncCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = SyncRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SyncResponse;
+  }
+
+  /**
+   * No description
+   * @tags miniapp-todo
+   * @name TasksList
+   * @summary 查询与分页读取待办历史
+   * @request GET:/miniapp-todo/tasks
+   * @secure
+   */
+  export namespace TasksList {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** 完成状态 true 或 false */
+      completed?: string;
+      /** 清单 ID */
+      listID?: string;
+      /** 页码 */
+      page?: number;
+      /** 每页数量，最多 100 */
+      pageSize?: number;
+      /** 标题或备注 */
+      q?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = TaskPageResponse;
   }
 }
 

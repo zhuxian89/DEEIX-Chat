@@ -1,5 +1,5 @@
 export default defineAppConfig({
-  pages: ["pages/index/index"],
+  pages: ["pages/entry/index", "pages/index/index"],
   permission: { "scope.record": { desc: "用于将你的语音转换成输入框文字" } },
   window: {
     backgroundTextStyle: "light",

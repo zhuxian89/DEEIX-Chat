@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
@@ -32,7 +33,12 @@ func TestSpeechRemainsAuthenticatedWhenCompanionIsDisabled(t *testing.T) {
 		}
 	}
 	tables, err := db.Migrator().GetTables()
-	if err != nil || len(tables) != 0 {
-		t.Fatal("speech must not create or alter tables")
+	if err != nil || len(tables) != 5 {
+		t.Fatal("only the five independent TODO tables should be registered", tables, err)
+	}
+	for _, table := range tables {
+		if !strings.HasPrefix(table, "miniapp_") {
+			t.Fatalf("speech must not create or alter tables: %s", table)
+		}
 	}
 }

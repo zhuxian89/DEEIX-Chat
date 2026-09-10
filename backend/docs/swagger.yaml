@@ -3411,6 +3411,18 @@ definitions:
     - data
     - errorMsg
     type: object
+  EntryStatusResponse:
+    properties:
+      ownerKey:
+        type: string
+      unlocked:
+        type: boolean
+      unlockedAt:
+        type: string
+    required:
+    - ownerKey
+    - unlocked
+    type: object
   Envelope:
     properties:
       data: {}
@@ -3424,6 +3436,27 @@ definitions:
     required:
     - data
     - errorMsg
+    type: object
+  ExportResponse:
+    properties:
+      content:
+        type: string
+      filename:
+        type: string
+      mimeType:
+        type: string
+    required:
+    - content
+    - filename
+    - mimeType
+    type: object
+  FeedbackRequest:
+    properties:
+      content:
+        maxLength: 2000
+        type: string
+    required:
+    - content
     type: object
   FileListResponse:
     properties:
@@ -4434,22 +4467,23 @@ definitions:
     required:
     - errorMsg
     type: object
-  ListResponse:
+  ListDraftRequest:
     properties:
-      results:
-        items:
-          $ref: '#/definitions/CodeResponse'
-        type: array
-      total:
+      id:
+        type: string
+      name:
+        type: string
+      position:
         type: integer
     required:
-    - results
-    - total
+    - id
+    - name
+    - position
     type: object
   ListResponseDoc:
     properties:
       data:
-        $ref: '#/definitions/ListResponse'
+        $ref: '#/definitions/RegistrationcodeListResponse'
       errorMsg:
         type: string
     required:
@@ -5071,6 +5105,24 @@ definitions:
     - subscriptionStatus
     - subscriptionTier
     - username
+    type: object
+  MiniapptodoListResponse:
+    properties:
+      deletedAt:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      position:
+        type: integer
+      version:
+        type: integer
+    required:
+    - id
+    - name
+    - position
+    - version
     type: object
   ModelDataResponse:
     properties:
@@ -5969,6 +6021,40 @@ definitions:
     - inputCacheRead
     - inputCacheWrite
     - prompt
+    type: object
+  OperationRequest:
+    properties:
+      baseVersion:
+        type: integer
+      completed:
+        type: boolean
+      entityID:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      list:
+        $ref: '#/definitions/ListDraftRequest'
+      task:
+        $ref: '#/definitions/TaskDraftRequest'
+    required:
+    - baseVersion
+    - entityID
+    - id
+    - kind
+    type: object
+  OperationResultResponse:
+    properties:
+      id:
+        type: string
+      message:
+        type: string
+      status:
+        type: string
+    required:
+    - id
+    - status
     type: object
   PasswordResetCompleteRequest:
     properties:
@@ -7289,6 +7375,18 @@ definitions:
     - data
     - errorMsg
     type: object
+  RegistrationcodeListResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/CodeResponse'
+        type: array
+      total:
+        type: integer
+    required:
+    - results
+    - total
+    type: object
   RenameConversationRequest:
     properties:
       title:
@@ -7528,6 +7626,13 @@ definitions:
     - upstreamModelID
     - upstreamModelName
     - userID
+    type: object
+  SavedResponse:
+    properties:
+      saved:
+        type: boolean
+    required:
+    - saved
     type: object
   SecurityVerificationStartRequest:
     properties:
@@ -7988,6 +8093,20 @@ definitions:
     - trigger
     - updatedAt
     type: object
+  SnapshotResponse:
+    properties:
+      lists:
+        items:
+          $ref: '#/definitions/MiniapptodoListResponse'
+        type: array
+      tasks:
+        items:
+          $ref: '#/definitions/TaskResponse'
+        type: array
+    required:
+    - lists
+    - tasks
+    type: object
   SpeechCapabilities:
     properties:
       enabled:
@@ -8242,6 +8361,29 @@ definitions:
     - data
     - errorMsg
     type: object
+  SyncRequest:
+    properties:
+      operations:
+        items:
+          $ref: '#/definitions/OperationRequest'
+        maxItems: 50
+        minItems: 1
+        type: array
+    required:
+    - operations
+    type: object
+  SyncResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/OperationResultResponse'
+        type: array
+      snapshot:
+        $ref: '#/definitions/SnapshotResponse'
+    required:
+    - results
+    - snapshot
+    type: object
   SyncUpstreamModelsResponse:
     properties:
       createdUpstreamModels:
@@ -8350,6 +8492,117 @@ definitions:
     - source
     - traceID
     - updatedAt
+    type: object
+  TaskDraftRequest:
+    properties:
+      dueDate:
+        type: string
+      dueTime:
+        type: string
+      id:
+        type: string
+      important:
+        type: boolean
+      listID:
+        type: string
+      notes:
+        type: string
+      parentID:
+        type: string
+      position:
+        type: integer
+      repeatDay:
+        type: integer
+      repeatKind:
+        type: string
+      timezone:
+        type: string
+      title:
+        type: string
+    required:
+    - dueDate
+    - dueTime
+    - id
+    - important
+    - listID
+    - notes
+    - parentID
+    - position
+    - repeatDay
+    - repeatKind
+    - timezone
+    - title
+    type: object
+  TaskPageResponse:
+    properties:
+      results:
+        items:
+          $ref: '#/definitions/TaskResponse'
+        type: array
+      total:
+        type: integer
+    required:
+    - results
+    - total
+    type: object
+  TaskResponse:
+    properties:
+      completedAt:
+        type: string
+      createdAt:
+        type: string
+      deletedAt:
+        type: string
+      dueDate:
+        type: string
+      dueTime:
+        type: string
+      id:
+        type: string
+      important:
+        type: boolean
+      listID:
+        type: string
+      notes:
+        type: string
+      occurrence:
+        type: integer
+      parentID:
+        type: string
+      position:
+        type: integer
+      repeatDay:
+        type: integer
+      repeatKind:
+        type: string
+      seriesID:
+        type: string
+      timezone:
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+      version:
+        type: integer
+    required:
+    - createdAt
+    - dueDate
+    - dueTime
+    - id
+    - important
+    - listID
+    - notes
+    - occurrence
+    - parentID
+    - position
+    - repeatDay
+    - repeatKind
+    - seriesID
+    - timezone
+    - title
+    - updatedAt
+    - version
     type: object
   TemporaryChatHistoryMessage:
     properties:
@@ -8531,6 +8784,14 @@ definitions:
     required:
     - preference
     - topicURL
+    type: object
+  UnlockRequest:
+    properties:
+      code:
+        maxLength: 64
+        type: string
+    required:
+    - code
     type: object
   UpdateBillingAccountBalanceRequest:
     properties:
@@ -19387,6 +19648,166 @@ paths:
       summary: 设置消息反馈
       tags:
       - chat
+  /miniapp-entry/status:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/EntryStatusResponse'
+      security:
+      - BearerAuth: []
+      summary: 查询当前微信身份的默认入口
+      tags:
+      - miniapp-todo
+  /miniapp-entry/unlock:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 体验码
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/UnlockRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/EntryStatusResponse'
+      security:
+      - BearerAuth: []
+      summary: 使用共享体验码永久记住当前微信身份
+      tags:
+      - miniapp-todo
+  /miniapp-todo/export:
+    get:
+      parameters:
+      - description: text 或 csv
+        in: query
+        name: format
+        required: true
+        type: string
+      - description: 清单 ID
+        in: query
+        name: listID
+        type: string
+      - description: 完成状态 true 或 false
+        in: query
+        name: completed
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ExportResponse'
+      security:
+      - BearerAuth: []
+      summary: 导出当前用户的待办
+      tags:
+      - miniapp-todo
+  /miniapp-todo/feedback:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 普通反馈正文
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/FeedbackRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SavedResponse'
+      security:
+      - BearerAuth: []
+      summary: 保存普通反馈
+      tags:
+      - miniapp-todo
+  /miniapp-todo/snapshot:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SnapshotResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前用户的待办与近期记录
+      tags:
+      - miniapp-todo
+  /miniapp-todo/sync:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 待同步操作
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/SyncRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SyncResponse'
+      security:
+      - BearerAuth: []
+      summary: 按操作标识和版本同步待办
+      tags:
+      - miniapp-todo
+  /miniapp-todo/tasks:
+    get:
+      parameters:
+      - description: 标题或备注
+        in: query
+        name: q
+        type: string
+      - description: 完成状态 true 或 false
+        in: query
+        name: completed
+        type: string
+      - description: 清单 ID
+        in: query
+        name: listID
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，最多 100
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/TaskPageResponse'
+      security:
+      - BearerAuth: []
+      summary: 查询与分页读取待办历史
+      tags:
+      - miniapp-todo
   /models:
     get:
       consumes:

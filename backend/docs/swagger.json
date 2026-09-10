@@ -14113,6 +14113,269 @@
                 }
             }
         },
+        "/miniapp-entry/status": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-todo"
+                ],
+                "summary": "查询当前微信身份的默认入口",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/EntryStatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/miniapp-entry/unlock": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-todo"
+                ],
+                "summary": "使用共享体验码永久记住当前微信身份",
+                "parameters": [
+                    {
+                        "description": "体验码",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/UnlockRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/EntryStatusResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/miniapp-todo/export": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-todo"
+                ],
+                "summary": "导出当前用户的待办",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "text 或 csv",
+                        "name": "format",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "清单 ID",
+                        "name": "listID",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "完成状态 true 或 false",
+                        "name": "completed",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ExportResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/miniapp-todo/feedback": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-todo"
+                ],
+                "summary": "保存普通反馈",
+                "parameters": [
+                    {
+                        "description": "普通反馈正文",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/FeedbackRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SavedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/miniapp-todo/snapshot": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-todo"
+                ],
+                "summary": "获取当前用户的待办与近期记录",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SnapshotResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/miniapp-todo/sync": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-todo"
+                ],
+                "summary": "按操作标识和版本同步待办",
+                "parameters": [
+                    {
+                        "description": "待同步操作",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/SyncRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SyncResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/miniapp-todo/tasks": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "miniapp-todo"
+                ],
+                "summary": "查询与分页读取待办历史",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "标题或备注",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "完成状态 true 或 false",
+                        "name": "completed",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "清单 ID",
+                        "name": "listID",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页数量，最多 100",
+                        "name": "pageSize",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/TaskPageResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/models": {
             "get": {
                 "security": [
@@ -20151,6 +20414,24 @@
                 }
             }
         },
+        "EntryStatusResponse": {
+            "type": "object",
+            "required": [
+                "ownerKey",
+                "unlocked"
+            ],
+            "properties": {
+                "ownerKey": {
+                    "type": "string"
+                },
+                "unlocked": {
+                    "type": "boolean"
+                },
+                "unlockedAt": {
+                    "type": "string"
+                }
+            }
+        },
         "Envelope": {
             "type": "object",
             "required": [
@@ -20168,6 +20449,37 @@
                 },
                 "requestId": {
                     "type": "string"
+                }
+            }
+        },
+        "ExportResponse": {
+            "type": "object",
+            "required": [
+                "content",
+                "filename",
+                "mimeType"
+            ],
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "filename": {
+                    "type": "string"
+                },
+                "mimeType": {
+                    "type": "string"
+                }
+            }
+        },
+        "FeedbackRequest": {
+            "type": "object",
+            "required": [
+                "content"
+            ],
+            "properties": {
+                "content": {
+                    "type": "string",
+                    "maxLength": 2000
                 }
             }
         },
@@ -21617,20 +21929,21 @@
                 }
             }
         },
-        "ListResponse": {
+        "ListDraftRequest": {
             "type": "object",
             "required": [
-                "results",
-                "total"
+                "id",
+                "name",
+                "position"
             ],
             "properties": {
-                "results": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/CodeResponse"
-                    }
+                "id": {
+                    "type": "string"
                 },
-                "total": {
+                "name": {
+                    "type": "string"
+                },
+                "position": {
                     "type": "integer"
                 }
             }
@@ -21643,7 +21956,7 @@
             ],
             "properties": {
                 "data": {
-                    "$ref": "#/definitions/ListResponse"
+                    "$ref": "#/definitions/RegistrationcodeListResponse"
                 },
                 "errorMsg": {
                     "type": "string"
@@ -22522,6 +22835,32 @@
                 },
                 "username": {
                     "type": "string"
+                }
+            }
+        },
+        "MiniapptodoListResponse": {
+            "type": "object",
+            "required": [
+                "id",
+                "name",
+                "position",
+                "version"
+            ],
+            "properties": {
+                "deletedAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },
@@ -23803,6 +24142,56 @@
                     "type": "string"
                 },
                 "prompt": {
+                    "type": "string"
+                }
+            }
+        },
+        "OperationRequest": {
+            "type": "object",
+            "required": [
+                "baseVersion",
+                "entityID",
+                "id",
+                "kind"
+            ],
+            "properties": {
+                "baseVersion": {
+                    "type": "integer"
+                },
+                "completed": {
+                    "type": "boolean"
+                },
+                "entityID": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "list": {
+                    "$ref": "#/definitions/ListDraftRequest"
+                },
+                "task": {
+                    "$ref": "#/definitions/TaskDraftRequest"
+                }
+            }
+        },
+        "OperationResultResponse": {
+            "type": "object",
+            "required": [
+                "id",
+                "status"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 }
             }
@@ -25673,6 +26062,24 @@
                 }
             }
         },
+        "RegistrationcodeListResponse": {
+            "type": "object",
+            "required": [
+                "results",
+                "total"
+            ],
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CodeResponse"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "RenameConversationRequest": {
             "type": "object",
             "required": [
@@ -26016,6 +26423,17 @@
                 },
                 "userID": {
                     "type": "integer"
+                }
+            }
+        },
+        "SavedResponse": {
+            "type": "object",
+            "required": [
+                "saved"
+            ],
+            "properties": {
+                "saved": {
+                    "type": "boolean"
                 }
             }
         },
@@ -26686,6 +27104,27 @@
                 }
             }
         },
+        "SnapshotResponse": {
+            "type": "object",
+            "required": [
+                "lists",
+                "tasks"
+            ],
+            "properties": {
+                "lists": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/MiniapptodoListResponse"
+                    }
+                },
+                "tasks": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/TaskResponse"
+                    }
+                }
+            }
+        },
         "SpeechCapabilities": {
             "type": "object",
             "required": [
@@ -27044,6 +27483,40 @@
                 }
             }
         },
+        "SyncRequest": {
+            "type": "object",
+            "required": [
+                "operations"
+            ],
+            "properties": {
+                "operations": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "minItems": 1,
+                    "items": {
+                        "$ref": "#/definitions/OperationRequest"
+                    }
+                }
+            }
+        },
+        "SyncResponse": {
+            "type": "object",
+            "required": [
+                "results",
+                "snapshot"
+            ],
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/OperationResultResponse"
+                    }
+                },
+                "snapshot": {
+                    "$ref": "#/definitions/SnapshotResponse"
+                }
+            }
+        },
         "SyncUpstreamModelsResponse": {
             "type": "object",
             "required": [
@@ -27195,6 +27668,160 @@
                 },
                 "updatedAt": {
                     "type": "string"
+                }
+            }
+        },
+        "TaskDraftRequest": {
+            "type": "object",
+            "required": [
+                "dueDate",
+                "dueTime",
+                "id",
+                "important",
+                "listID",
+                "notes",
+                "parentID",
+                "position",
+                "repeatDay",
+                "repeatKind",
+                "timezone",
+                "title"
+            ],
+            "properties": {
+                "dueDate": {
+                    "type": "string"
+                },
+                "dueTime": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "important": {
+                    "type": "boolean"
+                },
+                "listID": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "parentID": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "repeatDay": {
+                    "type": "integer"
+                },
+                "repeatKind": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "TaskPageResponse": {
+            "type": "object",
+            "required": [
+                "results",
+                "total"
+            ],
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/TaskResponse"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "TaskResponse": {
+            "type": "object",
+            "required": [
+                "createdAt",
+                "dueDate",
+                "dueTime",
+                "id",
+                "important",
+                "listID",
+                "notes",
+                "occurrence",
+                "parentID",
+                "position",
+                "repeatDay",
+                "repeatKind",
+                "seriesID",
+                "timezone",
+                "title",
+                "updatedAt",
+                "version"
+            ],
+            "properties": {
+                "completedAt": {
+                    "type": "string"
+                },
+                "createdAt": {
+                    "type": "string"
+                },
+                "deletedAt": {
+                    "type": "string"
+                },
+                "dueDate": {
+                    "type": "string"
+                },
+                "dueTime": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "important": {
+                    "type": "boolean"
+                },
+                "listID": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "occurrence": {
+                    "type": "integer"
+                },
+                "parentID": {
+                    "type": "string"
+                },
+                "position": {
+                    "type": "integer"
+                },
+                "repeatDay": {
+                    "type": "integer"
+                },
+                "repeatKind": {
+                    "type": "string"
+                },
+                "seriesID": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updatedAt": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },
@@ -27449,6 +28076,18 @@
                 "topicURL": {
                     "type": "string",
                     "maxLength": 1500
+                }
+            }
+        },
+        "UnlockRequest": {
+            "type": "object",
+            "required": [
+                "code"
+            ],
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "maxLength": 64
                 }
             }
         },

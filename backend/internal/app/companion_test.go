@@ -40,15 +40,32 @@ func TestCompanionRegistrationIsAdditiveAndAuthenticated(t *testing.T) {
 	}
 }
 
-func TestCompanionCanBeDisabledWithoutMigratingTables(t *testing.T) {
+func TestCompanionCanBeDisabledWhileTodoStaysAvailable(t *testing.T) {
 	t.Setenv("DEEIX_COMPANION_ENABLED", "false")
+	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "todo-registration.db")), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sqlDB, _ := db.DB()
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	engine := gin.New()
-	if err := registerCompanion(engine, nil, nil, nil, nil, nil, nil, nil); err != nil {
+	if err := registerCompanion(engine, db, config.NewRuntime(config.Config{JWTSecret: "test"}), nil, nil, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	response := httptest.NewRecorder()
 	engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/companion", nil))
 	if response.Code != http.StatusNotFound {
 		t.Fatal("disabled companion registered routes")
+	}
+	if db.Migrator().HasTable("companion_profiles") || db.Migrator().HasTable("identity_users") {
+		t.Fatal("disabled companion or upstream tables migrated")
+	}
+	if !db.Migrator().HasTable("miniapp_entry_unlocks") || !db.Migrator().HasTable("miniapp_todo_tasks") {
+		t.Fatal("TODO must migrate independently")
+	}
+	response = httptest.NewRecorder()
+	engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/miniapp-entry/status", nil))
+	if response.Code != http.StatusUnauthorized {
+		t.Fatalf("TODO route must remain authenticated: %d", response.Code)
 	}
 }
