@@ -1,10 +1,12 @@
-# 小程序 TODO 首页与共享码解锁
+# 小程序 TODO 首页与反馈入口
 
-状态：本地实现、自动化验证和独立复审已完成；尚未部署，待 PostgreSQL 环境和微信真机验收。更新日期：2026-09-10。
+状态：本次仅保留动态配置码与反馈入口，其他改动已还原；相关本地测试和 API 契约检查通过，尚未提交或上传。更新日期：2026-09-11。
 
 ## 已确认的行为
 
-普通用户默认进入「AI省着用」的 TODO 首页。「我的 → 反馈与建议」提供普通反馈和独立的体验码输入框。所有人使用共享码 `666`，服务端去除首尾空格后校验。不同微信身份都可使用，不消费码，不建立发码后台。
+普通用户默认进入「AI省着用」的 TODO 首页。「我的 → 反馈与建议」只有一个反馈输入框。提交正文去除首尾空格后与服务端当前配置比较：匹配时永久记住当前身份并进入原页面；其余合法正文提示「反馈成功」。反馈正文不保存，不再提供独立输入码页面或接口。
+
+口令使用现有后台参数 `miniapp_todo:feedback_code`，默认留空，由管理员设置（例如 `888`）。修改立即生效，不需要重新构建；清空后停用新增授权，已有授权保留。最多 128 个字符，按现有敏感参数机制加密保存，管理端返回掩码状态，小程序不包含配置值。只有提交反馈时读取参数，普通 Web 请求没有新增查询。
 
 一次解锁后永久保存。同一 AppID、同一微信账号清缓存或换手机后，从服务端恢复并直接进入原 AI 页面。解锁没有到期时间。已有记录再次提交时保留首次解锁时间，无需重新校验码。
 
@@ -26,7 +28,7 @@
 | 清单 | 默认收件箱；新建、改名、上移排序；删除清单时将任务移入收件箱 |
 | 任务详情 | 标题、备注、重要标记、清单、日期、时间、一层步骤、重复规则、删除 |
 | 我的 | 已完成记录、文本复制、CSV 导出、同步状态、反馈与建议 |
-| 反馈与建议 | 普通反馈单独提交；体验码在单独输入框校验，不自动写入反馈正文 |
+| 反馈与建议 | 一个输入框；提交中显示加载、禁止重复提交；按服务端状态显示成功或进入原页面 |
 
 采用浅绿背景、深色文字、系统字体和简洁列表。UI 方向已使用 `ui-ux-pro-max` 核对；主要点击区域至少 44 个逻辑像素（750 设计宽度下为 88 样式单位），底部导航和添加按钮适配安全区，表单使用原生输入与选择器。
 
@@ -44,7 +46,7 @@
 | `miniapp_todo_lists` | 身份 + 清单 ID，名称、顺序、版本和软删除时间 |
 | `miniapp_todo_tasks` | 身份 + 任务 ID，版本、查询字段、完整任务数据和软删除状态 |
 | `miniapp_todo_operations` | 身份 + 操作 ID，请求摘要、处理回执，用于安全重试 |
-| `miniapp_todo_feedback` | 身份、正文、处理状态、创建时间 |
+| `miniapp_todo_feedback` | 保留原建表逻辑与已有历史，本次不再写入反馈正文 |
 
 五张表全部由 `backend/internal/infra/persistence/miniapptodo` 私有模型维护。没有用户表外键，没有邀请码库存、核销或独立认证表。
 
@@ -70,17 +72,16 @@ PostgreSQL 迁移使用模块专属事务 advisory lock。业务写入同样按�
 
 所有路径以 `/api/v1` 开头，沿用既有 JSON 响应封装。小程序 DTO 引用生成的 `@deeix/api-contract` 类型。
 
-上述新增接口必须通过 GitHub 的 Workspace Quality 检查。该工作流在根目录执行 `pnpm check`，其中 API 契约包会重新生成并比较 Swagger 和 TypeScript 类型。七个接口均在 `handler.go` 中声明 Swagger 注释；接口改动后运行 `pnpm api:generate`，一并保留 `backend/docs/docs.go`、`backend/docs/swagger.json`、`backend/docs/swagger.yaml` 和 `packages/api-contract/src/types.generated.ts`，再以 `pnpm api:check` 验证一致性。工作流已覆盖 `backend/**` 和 `packages/**`，新增接口无需单独添加 CI job。
+上述接口必须通过 GitHub 的 Workspace Quality 检查。六个接口均在 `handler.go` 中声明 Swagger 注释；接口改动后运行 `pnpm api:generate`，一并保留 `backend/docs/docs.go`、`backend/docs/swagger.json`、`backend/docs/swagger.yaml` 和 `packages/api-contract/src/types.generated.ts`，再以 `pnpm api:check` 验证一致性。工作流已覆盖相关目录，无需增加 CI job。
 
 | 接口 | 用途 |
 | --- | --- |
 | `GET /miniapp-entry/status` | 解锁状态和不暴露 OpenID 的缓存标识 |
-| `POST /miniapp-entry/unlock` | 共享码校验、永久解锁 |
 | `GET /miniapp-todo/snapshot` | 活跃待办与近期记录 |
 | `POST /miniapp-todo/sync` | 操作去重、版本校验和同步回执 |
 | `GET /miniapp-todo/tasks` | 搜索、清单筛选、完成状态、历史分页 |
 | `GET /miniapp-todo/export` | 文本或 CSV 导出 |
-| `POST /miniapp-todo/feedback` | 普通反馈 |
+| `POST /miniapp-todo/feedback` | 提交反馈，返回 `EntryStatusResponse`，不保存正文 |
 
 后端新包分布在 `domain/miniapptodo`、`application/miniapptodo`、`infra/persistence/miniapptodo` 和 `transport/http/miniapptodo`；小程序新增 `pages/entry`、`components/todo`、`product/todo` 和 `platform/todo-cache.ts`。既有业务的接入只修改 fork 注册入口和小程序页面配置；相邻启动测试更新为新的组合注册行为。
 
@@ -88,7 +89,7 @@ TODO 业务错误使用 `miniapp_todo.*` 专用错误码：`identity_required`�
 
 ## 验收与发布
 
-- 两个不同身份都能使用 `666`；错误码不写入记录；同一身份重复解锁保留首次时间。
+- 参数修改立即生效；旧配置不再接受，空配置不授权；不匹配时成功返回且不存储正文，同一身份保留首次授权时间。
 - 清缓存后从服务端恢复默认 AI 入口；普通 TODO 启动不依赖模型列表或聊天初始化。
 - 新表重复迁移、事务回滚、跨身份操作拒绝、回执去重、重复任务并发和子任务撤销由后端测试覆盖。
 - 离线队列恢复、存储失败不假报成功、冲突分支保留及 1000 项任务恢复由客户端测试覆盖。
@@ -96,6 +97,6 @@ TODO 业务错误使用 `miniapp_todo.*` 专用错误码：`identity_required`�
 - 运行小程序类型检查、测试、构建和产物检查，以及后端模块、启动接入、分层测试和 API 契约一致性检查。
 - PostgreSQL 实际运行和微信真机体验需要分别记录，不能以 SQLite 测试或类型检查代替；本机未配置可用于验收的 PostgreSQL 或微信真机环境。
 
-已通过：小程序 `pnpm check`（隔离检查、类型检查、全部测试、微信构建和产物校验）、后端 TODO 四层包及 `internal/app`、`internal/transport/http` 测试、`pnpm api:generate`、`pnpm api:check` 和 `git diff --check`。独立复审第二轮通过，没有未解决的问题。
+本次验证单独记录，不沿用此前完整 TODO 版本的独立复审结论。已还原 HTTP 入口和微信登录代码，删除拦截器、会话来源登记及对应新表模型；不增加 Web 请求开销，不改 Token 或原有接口访问权限。
 
 本次不自动提交、推送、部署或上传。本功能增加后端接口，需要先部署包含新模块的后端，再发布小程序。回滚时恢复旧小程序默认入口或旧后端代码即可；五张新表可保留，不自动删表或删除用户数据。

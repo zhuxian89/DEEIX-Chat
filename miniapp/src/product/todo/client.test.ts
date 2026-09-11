@@ -11,13 +11,13 @@ function fixture(codeError?: { errorCode: string; errorMsg: string }) {
   const transport: ApiTransport = {
     async request<T>(request: ApiRequest) {
       requests.push(request);
-      if (request.path.endsWith("/unlock") && codeError) {
+      if (request.path.endsWith("/feedback") && codeError) {
         return { statusCode: 400, data: codeError, headers: {}, cookies: [] };
       }
       let data: unknown = { ownerKey: "verified-owner", unlocked: false };
       if (request.path.endsWith("/login")) data = { auth };
       if (request.path.endsWith("/refresh")) { refreshes += 1; data = auth; }
-      if (request.path.endsWith("/unlock")) data = { ownerKey: "verified-owner", unlocked: true };
+      if (request.path.endsWith("/feedback")) data = { ownerKey: "verified-owner", unlocked: (request.body as { content: string }).content === "server-configured-value" };
       return { statusCode: 200, data: { data: data as T }, headers: {}, cookies: [] };
     },
   };
@@ -30,16 +30,19 @@ test("TODO startup uses existing WeChat login and only asks the new entry status
   assert.deepEqual(requests[0].body, { code: "wx-code" });
   assert.equal(requests[1].accessToken, "memory-only");
 });
-test("shared code is trimmed and sent separately from feedback", async () => {
+test("feedback is the only submission and uses the server entry status", async () => {
   const { client, requests } = fixture();
-  await client.connect(); assert.equal((await client.unlock(" 666 ")).unlocked, true);
-  assert.deepEqual(requests.at(-1)?.body, { code: "666" });
-  await client.feedback("建议"); assert.deepEqual(requests.at(-1)?.body, { content: "建议" });
+  await client.connect();
+  assert.equal((await client.feedback("建议")).unlocked, false);
+  assert.deepEqual(requests.at(-1)?.body, { content: "建议" });
+  assert.equal((await client.feedback(" server-configured-value ")).unlocked, true);
+  assert.deepEqual(requests.at(-1)?.body, { content: "server-configured-value" });
+  assert.equal(requests.some((request) => request.path.endsWith("/unlock")), false);
 });
 test("TODO business error codes produce localized messages instead of English fallbacks", async () => {
-  const { client } = fixture({ errorCode: "miniapp_todo.invalid_code", errorMsg: "invalid TODO experience code" });
+  const { client } = fixture({ errorCode: "miniapp_todo.invalid_request", errorMsg: "invalid todo request" });
   await client.connect();
-  await assert.rejects(() => client.unlock("wrong"), { message: "体验码不正确，请重新输入。" });
+  await assert.rejects(() => client.feedback(""), { message: "待办内容或操作无效，请检查后重试。" });
 });
 test("offline retry sends the exact operation identifier and payload", async () => {
   const { client, requests } = fixture();

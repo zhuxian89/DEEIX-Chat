@@ -7627,13 +7627,6 @@ definitions:
     - upstreamModelName
     - userID
     type: object
-  SavedResponse:
-    properties:
-      saved:
-        type: boolean
-    required:
-    - saved
-    type: object
   SecurityVerificationStartRequest:
     properties:
       verificationMethod:
@@ -8784,14 +8777,6 @@ definitions:
     required:
     - preference
     - topicURL
-    type: object
-  UnlockRequest:
-    properties:
-      code:
-        maxLength: 64
-        type: string
-    required:
-    - code
     type: object
   UpdateBillingAccountBalanceRequest:
     properties:
@@ -19662,29 +19647,6 @@ paths:
       summary: 查询当前微信身份的默认入口
       tags:
       - miniapp-todo
-  /miniapp-entry/unlock:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 体验码
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/UnlockRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/EntryStatusResponse'
-      security:
-      - BearerAuth: []
-      summary: 使用共享体验码永久记住当前微信身份
-      tags:
-      - miniapp-todo
   /miniapp-todo/export:
     get:
       parameters:
@@ -19730,10 +19692,10 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/SavedResponse'
+            $ref: '#/definitions/EntryStatusResponse'
       security:
       - BearerAuth: []
-      summary: 保存普通反馈
+      summary: 提交待办反馈并返回当前入口状态
       tags:
       - miniapp-todo
   /miniapp-todo/snapshot:

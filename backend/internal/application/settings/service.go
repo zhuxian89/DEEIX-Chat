@@ -368,6 +368,7 @@ func csvSet(raw string) map[string]struct{} {
 
 // validNamespaces 合法的 namespace 集合。
 var validNamespaces = map[string]bool{
+	"miniapp_todo":   true,
 	"speech":         true,
 	"auth":           true,
 	"billing":        true,
@@ -735,6 +736,8 @@ func validatePatchItem(item PatchItem) error {
 		}
 	case "wechat_miniapp:app_secret":
 		return validateStringMax(value, 512, key)
+	case "miniapp_todo:feedback_code":
+		return validateStringMax(value, 128, key)
 	case "wechat_miniapp:default_chat_model", "wechat_miniapp:default_image_model":
 		return validateStringMax(value, 255, key)
 	case "daily_checkin:config":

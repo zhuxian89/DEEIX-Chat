@@ -207,6 +207,7 @@ func defaultSettings() []domainsettings.SystemSetting {
 		{Namespace: "wechat", Key: "callback_token", Value: "", ValueType: "string", Description: "微信公众号服务器回调 Token"},
 
 		// 微信小程序配置
+		{Namespace: "miniapp_todo", Key: "feedback_code", Value: "", ValueType: "string", Description: "TODO 反馈口令；留空停用，修改后立即生效，已有授权保留"},
 		{Namespace: "wechat_miniapp", Key: "enabled", Value: "false", ValueType: "bool", Description: "是否启用微信小程序一键登录"},
 		{Namespace: "wechat_miniapp", Key: "app_id", Value: "", ValueType: "string", Description: "微信小程序 AppID"},
 		{Namespace: "wechat_miniapp", Key: "app_secret", Value: "", ValueType: "string", Description: "微信小程序 AppSecret"},

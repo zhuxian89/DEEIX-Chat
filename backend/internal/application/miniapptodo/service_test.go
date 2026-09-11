@@ -2,11 +2,13 @@ package miniapptodo
 
 import (
 	"context"
-	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/miniapptodo"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/miniapptodo"
 )
 
 type fakeStore struct {
@@ -56,20 +58,25 @@ func (f *fakeStore) Unlock(_ context.Context, o domain.Owner, at time.Time) (tim
 	f.grants[o.Key()] = at
 	return at, nil
 }
-func TestSharedCodePermanentlyUnlocksEachVerifiedIdentity(t *testing.T) {
+func TestFeedbackUsesCurrentConfigurationAndPreservesExistingGrants(t *testing.T) {
 	store := &fakeStore{grants: map[string]time.Time{}}
-	service := NewService(store, Config{AppID: "app"})
-	if _, err := service.Unlock(t.Context(), 1, "bad"); err == nil {
-		t.Fatal("wrong code accepted")
+	code := "888"
+	service := NewService(store, Config{AppID: "app", FeedbackCode: func(context.Context) (string, error) { return code, nil }})
+	if status, err := service.Feedback(t.Context(), 1, "666"); err != nil || status.Unlocked {
+		t.Fatal("ordinary feedback must succeed without granting access", status, err)
 	}
 	if len(store.grants) != 0 {
 		t.Fatal("wrong code persisted")
 	}
-	first, err := service.Unlock(t.Context(), 1, " 666 ")
+	first, err := service.Feedback(t.Context(), 1, " 888 ")
 	if err != nil || !first.Unlocked {
 		t.Fatal(first, err)
 	}
-	second, err := service.Unlock(t.Context(), 2, "666")
+	code = "new-code"
+	if status, err := service.Feedback(t.Context(), 2, "888"); err != nil || status.Unlocked {
+		t.Fatal("old configuration still accepted", status, err)
+	}
+	second, err := service.Feedback(t.Context(), 2, "new-code")
 	if err != nil || !second.Unlocked || first.OwnerKey == second.OwnerKey {
 		t.Fatal(second, err)
 	}
@@ -77,12 +84,27 @@ func TestSharedCodePermanentlyUnlocksEachVerifiedIdentity(t *testing.T) {
 	if err != nil || !restored.Unlocked || !restored.UnlockedAt.Equal(*first.UnlockedAt) {
 		t.Fatal(restored, err)
 	}
-	repeat, err := service.Unlock(t.Context(), 1, "old code no longer needed")
+	code = ""
+	repeat, err := service.Feedback(t.Context(), 1, "ordinary feedback")
 	if err != nil || !repeat.UnlockedAt.Equal(*first.UnlockedAt) {
 		t.Fatal(repeat, err)
 	}
 	other, err := NewService(store, Config{AppID: "another-app"}).Status(t.Context(), 1)
 	if err != nil || other.Unlocked {
 		t.Fatal(other, err)
+	}
+	if status, err := service.Feedback(t.Context(), 3, "new-code"); err != nil || status.Unlocked {
+		t.Fatal("empty configuration must disable new grants", status, err)
+	}
+	if _, err := service.Feedback(t.Context(), 3, "  "); !errors.Is(err, domain.ErrInvalid) {
+		t.Fatal("blank feedback accepted", err)
+	}
+}
+
+func TestFeedbackConfigurationFailureDoesNotGrantAccess(t *testing.T) {
+	store := &fakeStore{grants: map[string]time.Time{}}
+	service := NewService(store, Config{AppID: "app", FeedbackCode: func(context.Context) (string, error) { return "888", errors.New("configuration unavailable") }})
+	if _, err := service.Feedback(t.Context(), 1, "888"); err == nil || len(store.grants) != 0 {
+		t.Fatal("configuration failure must not grant access", err)
 	}
 }

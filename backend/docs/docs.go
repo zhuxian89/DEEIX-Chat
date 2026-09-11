@@ -14144,44 +14144,6 @@ const docTemplate = `{
                 }
             }
         },
-        "/miniapp-entry/unlock": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "miniapp-todo"
-                ],
-                "summary": "使用共享体验码永久记住当前微信身份",
-                "parameters": [
-                    {
-                        "description": "体验码",
-                        "name": "body",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/UnlockRequest"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/EntryStatusResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/miniapp-todo/export": {
             "get": {
                 "security": [
@@ -14243,7 +14205,7 @@ const docTemplate = `{
                 "tags": [
                     "miniapp-todo"
                 ],
-                "summary": "保存普通反馈",
+                "summary": "提交待办反馈并返回当前入口状态",
                 "parameters": [
                     {
                         "description": "普通反馈正文",
@@ -14259,7 +14221,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/SavedResponse"
+                            "$ref": "#/definitions/EntryStatusResponse"
                         }
                     }
                 }
@@ -26433,17 +26395,6 @@ const docTemplate = `{
                 }
             }
         },
-        "SavedResponse": {
-            "type": "object",
-            "required": [
-                "saved"
-            ],
-            "properties": {
-                "saved": {
-                    "type": "boolean"
-                }
-            }
-        },
         "SecurityVerificationStartRequest": {
             "type": "object",
             "properties": {
@@ -28083,18 +28034,6 @@ const docTemplate = `{
                 "topicURL": {
                     "type": "string",
                     "maxLength": 1500
-                }
-            }
-        },
-        "UnlockRequest": {
-            "type": "object",
-            "required": [
-                "code"
-            ],
-            "properties": {
-                "code": {
-                    "type": "string",
-                    "maxLength": 64
                 }
             }
         },

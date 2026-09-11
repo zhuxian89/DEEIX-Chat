@@ -9,6 +9,7 @@ import (
 )
 
 var sensitiveSettingKeys = map[string]struct{}{
+	"miniapp_todo:feedback_code":           {},
 	"speech:tencent_secret_id":             {},
 	"speech:tencent_secret_key":            {},
 	"auth:smtp_password":                   {},

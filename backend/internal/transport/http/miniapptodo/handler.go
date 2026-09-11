@@ -17,7 +17,6 @@ type Handler struct{ service *app.Service }
 func NewHandler(service *app.Service) *Handler { return &Handler{service: service} }
 func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 	group.GET("/miniapp-entry/status", h.Status)
-	group.POST("/miniapp-entry/unlock", h.Unlock)
 	group.GET("/miniapp-todo/snapshot", h.Snapshot)
 	group.POST("/miniapp-todo/sync", h.Sync)
 	group.GET("/miniapp-todo/tasks", h.Tasks)
@@ -60,28 +59,6 @@ func bind(c *gin.Context, value any) bool {
 // @Router /miniapp-entry/status [get]
 func (h *Handler) Status(c *gin.Context) {
 	value, err := h.service.Status(c.Request.Context(), middleware.MustUserID(c))
-	if err != nil {
-		fail(c, err)
-		return
-	}
-	response.Success(c, EntryStatusResponse(value))
-}
-
-// Unlock godoc
-// @Summary 使用共享体验码永久记住当前微信身份
-// @Tags miniapp-todo
-// @Accept json
-// @Produce json
-// @Security BearerAuth
-// @Param body body UnlockRequest true "体验码"
-// @Success 200 {object} EntryStatusResponse
-// @Router /miniapp-entry/unlock [post]
-func (h *Handler) Unlock(c *gin.Context) {
-	var req UnlockRequest
-	if !bind(c, &req) {
-		return
-	}
-	value, err := h.service.Unlock(c.Request.Context(), middleware.MustUserID(c), req.Code)
 	if err != nil {
 		fail(c, err)
 		return
@@ -197,22 +174,23 @@ func (h *Handler) Export(c *gin.Context) {
 }
 
 // Feedback godoc
-// @Summary 保存普通反馈
+// @Summary 提交待办反馈并返回当前入口状态
 // @Tags miniapp-todo
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param body body FeedbackRequest true "普通反馈正文"
-// @Success 200 {object} SavedResponse
+// @Success 200 {object} EntryStatusResponse
 // @Router /miniapp-todo/feedback [post]
 func (h *Handler) Feedback(c *gin.Context) {
 	var req FeedbackRequest
 	if !bind(c, &req) {
 		return
 	}
-	if err := h.service.Feedback(c.Request.Context(), middleware.MustUserID(c), req.Content); err != nil {
+	value, err := h.service.Feedback(c.Request.Context(), middleware.MustUserID(c), req.Content)
+	if err != nil {
 		fail(c, err)
 		return
 	}
-	response.Success(c, SavedResponse{Saved: true})
+	response.Success(c, EntryStatusResponse(value))
 }

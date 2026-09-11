@@ -12,7 +12,6 @@ import (
 	"time"
 
 	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/miniapptodo"
-	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -305,7 +304,4 @@ func (s *Store) ExportTasks(ctx context.Context, o domain.Owner, q domain.Query)
 		result = append(result, task)
 	}
 	return result, rows.Err()
-}
-func (s *Store) Feedback(ctx context.Context, o domain.Owner, content string, now time.Time) error {
-	return s.db.WithContext(ctx).Create(&feedbackRecord{Ownership: own(o), ID: uuid.NewString(), Content: content, Status: "new", CreatedAt: now}).Error
 }

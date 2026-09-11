@@ -6,7 +6,7 @@ import React from "react";
 import ts from "typescript";
 import { beijingDate, isOverdue } from "./dates";
 import { TodoStore } from "./store";
-import { newDraft, newID, taskDraft, type Operation, type Snapshot, type TodoTask } from "./types";
+import { newDraft, newID, taskDraft, type EntryStatus, type Operation, type Snapshot, type TodoTask } from "./types";
 
 Object.assign(globalThis, { ENABLE_INNER_HTML: false, ENABLE_ADJACENT_HTML: false, ENABLE_CLONE_NODE: false, ENABLE_CONTAINS: false, ENABLE_SIZE_APIS: false, ENABLE_TEMPLATE_CONTENT: false });
 const { document, createEvent } = require("@tarojs/runtime");
@@ -28,15 +28,15 @@ function makeTodo(owner: string) {
   const snapshot: Snapshot = { lists: [], tasks: [task] }; store.replaceSnapshot(snapshot);
   const operations: Omit<Operation, "id">[] = [];
   return { loading: false, syncing: false, error: "", online: true, snapshot, store: { current: store },
-    client: { current: { query: async () => ({ results: [] as TodoTask[], total: 0 }) } },
+    client: { current: { query: async () => ({ results: [] as TodoTask[], total: 0 }), feedback: async (_content: string): Promise<EntryStatus> => ({ ownerKey: owner, unlocked: false }) } },
     enqueue: (operation: Omit<Operation, "id">) => { operations.push(operation); }, redraw() {}, async sync() {}, async connect() {}, operations };
 }
 async function mount() {
-  const host = { todo: makeTodo("owner-a") };
+  const host = { todo: makeTodo("owner-a"), toasts: [] as string[], routes: [] as string[] };
   const scope = { React, useState: React.useState, useEffect: React.useEffect, useMemo: React.useMemo, useRef: React.useRef,
     Button: "button", Input: "input", Picker: "picker", ScrollView: "scroll-view", Switch: "switch", Text: "text", Textarea: "textarea", View: "view",
     beijingDate, isOverdue, newDraft, newID, taskDraft,
-    Taro: { showToast: async () => {}, showModal: async () => ({ confirm: true }) },
+    Taro: { showToast: async ({ title }: { title: string }) => { host.toasts.push(title); }, reLaunch: async ({ url }: { url: string }) => { host.routes.push(url); }, showModal: async () => ({ confirm: true }) },
     aiPage: "/pages/index/index", messageOf: (error: unknown) => String(error), useTodo: () => host.todo };
   const TaskEditor = compile("src/components/todo/task-editor.tsx", scope, "TaskEditor");
   const Component = compile("src/pages/entry/index.tsx", { ...scope, TaskEditor }, "default");
@@ -65,6 +65,55 @@ test("saving an open editor keeps its original version after a remote update", a
     page.click("todo-link", 1); await waitFor(() => page.host.todo.operations.length === 1);
     assert.equal(page.host.todo.operations[0].baseVersion, 1);
     assert.equal(page.host.todo.operations[0].task?.title, "my unsaved edit");
+  } finally { page.unmount(); }
+});
+
+async function openFeedback(page: Awaited<ReturnType<typeof mount>>) {
+  page.click("todo-nav-item", 2);
+  await waitFor(() => page.findAll("todo-field").some((item) => item.textContent.includes("反馈与建议")));
+  const index = page.findAll("todo-field").findIndex((item) => item.textContent.includes("反馈与建议"));
+  page.click("todo-field", index);
+  await waitFor(() => page.findAll("todo-notes").length === 1);
+}
+
+test("feedback has one form and follows the server result with loading feedback", async () => {
+  const page = await mount();
+  try {
+    await openFeedback(page);
+    assert.equal(page.findAll("todo-input").length, 0);
+    assert.equal(page.findAll("todo-primary").length, 1);
+    let finish!: (status: EntryStatus) => void;
+    let submitted = "";
+    page.host.todo.client.current.feedback = (content) => { submitted = content; return new Promise((resolve) => { finish = resolve; }); };
+    page.input("todo-notes", " ordinary feedback "); await tick();
+    page.click("todo-primary"); await waitFor(() => !!submitted);
+    await tick();
+    assert.equal(submitted, "ordinary feedback");
+    assert.equal(page.get("todo-primary").props.disabled, true);
+    finish({ ownerKey: "owner-a", unlocked: false });
+    await waitFor(() => page.host.toasts.length === 1);
+    assert.equal(page.host.toasts[0], "反馈成功");
+    assert.equal(page.get("todo-notes").props.value, "");
+    assert.deepEqual(page.host.routes, []);
+    page.host.todo.client.current.feedback = async () => ({ ownerKey: "owner-a", unlocked: true });
+    page.input("todo-notes", "configured value"); await tick();
+    page.click("todo-primary"); await waitFor(() => page.host.routes.length === 1);
+    assert.equal(page.host.routes[0], "/pages/index/index");
+  } finally { page.unmount(); }
+});
+
+test("a late feedback response cannot navigate another account", async () => {
+  const page = await mount();
+  try {
+    await openFeedback(page);
+    let finish!: (status: EntryStatus) => void;
+    page.host.todo.client.current.feedback = () => new Promise((resolve) => { finish = resolve; });
+    page.input("todo-notes", "private input"); await tick();
+    page.click("todo-primary"); await waitFor(() => !!finish);
+    page.host.todo = makeTodo("owner-b"); page.render(); await tick();
+    finish({ ownerKey: "owner-a", unlocked: true }); await tick();
+    assert.deepEqual(page.host.routes, []);
+    assert.deepEqual(page.host.toasts, []);
   } finally { page.unmount(); }
 });
 

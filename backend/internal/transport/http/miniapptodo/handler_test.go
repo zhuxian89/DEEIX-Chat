@@ -53,7 +53,7 @@ func TestHTTPEntrySyncAndFeedbackContracts(t *testing.T) {
 	store := &handlerStore{}
 	engine := gin.New()
 	group := engine.Group("/api/v1", func(c *gin.Context) { c.Set(middleware.ContextKeyUserID, uint(7)) })
-	NewHandler(app.NewService(store, app.Config{AppID: "app"})).RegisterRoutes(group)
+	NewHandler(app.NewService(store, app.Config{AppID: "app", FeedbackCode: func(context.Context) (string, error) { return "888", nil }})).RegisterRoutes(group)
 	call := func(method, path, body string) *httptest.ResponseRecorder {
 		t.Helper()
 		req := httptest.NewRequest(method, "/api/v1"+path, strings.NewReader(body))
@@ -62,14 +62,17 @@ func TestHTTPEntrySyncAndFeedbackContracts(t *testing.T) {
 		engine.ServeHTTP(recorder, req)
 		return recorder
 	}
-	bad := call(http.MethodPost, "/miniapp-entry/unlock", `{"code":"wrong","openid":"attacker"}`)
-	if bad.Code != 400 || store.grant != nil {
+	bad := call(http.MethodPost, "/miniapp-todo/feedback", `{"content":"666","openid":"attacker"}`)
+	if bad.Code != 200 || store.grant != nil || store.feedback != "" {
 		t.Fatal(bad.Code, bad.Body.String())
 	}
-	if !strings.Contains(bad.Body.String(), `"errorCode":"miniapp_todo.invalid_code"`) {
-		t.Fatal("missing stable code for invalid experience code:", bad.Body.String())
+	if !strings.Contains(bad.Body.String(), `"unlocked":false`) {
+		t.Fatal("ordinary feedback must return the unchanged entry status:", bad.Body.String())
 	}
-	good := call(http.MethodPost, "/miniapp-entry/unlock", `{"code":"666"}`)
+	if old := call(http.MethodPost, "/miniapp-entry/unlock", `{"code":"666"}`); old.Code != 404 {
+		t.Fatal("old endpoint is still available", old.Code)
+	}
+	good := call(http.MethodPost, "/miniapp-todo/feedback", `{"content":"888"}`)
 	if good.Code != 200 || strings.Contains(good.Body.String(), "server-openid") {
 		t.Fatal(good.Code, good.Body.String())
 	}
@@ -85,7 +88,7 @@ func TestHTTPEntrySyncAndFeedbackContracts(t *testing.T) {
 		t.Fatal(result.Body.String())
 	}
 	feedback := call(http.MethodPost, "/miniapp-todo/feedback", `{"content":"建议"}`)
-	if feedback.Code != 200 || store.feedback != "建议" {
+	if feedback.Code != 200 || store.feedback != "" {
 		t.Fatal(feedback.Body.String())
 	}
 	malformed := call(http.MethodPost, "/miniapp-todo/sync", `{"operations":[]}`)

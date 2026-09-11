@@ -136,7 +136,6 @@ type Repository interface {
 	Apply(context.Context, Owner, Operation, time.Time) (OperationResult, error)
 	Query(context.Context, Owner, Query) (TaskPage, error)
 	ExportTasks(context.Context, Owner, Query) ([]Task, error)
-	Feedback(context.Context, Owner, string, time.Time) error
 }
 
 func ValidID(id string) bool { _, err := uuid.Parse(id); return err == nil }

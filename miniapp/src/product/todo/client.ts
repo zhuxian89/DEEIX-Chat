@@ -29,9 +29,6 @@ export class TodoClient {
     return this.status();
   }
   status(): Promise<EntryStatus> { return this.request({ path: "/api/v1/miniapp-entry/status" }); }
-  unlock(code: string): Promise<EntryStatus> {
-    return this.request({ path: "/api/v1/miniapp-entry/unlock", method: "POST", body: { code: code.trim() } });
-  }
   snapshot(): Promise<Snapshot> { return this.request({ path: "/api/v1/miniapp-todo/snapshot" }); }
   sync(operations: Operation[]): Promise<SyncResult> {
     return this.request({ path: "/api/v1/miniapp-todo/sync", method: "POST", body: { operations } });
@@ -42,8 +39,8 @@ export class TodoClient {
   export(format: "text" | "csv", listID = "", completed = ""): Promise<TodoExport> {
     return this.request({ path: `/api/v1/miniapp-todo/export?format=${format}&listID=${encodeURIComponent(listID)}&completed=${completed}` });
   }
-  feedback(content: string): Promise<unknown> {
-    return this.request({ path: "/api/v1/miniapp-todo/feedback", method: "POST", body: { content } });
+  feedback(content: string): Promise<EntryStatus> {
+    return this.request({ path: "/api/v1/miniapp-todo/feedback", method: "POST", body: { content: content.trim() } });
   }
   dispose(): void { this.accessToken = ""; this.expiresAt = 0; this.transport.dispose?.(); }
   private applyAuth(auth: Pick<AuthLoginResponse, "accessToken" | "expiresAt">): void {

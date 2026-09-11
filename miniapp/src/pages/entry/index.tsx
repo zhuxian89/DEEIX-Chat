@@ -87,11 +87,8 @@ function TodoWorkspace({ todo }: { todo: ReturnType<typeof useTodo> }) {
   const [listError, setListError] = useState("");
   const [feedback, setFeedback] = useState(false);
   const [body, setBody] = useState("");
-  const [code, setCode] = useState("");
   const [feedbackError, setFeedbackError] = useState("");
-  const [codeError, setCodeError] = useState("");
   const [sending, setSending] = useState(false);
-  const [unlocking, setUnlocking] = useState(false);
   const [undo, setUndo] = useState<{ task: TodoTask; kind: "task.restore" | "task.complete" }>();
   const [exportList, setExportList] = useState("");
   const [exportRange, setExportRange] = useState(0);
@@ -284,37 +281,25 @@ function TodoWorkspace({ todo }: { todo: ReturnType<typeof useTodo> }) {
     });
   };
   const submitFeedback = () => {
+    if (sending || !body.trim()) return;
     setSending(true);
     setFeedbackError("");
     void todo.client
       .current!.feedback(body.trim())
-      .then(() => {
+      .then(async (status) => {
         if (!activeWorkspace.current) return;
         setBody("");
-        void Taro.showToast({ title: "谢谢你的反馈", icon: "success" });
+        if (status.unlocked) {
+          await Taro.reLaunch({ url: aiPage });
+          return;
+        }
+        void Taro.showToast({ title: "反馈成功", icon: "success" });
       })
       .catch((failure: unknown) => {
         if (activeWorkspace.current) setFeedbackError(messageOf(failure));
       })
       .finally(() => {
         if (activeWorkspace.current) setSending(false);
-      });
-  };
-  const unlockAI = () => {
-    setUnlocking(true);
-    setCodeError("");
-    void todo.client
-      .current!.unlock(code)
-      .then(async (status) => {
-        if (!activeWorkspace.current) return;
-        if (!status.unlocked) throw new Error("体验码未生效，请重试");
-        await Taro.reLaunch({ url: aiPage });
-      })
-      .catch((failure: unknown) => {
-        if (activeWorkspace.current) setCodeError(messageOf(failure));
-      })
-      .finally(() => {
-        if (activeWorkspace.current) setUnlocking(false);
       });
   };
   const deleteList = async (list: TodoList) => {
@@ -467,7 +452,11 @@ function TodoWorkspace({ todo }: { todo: ReturnType<typeof useTodo> }) {
               placeholder="写下你的建议"
               value={body}
               maxlength={2000}
-              onInput={(event) => setBody(event.detail.value)}
+              disabled={sending}
+              onInput={(event) => {
+                setBody(event.detail.value);
+                setFeedbackError("");
+              }}
             />
             {feedbackError && <Text className="todo-error">{feedbackError}</Text>}
             <Button
@@ -477,29 +466,6 @@ function TodoWorkspace({ todo }: { todo: ReturnType<typeof useTodo> }) {
               onClick={submitFeedback}
             >
               提交反馈
-            </Button>
-          </View>
-          <View className="todo-card">
-            <Text className="todo-heading">已有体验码</Text>
-            <Text className="todo-muted">输入体验码，打开对应功能。</Text>
-            <Input
-              className="todo-input"
-              value={code}
-              maxlength={64}
-              placeholder="输入体验码"
-              onInput={(event) => {
-                setCode(event.detail.value);
-                setCodeError("");
-              }}
-            />
-            {codeError && <Text className="todo-error">{codeError}</Text>}
-            <Button
-              className="todo-primary"
-              loading={unlocking}
-              disabled={unlocking || !code.trim()}
-              onClick={unlockAI}
-            >
-              进入
             </Button>
           </View>
           <View className="todo-spacer" />

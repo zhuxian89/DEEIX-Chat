@@ -2,6 +2,8 @@ package miniapptodo
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/csv"
 	"fmt"
 	"strings"
@@ -14,6 +16,7 @@ import (
 type Config struct {
 	AppID        string
 	CurrentAppID func() string
+	FeedbackCode func(context.Context) (string, error)
 }
 type Service struct {
 	store  domain.Repository
@@ -38,7 +41,11 @@ func (s *Service) Status(ctx context.Context, userID uint) (domain.EntryStatus, 
 	at, err := s.store.UnlockedAt(ctx, o)
 	return domain.EntryStatus{OwnerKey: o.Key(), Unlocked: at != nil, UnlockedAt: at}, err
 }
-func (s *Service) Unlock(ctx context.Context, userID uint, code string) (domain.EntryStatus, error) {
+func (s *Service) Feedback(ctx context.Context, userID uint, content string) (domain.EntryStatus, error) {
+	content = strings.TrimSpace(content)
+	if content == "" || utf8.RuneCountInString(content) > 2000 {
+		return domain.EntryStatus{}, domain.ErrInvalid
+	}
 	o, err := s.owner(ctx, userID)
 	if err != nil {
 		return domain.EntryStatus{}, err
@@ -47,17 +54,24 @@ func (s *Service) Unlock(ctx context.Context, userID uint, code string) (domain.
 	if err != nil {
 		return domain.EntryStatus{}, err
 	}
-	if at == nil {
-		if strings.TrimSpace(code) != "666" {
-			return domain.EntryStatus{}, domain.ErrInvalidCode
-		}
+	status := domain.EntryStatus{OwnerKey: o.Key(), Unlocked: at != nil, UnlockedAt: at}
+	if status.Unlocked || s.config.FeedbackCode == nil {
+		return status, nil
+	}
+	code, err := s.config.FeedbackCode(ctx)
+	if err != nil {
+		return domain.EntryStatus{}, err
+	}
+	code = strings.TrimSpace(code)
+	want, got := sha256.Sum256([]byte(code)), sha256.Sum256([]byte(content))
+	if code != "" && subtle.ConstantTimeCompare(want[:], got[:]) == 1 {
 		unlockedAt, err := s.store.Unlock(ctx, o, time.Now().UTC())
 		if err != nil {
 			return domain.EntryStatus{}, err
 		}
-		at = &unlockedAt
+		status.Unlocked, status.UnlockedAt = true, &unlockedAt
 	}
-	return domain.EntryStatus{OwnerKey: o.Key(), Unlocked: true, UnlockedAt: at}, nil
+	return status, nil
 }
 func (s *Service) Snapshot(ctx context.Context, userID uint) (domain.Snapshot, error) {
 	o, err := s.owner(ctx, userID)
@@ -105,17 +119,6 @@ func validateQuery(query domain.Query) error {
 		return domain.ErrInvalid
 	}
 	return nil
-}
-func (s *Service) Feedback(ctx context.Context, userID uint, content string) error {
-	content = strings.TrimSpace(content)
-	if content == "" || utf8.RuneCountInString(content) > 2000 {
-		return domain.ErrInvalid
-	}
-	o, err := s.owner(ctx, userID)
-	if err != nil {
-		return err
-	}
-	return s.store.Feedback(ctx, o, content, time.Now().UTC())
 }
 func (s *Service) Export(ctx context.Context, userID uint, query domain.Query, format string) (domain.Export, error) {
 	if format != "text" && format != "csv" {

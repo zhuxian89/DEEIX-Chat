@@ -10,14 +10,8 @@ type EntryStatusResponse struct {
 	Unlocked   bool       `json:"unlocked"`
 	UnlockedAt *time.Time `json:"unlockedAt,omitempty"`
 }
-type UnlockRequest struct {
-	Code string `json:"code" binding:"max=64"`
-}
 type FeedbackRequest struct {
 	Content string `json:"content" binding:"required,max=2000"`
-}
-type SavedResponse struct {
-	Saved bool `json:"saved"`
 }
 type ListResponse struct {
 	ID        string     `json:"id"`

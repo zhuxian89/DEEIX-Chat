@@ -3370,10 +3370,6 @@ export interface RunResponse {
   userID: number;
 }
 
-export interface SavedResponse {
-  saved: boolean;
-}
-
 export interface SecurityVerificationStartRequest {
   verificationMethod?: "none" | "two_factor" | "email";
 }
@@ -3879,11 +3875,6 @@ export interface TopicFeedbackRequest {
   preference: "like" | "avoid";
   /** @maxLength 1500 */
   topicURL: string;
-}
-
-export interface UnlockRequest {
-  /** @maxLength 64 */
-  code: string;
 }
 
 export interface UpdateBillingAccountBalanceRequest {
@@ -10144,22 +10135,6 @@ export namespace MiniappEntry {
     export type RequestHeaders = {};
     export type ResponseBody = EntryStatusResponse;
   }
-
-  /**
-   * No description
-   * @tags miniapp-todo
-   * @name UnlockCreate
-   * @summary 使用共享体验码永久记住当前微信身份
-   * @request POST:/miniapp-entry/unlock
-   * @secure
-   */
-  export namespace UnlockCreate {
-    export type RequestParams = {};
-    export type RequestQuery = {};
-    export type RequestBody = UnlockRequest;
-    export type RequestHeaders = {};
-    export type ResponseBody = EntryStatusResponse;
-  }
 }
 
 export namespace MiniappTodo {
@@ -10190,7 +10165,7 @@ export namespace MiniappTodo {
    * No description
    * @tags miniapp-todo
    * @name FeedbackCreate
-   * @summary 保存普通反馈
+   * @summary 提交待办反馈并返回当前入口状态
    * @request POST:/miniapp-todo/feedback
    * @secure
    */
@@ -10199,7 +10174,7 @@ export namespace MiniappTodo {
     export type RequestQuery = {};
     export type RequestBody = FeedbackRequest;
     export type RequestHeaders = {};
-    export type ResponseBody = SavedResponse;
+    export type ResponseBody = EntryStatusResponse;
   }
 
   /**
