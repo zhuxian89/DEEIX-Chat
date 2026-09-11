@@ -1,6 +1,16 @@
 import type { AuthLoginResponse, WechatminiappLoginResponse } from "@deeix/api-contract";
+import zhErrors from "../../../../frontend/i18n/messages/zh-CN/errors.json";
 import type { ApiRequest, ApiTransport } from "../../platform/transport";
 import type { EntryStatus, Operation, Snapshot, SyncResult, TaskPage, TodoExport } from "./types";
+
+const todoErrorMessages: Record<string, string> = {
+  "miniapp_todo.identity_required": zhErrors.miniappTodo.identityRequired,
+  "miniapp_todo.invalid_request": zhErrors.miniappTodo.invalidRequest,
+  "miniapp_todo.invalid_code": zhErrors.miniappTodo.invalidCode,
+  "miniapp_todo.version_conflict": zhErrors.miniappTodo.versionConflict,
+  "miniapp_todo.snapshot_limit_exceeded": zhErrors.miniappTodo.snapshotLimitExceeded,
+  "miniapp_todo.export_limit_exceeded": zhErrors.miniappTodo.exportLimitExceeded,
+};
 
 export class TodoClient {
   private accessToken = "";
@@ -60,9 +70,9 @@ export class TodoClient {
   private async raw<T>(request: ApiRequest): Promise<T> { return unwrap(await this.transport.request<T>(request)); }
 }
 
-function unwrap<T>(response: { statusCode: number; data: { data?: T; errorMsg?: string } }): T {
+function unwrap<T>(response: { statusCode: number; data: { data?: T; errorCode?: string; errorMsg?: string } }): T {
   if (response.statusCode < 200 || response.statusCode >= 300 || response.data.errorMsg) {
-    throw new Error(response.data.errorMsg || `请求失败（${response.statusCode}）`);
+    throw new Error(todoErrorMessages[response.data.errorCode ?? ""] || response.data.errorMsg || `请求失败（${response.statusCode}）`);
   }
   if (response.data.data == null) throw new Error("服务响应缺少数据");
   return response.data.data;

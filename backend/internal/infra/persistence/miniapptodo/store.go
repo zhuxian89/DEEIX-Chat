@@ -296,7 +296,7 @@ func (s *Store) ExportTasks(ctx context.Context, o domain.Owner, q domain.Query)
 		}
 		size += len(row.Data)
 		if len(result) >= 10000 || size > 8*1024*1024 {
-			return nil, fmt.Errorf("%w: 导出内容较大，请缩小清单或完成状态范围", domain.ErrInvalid)
+			return nil, domain.ErrExportLimit
 		}
 		task, err := decode(row)
 		if err != nil {

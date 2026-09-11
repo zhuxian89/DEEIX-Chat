@@ -27,15 +27,19 @@ func (h *Handler) RegisterRoutes(group *gin.RouterGroup) {
 func fail(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, domain.ErrIdentity):
-		response.Error(c, http.StatusForbidden, "请使用当前小程序的微信身份登录")
+		response.ErrorWithCode(c, http.StatusForbidden, "miniapp_todo.identity_required", "")
+	case errors.Is(err, domain.ErrInvalidCode):
+		response.ErrorWithCode(c, http.StatusBadRequest, "miniapp_todo.invalid_code", "")
+	case errors.Is(err, domain.ErrExportLimit):
+		response.ErrorWithCode(c, http.StatusBadRequest, "miniapp_todo.export_limit_exceeded", "")
 	case errors.Is(err, domain.ErrInvalid):
-		response.Error(c, http.StatusBadRequest, err.Error())
+		response.ErrorWithCode(c, http.StatusBadRequest, "miniapp_todo.invalid_request", "")
 	case errors.Is(err, domain.ErrConflict):
-		response.Error(c, http.StatusConflict, err.Error())
+		response.ErrorWithCode(c, http.StatusConflict, "miniapp_todo.version_conflict", "")
 	case errors.Is(err, domain.ErrSnapshotLimit):
-		response.Error(c, http.StatusConflict, "未完成任务超过 5000 项，请先通过搜索完成或删除部分任务；本机修改已保留")
+		response.ErrorWithCode(c, http.StatusConflict, "miniapp_todo.snapshot_limit_exceeded", "")
 	default:
-		response.Error(c, http.StatusInternalServerError, "待办服务暂不可用，请稍后重试")
+		response.Error(c, http.StatusInternalServerError, "internal server error")
 	}
 }
 func bind(c *gin.Context, value any) bool {

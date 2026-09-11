@@ -490,6 +490,12 @@ func fallbackMessage(status int, code string) string {
 }
 
 var fallbackMessages = map[string]string{
+	"miniapp_todo.identity_required":                    "verified miniapp identity required",
+	"miniapp_todo.invalid_request":                      "invalid todo request",
+	"miniapp_todo.invalid_code":                         "invalid todo experience code",
+	"miniapp_todo.version_conflict":                     "TODO version conflict",
+	"miniapp_todo.snapshot_limit_exceeded":              "TODO task capacity exceeded; complete or delete tasks and retry",
+	"miniapp_todo.export_limit_exceeded":                "TODO export limit exceeded; narrow the selected range",
 	CodeRequestInvalidQuery:                             "invalid query parameter",
 	"auth.admin_required":                               "admin permission required",
 	"auth.superadmin_required":                          "superadmin permission required",

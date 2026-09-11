@@ -84,6 +84,8 @@ PostgreSQL 迁移使用模块专属事务 advisory lock。业务写入同样按�
 
 后端新包分布在 `domain/miniapptodo`、`application/miniapptodo`、`infra/persistence/miniapptodo` 和 `transport/http/miniapptodo`；小程序新增 `pages/entry`、`components/todo`、`product/todo` 和 `platform/todo-cache.ts`。既有业务的接入只修改 fork 注册入口和小程序页面配置；相邻启动测试更新为新的组合注册行为。
 
+TODO 业务错误使用 `miniapp_todo.*` 专用错误码：`identity_required`、`invalid_request`、`invalid_code`、`version_conflict`、`snapshot_limit_exceeded`、`export_limit_exceeded`。HTTP 状态码分别沿用 403、400、400、409、409、400；未知服务端错误返回通用 500 并隐藏内部细节。Service 层错误及 API 兜底文案使用英文，中英文展示由 `frontend/i18n/messages/*/errors.json` 的 `miniappTodo` 翻译提供，小程序复用其中的中文翻译。
+
 ## 验收与发布
 
 - 两个不同身份都能使用 `666`；错误码不写入记录；同一身份重复解锁保留首次时间。

@@ -1,4 +1,12 @@
 {
+  "miniappTodo": {
+    "identityRequired": "请使用当前小程序的微信身份登录。",
+    "invalidRequest": "待办内容或操作无效，请检查后重试。",
+    "invalidCode": "体验码不正确，请重新输入。",
+    "versionConflict": "内容已被修改，请选择保留方式。",
+    "snapshotLimitExceeded": "待办数量或内容超过容量，请先通过搜索完成或删除部分任务；本机修改已保留。",
+    "exportLimitExceeded": "导出内容较大，请缩小清单或完成状态范围。"
+  },
   "admin": {
     "defaultPermissionGroupDeleteNotAllowed": "默认权限组不可删除。",
     "permissionGroupNotFound": "权限组不存在。",

@@ -49,7 +49,7 @@ func (s *Service) Unlock(ctx context.Context, userID uint, code string) (domain.
 	}
 	if at == nil {
 		if strings.TrimSpace(code) != "666" {
-			return domain.EntryStatus{}, fmt.Errorf("%w: 体验码不正确，请重新输入", domain.ErrInvalid)
+			return domain.EntryStatus{}, domain.ErrInvalidCode
 		}
 		unlockedAt, err := s.store.Unlock(ctx, o, time.Now().UTC())
 		if err != nil {
@@ -167,7 +167,7 @@ func (s *Service) Export(ctx context.Context, userID uint, query domain.Query, f
 			}
 		}
 		if builder.Len() > 8*1024*1024 {
-			return domain.Export{}, fmt.Errorf("%w: 导出内容较大，请缩小范围", domain.ErrInvalid)
+			return domain.Export{}, domain.ErrExportLimit
 		}
 	}
 	extension := "txt"
@@ -181,7 +181,7 @@ func (s *Service) Export(ctx context.Context, userID uint, query domain.Query, f
 		mime = "text/csv;charset=utf-8"
 	}
 	if builder.Len() > 8*1024*1024 {
-		return domain.Export{}, fmt.Errorf("%w: 导出内容较大，请缩小范围", domain.ErrInvalid)
+		return domain.Export{}, domain.ErrExportLimit
 	}
 	return domain.Export{Filename: "todo-" + time.Now().UTC().Format("20060102") + "." + extension, Content: builder.String(), MimeType: mime}, nil
 }

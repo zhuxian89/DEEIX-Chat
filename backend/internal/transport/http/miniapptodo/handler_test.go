@@ -3,6 +3,7 @@ package miniapptodo
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,6 +12,7 @@ import (
 
 	app "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/miniapptodo"
 	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/miniapptodo"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/response"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/transport/http/middleware"
 	"github.com/gin-gonic/gin"
 )
@@ -64,6 +66,9 @@ func TestHTTPEntrySyncAndFeedbackContracts(t *testing.T) {
 	if bad.Code != 400 || store.grant != nil {
 		t.Fatal(bad.Code, bad.Body.String())
 	}
+	if !strings.Contains(bad.Body.String(), `"errorCode":"miniapp_todo.invalid_code"`) {
+		t.Fatal("missing stable code for invalid experience code:", bad.Body.String())
+	}
 	good := call(http.MethodPost, "/miniapp-entry/unlock", `{"code":"666"}`)
 	if good.Code != 200 || strings.Contains(good.Body.String(), "server-openid") {
 		t.Fatal(good.Code, good.Body.String())
@@ -86,5 +91,37 @@ func TestHTTPEntrySyncAndFeedbackContracts(t *testing.T) {
 	malformed := call(http.MethodPost, "/miniapp-todo/sync", `{"operations":[]}`)
 	if malformed.Code != 400 {
 		t.Fatal(malformed.Code)
+	}
+}
+
+func TestHTTPFailuresUseTODOErrorCodes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	cases := []struct {
+		err     error
+		status  int
+		code    string
+		message string
+	}{
+		{domain.ErrIdentity, http.StatusForbidden, "miniapp_todo.identity_required", "verified miniapp identity required"},
+		{domain.ErrInvalid, http.StatusBadRequest, "miniapp_todo.invalid_request", "invalid todo request"},
+		{domain.ErrInvalidCode, http.StatusBadRequest, "miniapp_todo.invalid_code", "invalid todo experience code"},
+		{domain.ErrExportLimit, http.StatusBadRequest, "miniapp_todo.export_limit_exceeded", "TODO export limit exceeded; narrow the selected range"},
+		{domain.ErrConflict, http.StatusConflict, "miniapp_todo.version_conflict", "TODO version conflict"},
+		{domain.ErrSnapshotLimit, http.StatusConflict, "miniapp_todo.snapshot_limit_exceeded", "TODO task capacity exceeded; complete or delete tasks and retry"},
+		{errors.New("private database connection detail"), http.StatusInternalServerError, "internal.error", "internal server error"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.code, func(t *testing.T) {
+			recorder := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(recorder)
+			fail(ctx, tc.err)
+			var envelope response.Envelope
+			if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+				t.Fatal(err)
+			}
+			if recorder.Code != tc.status || envelope.ErrorCode != tc.code || envelope.ErrorMsg != tc.message {
+				t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+			}
+		})
 	}
 }

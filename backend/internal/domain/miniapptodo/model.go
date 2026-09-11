@@ -19,6 +19,8 @@ var (
 	ErrIdentity      = errors.New("verified miniapp identity required")
 	ErrConflict      = errors.New("TODO version conflict")
 	ErrSnapshotLimit = errors.New("TODO snapshot limit exceeded")
+	ErrInvalidCode   = fmt.Errorf("%w: invalid experience code", ErrInvalid)
+	ErrExportLimit   = fmt.Errorf("%w: export limit exceeded", ErrInvalid)
 )
 
 const SnapshotLimit = 5000

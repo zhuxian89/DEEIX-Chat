@@ -1,4 +1,12 @@
 {
+  "miniappTodo": {
+    "identityRequired": "Sign in with your WeChat identity for this mini program.",
+    "invalidRequest": "Invalid task content or operation. Check it and try again.",
+    "invalidCode": "The experience code is incorrect. Please try again.",
+    "versionConflict": "This item has changed. Choose which version to keep.",
+    "snapshotLimitExceeded": "Task count or content exceeds capacity. Complete or delete some tasks using search. Your local changes are preserved.",
+    "exportLimitExceeded": "The export is too large. Narrow the list or completion-status range."
+  },
   "admin": {
     "defaultPermissionGroupDeleteNotAllowed": "The default permission group cannot be deleted.",
     "permissionGroupNotFound": "Permission group not found.",

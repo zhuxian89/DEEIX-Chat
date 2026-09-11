@@ -4,13 +4,16 @@ import type { ApiRequest, ApiTransport } from "../../platform/transport";
 import { TodoClient } from "./client";
 import { newDraft } from "./types";
 
-function fixture() {
+function fixture(codeError?: { errorCode: string; errorMsg: string }) {
   const requests: ApiRequest[] = [];
   let refreshes = 0;
   const auth = { accessToken: "memory-only", expiresAt: new Date(Date.now() + 3600000).toISOString() };
   const transport: ApiTransport = {
     async request<T>(request: ApiRequest) {
       requests.push(request);
+      if (request.path.endsWith("/unlock") && codeError) {
+        return { statusCode: 400, data: codeError, headers: {}, cookies: [] };
+      }
       let data: unknown = { ownerKey: "verified-owner", unlocked: false };
       if (request.path.endsWith("/login")) data = { auth };
       if (request.path.endsWith("/refresh")) { refreshes += 1; data = auth; }
@@ -32,6 +35,11 @@ test("shared code is trimmed and sent separately from feedback", async () => {
   await client.connect(); assert.equal((await client.unlock(" 666 ")).unlocked, true);
   assert.deepEqual(requests.at(-1)?.body, { code: "666" });
   await client.feedback("建议"); assert.deepEqual(requests.at(-1)?.body, { content: "建议" });
+});
+test("TODO business error codes produce localized messages instead of English fallbacks", async () => {
+  const { client } = fixture({ errorCode: "miniapp_todo.invalid_code", errorMsg: "invalid TODO experience code" });
+  await client.connect();
+  await assert.rejects(() => client.unlock("wrong"), { message: "体验码不正确，请重新输入。" });
 });
 test("offline retry sends the exact operation identifier and payload", async () => {
   const { client, requests } = fixture();
