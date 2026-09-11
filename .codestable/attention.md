@@ -1,6 +1,10 @@
 # Project Attention
 项目级事实与每次会话需要优先注意的约束。
 
+## TODO 当前交接
+
+2026-09-11：仅保留动态配置码与单一反馈入口，拦截器、会话来源登记及登录改动已撤回。当前功能记录见 [work/feat-miniapp-todo-feedback.md](work/feat-miniapp-todo-feedback.md)，提交与上传记录见 [work/todo-release-63.md](work/todo-release-63.md)。其他平台从 [README.md](README.md) 进入，旧归档中的执行命令和未完成状态不再代表当前任务。
+
 ## 必须遵守
 
 - 提交文案约束（owner 于 2026-09-10 明确要求，持续生效）：本仓库后续所有 Git commit 标题、正文，以及微信小程序上传时的提交说明、版本描述，只允许描述 TODO 相关内容；不得包含 `AI`（不区分大小写），也不得描述切换、解锁或进入其他界面的功能。生成实际提交或上传文案时先核对此约束。本条只约束文案，不授权执行 commit、push 或上传。

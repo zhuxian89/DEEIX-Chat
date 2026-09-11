@@ -1,0 +1,7 @@
+# Machine-local execution output is summarized in the shared Markdown records.
+/work/*.log
+/work/*.pid
+/work/*.status
+/work/todo-ci-verify.ps1
+/work/todo-upload.ps1
+/work/todo-upload-verify.mjs
