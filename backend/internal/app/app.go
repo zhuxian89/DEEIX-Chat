@@ -310,6 +310,11 @@ func NewApp() (*App, error) {
 		wechatminiappinfra.DefaultAPIBase,
 	)
 	wechatMiniAppService := appwechatminiapp.NewService(runtimeCfg, userRepo, wechatMiniAppClient, authService)
+	miniappAccessStore, miniappAccessMiddleware, err := buildMiniappAccess(db, runtimeCfg)
+	if err != nil {
+		return nil, err
+	}
+	wechatMiniAppService.SetSessionRegistrar(miniappAccessStore)
 	wechatMiniAppModule := wechatminiapphttp.NewModule(wechatminiapphttp.NewHandler(wechatMiniAppService, authService))
 	registrationCodeRepo := registrationcoderepo.NewRepo(db)
 	registrationCodeService := appregistrationcode.NewService(registrationCodeRepo)
@@ -467,6 +472,7 @@ func NewApp() (*App, error) {
 	engine, err := platformhttp.NewEngine(runtimeCfg, log, platformhttp.Modules{
 		Auth:              authModule,
 		AuthService:       authService,
+		SessionAccess:     miniappAccessMiddleware,
 		Channel:           channelModule,
 		Conversation:      conversationModule,
 		MCP:               mcpModule,

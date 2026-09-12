@@ -60,6 +60,7 @@ type HealthChecker interface {
 type Modules struct {
 	Auth              *authhttp.Module
 	AuthService       middleware.SessionValidator
+	SessionAccess     gin.HandlerFunc
 	Channel           *channelhttp.Module
 	Conversation      *conversationhttp.Module
 	MCP               *mcphttp.Module
@@ -113,6 +114,9 @@ func NewEngine(cfg *config.Runtime, log *zap.Logger, modules Modules, hc HealthC
 	engine.Use(middleware.AccessLog(log))
 	engine.Use(middleware.SecurityHeaders())
 	engine.Use(middleware.CORS(snapshot.CORSAllowOrigin))
+	if modules.SessionAccess != nil {
+		engine.Use(modules.SessionAccess)
+	}
 
 	engine.GET("/healthz", func(c *gin.Context) {
 		info := buildinfo.Snapshot()

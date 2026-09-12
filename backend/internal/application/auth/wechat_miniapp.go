@@ -11,10 +11,6 @@ import (
 
 const WeChatMiniAppUserAgentPrefix = "DEEIX-WeChat-MiniApp"
 
-type miniAppSessionRepository interface {
-	RevokeActiveMiniAppSessions(ctx context.Context, userID uint, userAgentPrefix string, now time.Time) error
-}
-
 // IssueWeChatMiniAppLogin signs a normal DEEIX session after the Mini Program
 // service has authoritatively resolved its OpenID binding.
 func (s *Service) IssueWeChatMiniAppLogin(
@@ -32,11 +28,8 @@ func (s *Service) IssueWeChatMiniAppLogin(
 		return nil, ErrInvalidCredentials
 	}
 	now := time.Now()
-	if repo, ok := s.repo.(miniAppSessionRepository); ok {
-		if err = repo.RevokeActiveMiniAppSessions(ctx, userID, WeChatMiniAppUserAgentPrefix, now); err != nil {
-			return nil, err
-		}
-	}
+	// Miniapp access registration invalidates previous miniapp sessions by their
+	// authoritative source. Mutable User-Agent metadata must not revoke Web sessions.
 	normalizedAuditCtx := s.resolveSessionAuditContext(ctx, auditCtx)
 	if !strings.HasPrefix(normalizedAuditCtx.UserAgent, WeChatMiniAppUserAgentPrefix) {
 		normalizedAuditCtx.UserAgent = WeChatMiniAppUserAgentPrefix

@@ -3,7 +3,7 @@
 
 ## TODO 当前交接
 
-2026-09-11：仅保留动态配置码与单一反馈入口，拦截器、会话来源登记及登录改动已撤回。当前功能记录见 [work/feat-miniapp-todo-feedback.md](work/feat-miniapp-todo-feedback.md)，提交与上传记录见 [work/todo-release-63.md](work/todo-release-63.md)。其他平台从 [README.md](README.md) 进入，旧归档中的执行命令和未完成状态不再代表当前任务。
+2026-09-11：动态配置码与单一反馈入口保留。owner 随后批准新增按 sessionID 识别的小程序服务端门禁，并允许来源不明旧会话强制重新登录（可能涉及旧 Web 会话）；重新登录后的 Web 权限不变。当前门禁设计和部署边界见 [小程序会话访问门禁](../docs/miniapp-access-control.md)。此前 [work/feat-miniapp-todo-feedback.md](work/feat-miniapp-todo-feedback.md) 与 [work/todo-release-63.md](work/todo-release-63.md) 是上一版本交付记录，不能代表本次门禁已经部署。
 
 ## 必须遵守
 

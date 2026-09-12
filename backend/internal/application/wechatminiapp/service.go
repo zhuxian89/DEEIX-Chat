@@ -10,6 +10,7 @@ import (
 	"time"
 
 	appauth "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/auth"
+	access "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/miniappaccess"
 	domainuser "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/user"
 	domainwechatminiapp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/wechatminiapp"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
@@ -53,11 +54,15 @@ type Service struct {
 	exchanger CodeExchanger
 	issuer    LoginIssuer
 	now       func() time.Time
+	registrar access.Registrar
 }
 
 func NewService(cfg *config.Runtime, repo Repository, exchanger CodeExchanger, issuer LoginIssuer) *Service {
 	return &Service{cfg: cfg, repo: repo, exchanger: exchanger, issuer: issuer, now: time.Now}
 }
+
+// SetSessionRegistrar connects the fork-owned access boundary at startup.
+func (s *Service) SetSessionRegistrar(registrar access.Registrar) { s.registrar = registrar }
 
 func (s *Service) Login(ctx context.Context, code, requestID string, auditCtx requestmeta.SessionAuditContext) (*LoginResult, error) {
 	if s == nil || s.cfg == nil || s.repo == nil || s.exchanger == nil || s.issuer == nil {
@@ -111,6 +116,14 @@ func (s *Service) Login(ctx context.Context, code, requestID string, auditCtx re
 	}
 	if err != nil {
 		return nil, err
+	}
+	if s.registrar != nil {
+		if authResult == nil {
+			return nil, errors.New("missing mini program login result")
+		}
+		if err := s.registrar.Register(ctx, binding.UserID, authResult.SessionID, cfg.WeChatMiniAppAppID, identity.OpenID); err != nil {
+			return nil, err
+		}
 	}
 	return &LoginResult{
 		Auth:    authResult,
