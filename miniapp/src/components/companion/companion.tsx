@@ -3,10 +3,10 @@ import { Button, Image, ScrollView, Switch, Text, Textarea, View } from "@tarojs
 import Taro from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
-import { SpeechInputButton } from "@/components/speech-input/speech-input";
+import { SpeechComposer } from "@/components/speech-input/speech-input";
 import { canOfferCompanionGreeting, companionBeijingDate, companionImageIDs, type CompanionMemory, type CompanionProactivity, type CompanionState } from "@/product/companion-client";
 import { canOfferCompanionContinuation, CompanionInitiativeVisit, withCompanionInitiative } from "@/product/companion-initiative";
-import { composerKeyboardStyle } from "@/product/keyboard-layout";
+import { composerKeyboardHandlers, composerKeyboardStyle } from "@/product/keyboard-layout";
 import { companionDisplayText } from "@/product/companion-message";
 import { nextChatBottomScrollTop, shouldReleaseChatAutoFollow } from "@/product/chat-auto-scroll";
 import { latestVisibleMessages, messageFromAPI, type ConversationMessage } from "@/product/message-timeline";
@@ -169,6 +169,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   const previousScrollTop = useRef(0);
   const historyHeight = useRef(0);
   const busyRef = useRef(false);
+  const composerComposingRef = useRef(false);
   const readThrough = useRef(0);
   const initiativeVisit = useRef(new CompanionInitiativeVisit());
   const initiativeForeground = useRef(true);
@@ -279,17 +280,14 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
 
   useEffect(() => {
     mounted.current = true;
-    const change = (event: { height: number }) => { recordCompanionInteraction(); setKeyboard(Math.max(0, event.height)); };
     const show = () => { initiativeForeground.current = true; recordCompanionInteraction(); setForeground(true); };
-    const hide = () => { initiativeForeground.current = false; recordCompanionInteraction(); setForeground(false); };
+    const hide = () => { initiativeForeground.current = false; recordCompanionInteraction(); setForeground(false); setKeyboard(0); };
     Taro.onAppShow(show);
     Taro.onAppHide(hide);
-    Taro.onKeyboardHeightChange(change);
     void initialize();
     return () => {
       mounted.current = false;
       initiativeVisit.current.invalidate();
-      Taro.offKeyboardHeightChange(change);
       Taro.offAppShow(show);
       Taro.offAppHide(hide);
       if (busyRef.current) session.abort();
@@ -343,9 +341,9 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
     void session.companion.markRead(latest.serverID).catch(() => { readThrough.current = 0; });
   }, [messages, foreground, memoryOpen, busy, loading, following, session]);
 
-  const send = async () => {
-    const content = draft.trim();
-    if (!conversation || !state || busyRef.current || uploading || speechActive || (!content && !attachment)) return;
+  const send = async (submittedText?: string) => {
+    const content = (submittedText ?? draft).trim();
+    if (!conversation || !state || busyRef.current || uploading || (speechActive && submittedText === undefined) || (!content && !attachment)) return false;
     recordCompanionInteraction();
     busyRef.current = true;
     setBusy(true);
@@ -372,7 +370,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
         { branchReason: "default" },
         true,
       );
-      if (!mounted.current) return;
+      if (!mounted.current) return true;
       const assistant = result.assistantMessage ? toDisplay(result.assistantMessage) : null;
       const user = result.userMessage ? toDisplay(result.userMessage) : null;
       setMessages((current) => current.map((item) => {
@@ -400,6 +398,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
       busyRef.current = false;
       if (mounted.current) setBusy(false);
     }
+    return true;
   };
 
   const chooseImage = async () => {
@@ -432,6 +431,8 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
 
   const openMemories = async () => {
     recordCompanionInteraction();
+    setKeyboard(0);
+    composerComposingRef.current = false;
     setMemoryOpen(true);
     await runMemoryAction(async () => {
       setError("");
@@ -600,10 +601,21 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
           {attachment && <View className="companionAttachment"><Image src={attachment.path} mode="aspectFill" /><Text onClick={() => setAttachment(null)}>移除图片</Text></View>}
           <View className="companionInputRow">
             <Button className="companionPhoto" disabled={busy || uploading || loading || speechActive} onClick={() => void chooseImage()}>{uploading ? "…" : "图片"}</Button>
-            <Textarea className="companionInput" value={draft} placeholder="随口说点什么…" maxlength={8000} autoHeight adjustPosition={false} showConfirmBar={false} disabled={busy || loading || speechActive} onLineChange={measureHistory} onInput={(event) => { recordCompanionInteraction(); setDraft(event.detail.value); }} />
-            <SpeechInputButton client={session.speech} draft={draft} disabled={busy || uploading || loading || memoryOpen}
-              onDraft={(value) => { recordCompanionInteraction(); setDraft(value); }}
-              onActive={(active) => { recordCompanionInteraction(); setSpeechActive(active); }} onError={setError} />
+            <SpeechComposer client={session.speech} draft={draft} disabled={busy || uploading || loading || memoryOpen}
+              onSend={(text) => send(text)}
+              onActive={(active) => { recordCompanionInteraction(); setSpeechActive(active); }} onError={setError}>
+              <Textarea className="companionInput"
+                {...composerKeyboardHandlers((height) => { recordCompanionInteraction(); setKeyboard(height); })}
+                confirmType="send" confirmHold
+                onKeyboardCompositionStart={() => { composerComposingRef.current = true; }}
+                onKeyboardCompositionEnd={() => { composerComposingRef.current = false; }}
+                onBlur={() => { composerComposingRef.current = false; recordCompanionInteraction(); setKeyboard(0); }}
+                onConfirm={(event) => {
+                  if (composerComposingRef.current || speechActive || loading || memoryOpen) return;
+                  return send(event.detail.value);
+                }}
+                value={draft} placeholder="随口说点什么…" maxlength={8000} autoHeight adjustPosition={false} showConfirmBar={false} disabled={busy || loading || speechActive} onLineChange={measureHistory} onInput={(event) => { recordCompanionInteraction(); setDraft(event.detail.value); }} />
+            </SpeechComposer>
             <Button className="companionSend" disabled={loading || uploading || speechActive || (!busy && !draft.trim() && !attachment)} onClick={() => busy ? void session.cancelActiveGeneration().catch((cause) => setError(errorMessage(cause))) : void send()}>{busy ? "停止" : "发送"}</Button>
           </View>
           {!keyboard && <Text className="companionFootnote">聊天及联网按平台用量计费 · 主动招呼不扣余额</Text>}

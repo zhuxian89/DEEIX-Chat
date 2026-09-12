@@ -29,8 +29,8 @@ import {
   resolveImageEditModel,
   resolveImageSubmitDecision,
 } from "@/product/image-task";
-import { composerKeyboardStyle } from "@/product/keyboard-layout";
-import { SpeechInputButton } from "@/components/speech-input/speech-input";
+import { composerKeyboardHandlers, composerKeyboardStyle } from "@/product/keyboard-layout";
+import { SpeechComposer } from "@/components/speech-input/speech-input";
 import { MINIAPP_BUILD_VERSION } from "@/product/build-version";
 import { nextChatBottomScrollTop, shouldReleaseChatAutoFollow } from "@/product/chat-auto-scroll";
 import { wheelRotationForPrize } from "@/product/daily-checkin";
@@ -130,9 +130,12 @@ function mergeHistoryPage(
   return [...current, ...incoming.filter((conversation) => !existingIDs.has(conversation.publicID))];
 }
 
-function chatGenerationFailureText(currentText: string, stopped: boolean): string {
+function chatGenerationFailureText(currentText: string, stopped: boolean, billingMessage?: string): string {
   if (stopped) {
     return currentText ? `${currentText}\n\n（本次回复已停止）` : "本次回复已停止";
+  }
+  if (billingMessage) {
+    return currentText ? `${currentText}\n\n（${billingMessage}）` : billingMessage;
   }
   return currentText
     ? `${currentText}\n\n（回复中断，可重新进入会话恢复）`
@@ -239,6 +242,8 @@ export default function HomePage() {
   const [currentConversation, setCurrentConversation] = useState<ConversationResponse | null>(null);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [prompt, setPrompt] = useState("");
+  const composerSendingRef = useRef(false);
+  const composerComposingRef = useRef(false);
   const [speechActive, setSpeechActive] = useState(false);
   const [running, setRunning] = useState(false);
   const [stopping, setStopping] = useState(false);
@@ -424,12 +429,9 @@ export default function HomePage() {
   }, [messages, screen]);
 
   useEffect(() => {
-    const handleKeyboardHeightChange = (event: { height: number }) => {
-      setKeyboardHeight(Math.max(0, Number(event.height) || 0));
-    };
-    Taro.onKeyboardHeightChange(handleKeyboardHeightChange);
-    return () => Taro.offKeyboardHeightChange(handleKeyboardHeightChange);
-  }, []);
+    setKeyboardHeight(0);
+    composerComposingRef.current = false;
+  }, [screen, currentConversation?.publicID]);
 
   useEffect(() => {
     if (screen !== "history") {
@@ -1026,15 +1028,16 @@ export default function HomePage() {
     }
   };
 
-  const sendChat = async () => {
+  const sendChat = async (submittedText?: string) => {
     const session = sessionRef.current;
     const conversation = currentConversation;
     const selectedModel = selectedChatModel;
-    const content = prompt.trim();
+    const content = (submittedText ?? prompt).trim();
     const attachment = pendingImage;
-    if (!session || !conversation || !selectedModel || running || uploading || (!content && !attachment)) {
-      return;
+    if (!session || !conversation || !selectedModel || running || uploading || composerSendingRef.current || (!content && !attachment)) {
+      return false;
     }
+    composerSendingRef.current = true;
     enableChatAutoFollow(true);
     setWorkspaceError("");
     messageCounter.current += 1;
@@ -1094,24 +1097,32 @@ export default function HomePage() {
       }
     } catch (error) {
       const stopped = error instanceof MiniAppRequestAbortedError;
+      const errorMessage = error instanceof Error ? error.message : "发送失败，请重试";
+      const billingMessage = errorMessage.includes("billing.insufficient_funds")
+        ? "可用额度或余额不足，暂时无法继续聊天"
+        : errorMessage.includes("billing.period_credit_exceeded")
+          ? "本期订阅额度已用完，暂时无法继续聊天"
+          : undefined;
       setMessages((items) => items.map((item) => item.id === assistantID
           ? {
             ...item,
             activityStatus: undefined,
             pending: false,
-            text: chatGenerationFailureText(item.text, stopped),
+            text: chatGenerationFailureText(item.text, stopped, billingMessage),
           }
         : item));
       if (attachment) {
         setPendingImage((current) => current ?? attachment);
       }
       if (!stopped) {
-        setWorkspaceError(error instanceof Error ? error.message : "发送失败，请重试");
+        setWorkspaceError(billingMessage ?? errorMessage);
       }
     } finally {
+      composerSendingRef.current = false;
       setRunning(false);
       setStopping(false);
     }
+    return true;
   };
 
   const stopGeneration = async () => {
@@ -1245,22 +1256,23 @@ export default function HomePage() {
     );
   };
 
-  const generateImage = async () => {
+  const generateImage = async (submittedText?: string) => {
     const session = sessionRef.current;
     const conversation = currentConversation;
     const selectedModel = selectedImageModel;
-    const content = prompt.trim();
+    const content = (submittedText ?? prompt).trim();
     const attachment = pendingImage;
-    if (!session || !conversation || !selectedModel || running || !content) {
-      return;
+    if (!session || !conversation || !selectedModel || running || uploading || composerSendingRef.current || !content) {
+      return false;
     }
     const decision = resolveImageSubmitDecision(selectedModel, Boolean(attachment));
     if (!decision.task) {
       setWorkspaceError(decision.blockedReason === "image_edit_input_required"
         ? "该模型用于图片编辑，请先上传需要编辑的图片"
         : "当前模型不支持图片编辑，请移除图片或切换模型");
-      return;
+      return false;
     }
+    composerSendingRef.current = true;
     setWorkspaceError("");
     messageCounter.current += 1;
     const userID = `local-image-user-${messageCounter.current}`;
@@ -1331,9 +1343,11 @@ export default function HomePage() {
         setPendingImage((current) => current ?? attachment);
       }
     } finally {
+      composerSendingRef.current = false;
       setRunning(false);
       setStopping(false);
     }
+    return true;
   };
 
   const requestRenameConversation = async (conversation: ConversationListItem) => {
@@ -2381,27 +2395,39 @@ export default function HomePage() {
             >
               {uploading ? "…" : "＋"}
             </Button>
-            <Textarea
-              className="composerInput"
-              value={prompt}
-              placeholder={screen === "chat"
-                ? "输入消息…"
-                : pendingImage
-                  ? "描述你想怎样修改这张图片…"
-                  : "描述你想生成的图片…"}
-              maxlength={8000}
-              autoHeight
-              adjustPosition={false}
-              cursorSpacing={0}
-              showConfirmBar={false}
-              disabled={running || uploading || speechActive}
-              onInput={(event) => setPrompt(event.detail.value)}
-            >
-              <KeyboardAccessory style={{ height: "1px" }} />
-            </Textarea>
-            {sessionRef.current && <SpeechInputButton key={currentConversation.publicID}
-              client={sessionRef.current.speech} draft={prompt} disabled={running || uploading}
-              onDraft={setPrompt} onActive={setSpeechActive} onError={setWorkspaceError} />}
+            <SpeechComposer key={currentConversation.publicID}
+              client={sessionRef.current?.speech} draft={prompt} disabled={running || uploading}
+              onSend={(text) => screen === "chat" ? sendChat(text) : generateImage(text)}
+              onActive={setSpeechActive} onError={setWorkspaceError}>
+              <Textarea
+                className="composerInput"
+                {...composerKeyboardHandlers(setKeyboardHeight)}
+                value={prompt}
+                placeholder={screen === "chat"
+                  ? "输入消息…"
+                  : pendingImage
+                    ? "描述你想怎样修改这张图片…"
+                    : "描述你想生成的图片…"}
+                maxlength={8000}
+                autoHeight
+                adjustPosition={false}
+                cursorSpacing={0}
+                showConfirmBar={false}
+                confirmType="send"
+                confirmHold
+                disabled={running || uploading || speechActive}
+                onInput={(event) => setPrompt(event.detail.value)}
+                onKeyboardCompositionStart={() => { composerComposingRef.current = true; }}
+                onKeyboardCompositionEnd={() => { composerComposingRef.current = false; }}
+                onBlur={() => { composerComposingRef.current = false; setKeyboardHeight(0); }}
+                onConfirm={(event) => {
+                  if (composerComposingRef.current || speechActive || stopping) return;
+                  return screen === "chat" ? sendChat(event.detail.value) : generateImage(event.detail.value);
+                }}
+              >
+                <KeyboardAccessory style={{ height: "1px" }} />
+              </Textarea>
+            </SpeechComposer>
             <Button
               className={`sendButton ${running ? "stopSendButton" : ""}`}
               disabled={speechActive || stopping || (!running && (
@@ -2412,8 +2438,8 @@ export default function HomePage() {
               onClick={running
                 ? () => void stopGeneration()
                 : screen === "chat"
-                  ? sendChat
-                  : generateImage}
+                  ? () => void sendChat()
+                  : () => void generateImage()}
             >
               {stopping ? "停止中" : running ? "停" : screen === "chat" ? "发送" : "生成"}
             </Button>
