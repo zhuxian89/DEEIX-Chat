@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { MapPinned, Monitor, Moon, ShieldCheck, Sun } from "lucide-react";
+import { MapPinned, Monitor, Moon, Sun } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
@@ -18,15 +18,12 @@ import {
   serializeAppearancePreferences,
 } from "@/features/settings/utils/appearance-preferences";
 import {
-  cancelCurrentTwoFactorSetup,
   completeOnboarding,
-  confirmCurrentTwoFactorSetup,
   isPasswordReuseNotAllowedError,
   patchMe,
   patchUsername,
-  startCurrentTwoFactorSetup,
 } from "@/shared/api/auth";
-import type { TwoFactorSetupStartData, UserDTO } from "@/shared/api/auth.types";
+import type { UserDTO } from "@/shared/api/auth.types";
 import {
   DISPLAY_NAME_MAX_LENGTH,
   PASSWORD_MIN_LENGTH,
@@ -41,10 +38,8 @@ import { useAppLocale } from "@/i18n/app-i18n-provider";
 import { APP_LOCALE_LABELS, APP_LOCALES, type AppLocale } from "@/i18n/config";
 import { useLocalizedErrorMessage } from "@/i18n/use-localized-error";
 import { AppLogo } from "@/shared/components/app-logo";
-import { CopyActionButton } from "@/shared/components/copy-action";
 import { TimeZoneSelect } from "@/shared/components/time-zone-select";
 import { useTheme, type ThemePreset } from "@/shared/components/theme-provider";
-import { createQRCodeDataURL } from "@/shared/lib/qr-code";
 import { detectCurrentTimeZone } from "@/shared/lib/time-zone";
 import { cn } from "@/lib/utils";
 import { getInitialSecurityCopy, isAdminRole } from "./initial-security-copy";
@@ -65,7 +60,6 @@ const USER_ONBOARDING_TIPS = [
   "userTips.models",
   "userTips.files",
   "userTips.conversation",
-  "userTips.twoFactor",
 ];
 
 function titleFromIconSlug(slug: string): string {
@@ -200,23 +194,12 @@ export function InitialSecurityGuard() {
   const [displayName, setDisplayName] = React.useState("");
   const [timezone, setTimezone] = React.useState(detectCurrentTimeZone);
   const [password, setPassword] = React.useState("");
-  const [otp, setOtp] = React.useState("");
   const [savingAccount, setSavingAccount] = React.useState(false);
-  const [savingTwoFactor, setSavingTwoFactor] = React.useState(false);
   const [savingLocale, setSavingLocale] = React.useState<AppLocale | null>(null);
   const [savingThemePreset, setSavingThemePreset] = React.useState(false);
   const [savingPersonalization, setSavingPersonalization] = React.useState(false);
   const [finishing, setFinishing] = React.useState(false);
-  const [twoFactorSetup, setTwoFactorSetup] = React.useState<TwoFactorSetupStartData | null>(null);
-  const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
-  const [twoFactorSkipped, setTwoFactorSkipped] = React.useState(false);
-  const setupStartedRef = React.useRef(false);
   const initializedTimeZoneUserRef = React.useRef<string | null>(null);
-  const qrCodeDataURL = React.useMemo(
-    () => (twoFactorSetup?.otpauthURL ? createQRCodeDataURL(twoFactorSetup.otpauthURL, 3, t("aria.twoFactorQRCode")) : ""),
-    [t, twoFactorSetup?.otpauthURL],
-  );
-  const qrCodeUnavailable = Boolean(twoFactorSetup?.otpauthURL && !qrCodeDataURL);
   const isAdminGuide = isAdminRole(viewer?.role);
   const activeOnboardingTips = isAdminGuide ? ADMIN_ONBOARDING_TIPS : USER_ONBOARDING_TIPS;
 
@@ -226,10 +209,6 @@ export function InitialSecurityGuard() {
     setDisplayName(user?.displayName ?? "");
     if (!user) {
       setGuideActive(false);
-      setRecoveryCodes([]);
-      setTwoFactorSetup(null);
-      setTwoFactorSkipped(false);
-      setupStartedRef.current = false;
       initializedTimeZoneUserRef.current = null;
       setStep(1);
       return;
@@ -262,28 +241,6 @@ export function InitialSecurityGuard() {
     setActiveTipIndex(0);
   }, [isAdminGuide]);
 
-  React.useEffect(() => {
-    if (step !== 3 || !viewer?.twoFactorAvailable || viewer.twoFactorEnabled || setupStartedRef.current) {
-      return;
-    }
-    setupStartedRef.current = true;
-    setTwoFactorSkipped(false);
-    setSavingTwoFactor(true);
-    void startCurrentTwoFactorSetup(accessToken)
-      .then((result) => setTwoFactorSetup(result))
-      .catch((error) => {
-        setupStartedRef.current = false;
-        toast.error(t("toasts.startTwoFactorFailed"), {
-          description: resolveErrorMessage(error, tCommonErrors("unknown")),
-        });
-      })
-      .finally(() => setSavingTwoFactor(false));
-  }, [accessToken, resolveErrorMessage, step, t, tCommonErrors, viewer?.twoFactorAvailable, viewer?.twoFactorEnabled]);
-
-  React.useEffect(() => {
-    setOtp("");
-  }, [twoFactorSetup?.secret]);
-
   const mustResetPassword = Boolean(viewer?.mustResetPassword);
   const initialSecurityCopy = getInitialSecurityCopy({ role: viewer?.role, mustResetPassword });
   const currentTimeZone = React.useMemo(() => detectCurrentTimeZone(), []);
@@ -292,7 +249,6 @@ export function InitialSecurityGuard() {
     ? t("adminWelcomeDescription")
     : t("userWelcomeDescription");
   const accountTitle = t(initialSecurityCopy.accountTitleKey);
-  const twoFactorTitle = isAdminGuide ? t("adminTwoFactorTitle") : t("userTwoFactorTitle");
   const readyDescription = t(initialSecurityCopy.readyDescriptionKey);
 
   const submitAccountStep = React.useCallback(async () => {
@@ -342,75 +298,6 @@ export function InitialSecurityGuard() {
     }
   }, [accessToken, displayName, password, resolveErrorMessage, savingAccount, t, tCommonErrors, username, viewer]);
 
-  const confirmTwoFactor = React.useCallback(async () => {
-    if (savingTwoFactor) return;
-    const code = otp.replace(/\D/g, "").slice(0, 6);
-    if (code.length !== 6) {
-      toast.error(t("toasts.otpRequired"));
-      return;
-    }
-
-    setSavingTwoFactor(true);
-    try {
-      const result = await confirmCurrentTwoFactorSetup(accessToken, code);
-      const status = result.status;
-      if (!status?.totpEnabled) {
-        throw new Error(t("toasts.twoFactorNotEnabled"));
-      }
-      const nextViewer = await refreshUser();
-      if (nextViewer && !nextViewer.twoFactorEnabled) {
-        throw new Error(t("toasts.twoFactorNotSynced"));
-      }
-      setRecoveryCodes(result.recoveryCodes);
-      setTwoFactorSkipped(false);
-      setViewer((current) => nextViewer ?? (current ? {
-        ...current,
-        twoFactorAvailable: status.available,
-        twoFactorEnabled: status.totpEnabled,
-        twoFactorRequired: status.required,
-        twoFactorRecoveryCount: status.recoveryCount,
-      } : current));
-      setTwoFactorSetup(null);
-      setupStartedRef.current = false;
-      setStep(4);
-      if (nextViewer) {
-        dispatchUserProfileUpdated(nextViewer);
-      }
-    } catch (error) {
-      toast.error(t("toasts.enableTwoFactorFailed"), {
-        description: resolveErrorMessage(error, tCommonErrors("unknown")),
-      });
-    } finally {
-      setSavingTwoFactor(false);
-    }
-  }, [accessToken, otp, refreshUser, resolveErrorMessage, savingTwoFactor, t, tCommonErrors]);
-
-  const skipTwoFactor = React.useCallback(async () => {
-    if (savingTwoFactor) return;
-    setSavingTwoFactor(true);
-    try {
-      if (twoFactorSetup) {
-        await cancelCurrentTwoFactorSetup(accessToken);
-      }
-      setTwoFactorSkipped(true);
-      setTwoFactorSetup(null);
-      setupStartedRef.current = false;
-      setStep(4);
-    } catch (error) {
-      toast.error(t("toasts.skipTwoFactorFailed"), {
-        description: resolveErrorMessage(error, tCommonErrors("unknown")),
-      });
-    } finally {
-      setSavingTwoFactor(false);
-    }
-  }, [accessToken, resolveErrorMessage, savingTwoFactor, t, tCommonErrors, twoFactorSetup]);
-
-  const copyMessages = React.useMemo(() => ({
-    copied: t("toasts.copied", { label: "" }).trim(),
-    failed: t("toasts.copyFailed"),
-    failedDescription: t("toasts.manualCopy"),
-  }), [t]);
-
   const handleLocaleChange = React.useCallback((nextLocale: AppLocale) => {
     if (nextLocale === locale) {
       return;
@@ -459,7 +346,7 @@ export function InitialSecurityGuard() {
     const appearancePreferences = currentAppearancePreferences();
 
     if (appearancePreferences === (viewer.appearancePreferences?.trim() ?? "")) {
-      setStep(5);
+      setStep(4);
       return;
     }
 
@@ -468,7 +355,7 @@ export function InitialSecurityGuard() {
       const nextViewer = await patchMe(accessToken, { appearancePreferences });
       setViewer(nextViewer);
       dispatchUserProfileUpdated(nextViewer);
-      setStep(5);
+      setStep(4);
     } catch (error) {
       toast.error(t("toasts.savePersonalizationFailed"), {
         description: resolveErrorMessage(error, tCommonErrors("unknown")),
@@ -492,7 +379,7 @@ export function InitialSecurityGuard() {
     }
 
     if (Object.keys(profilePayload).length === 0) {
-      setStep(6);
+      setStep(5);
       return;
     }
 
@@ -501,7 +388,7 @@ export function InitialSecurityGuard() {
       const nextViewer = await patchMe(accessToken, profilePayload);
       setViewer(nextViewer);
       dispatchUserProfileUpdated(nextViewer);
-      setStep(6);
+      setStep(5);
     } catch (error) {
       toast.error(t("toasts.savePersonalizationFailed"), {
         description: resolveErrorMessage(error, tCommonErrors("unknown")),
@@ -520,12 +407,8 @@ export function InitialSecurityGuard() {
     }
     setFinishing(true);
     try {
-      const refreshedViewer = await refreshUser();
-      let nextViewer = refreshedViewer;
-      if (!twoFactorSkipped && nextViewer?.twoFactorAvailable && !nextViewer.twoFactorEnabled) {
-        throw new Error(t("toasts.twoFactorNotSynced"));
-      }
-      nextViewer = await completeOnboarding(
+      await refreshUser();
+      const nextViewer = await completeOnboarding(
         accessToken,
         viewer.mustResetPassword ? { newPassword: password.trim() } : undefined,
       );
@@ -533,7 +416,6 @@ export function InitialSecurityGuard() {
         setViewer(nextViewer);
         dispatchUserProfileUpdated(nextViewer);
       }
-      setRecoveryCodes([]);
       setGuideActive(false);
       if (viewer.mustResetPassword) {
         toast.success(t("toasts.initializedRelogin"));
@@ -551,9 +433,9 @@ export function InitialSecurityGuard() {
     } finally {
       setFinishing(false);
     }
-  }, [accessToken, finishing, password, refreshUser, resolveErrorMessage, t, tCommonErrors, twoFactorSkipped, viewer]);
+  }, [accessToken, finishing, password, refreshUser, resolveErrorMessage, t, tCommonErrors, viewer]);
 
-  if (!viewer || (!guideActive && recoveryCodes.length === 0)) {
+  if (!viewer || !guideActive) {
     return null;
   }
 
@@ -562,7 +444,7 @@ export function InitialSecurityGuard() {
       <Onboarding
         value={step}
         onValueChange={setStep}
-        totalSteps={6}
+        totalSteps={5}
         role="dialog"
         aria-modal="true"
         aria-label={t("aria.onboarding")}
@@ -718,108 +600,6 @@ export function InitialSecurityGuard() {
               <div className="w-full space-y-5">
                 <Onboarding.Header className="text-left">
                   <div className="space-y-2">
-                    <h2 className="text-2xl font-semibold tracking-normal">{twoFactorTitle}</h2>
-                  </div>
-                </Onboarding.Header>
-
-                {!viewer.twoFactorAvailable ? (
-                  <div className="rounded-lg border border-border/60 bg-muted/25 px-4 py-3 text-xs text-muted-foreground">
-                    {t("states.twoFactorUnavailable")}
-                  </div>
-                ) : viewer.twoFactorEnabled ? (
-                  <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/25 px-4 py-3 text-xs font-medium">
-                    <ShieldCheck className="size-3.5 text-muted-foreground" />
-                    {t("states.twoFactorEnabled")}
-                  </div>
-                ) : savingTwoFactor && !twoFactorSetup ? (
-                  <div className="flex min-h-[7.5rem] items-center justify-center rounded-lg border border-border/60 bg-muted/20 text-xs text-muted-foreground">
-                    <SpinnerLabel>{t("generating")}</SpinnerLabel>
-                  </div>
-                ) : !twoFactorSetup ? (
-                  <div className="rounded-lg border border-border/60 bg-muted/25 px-4 py-3 text-xs text-muted-foreground">
-                    {t("states.twoFactorPreparing")}
-                  </div>
-                ) : (
-                  <div className="grid items-center gap-5 sm:grid-cols-[7.5rem_minmax(0,1fr)]">
-                    <div className="flex min-h-[7.5rem] items-center justify-center">
-                      {savingTwoFactor && !qrCodeDataURL ? (
-                        <div className="flex size-[7.5rem] items-center justify-center rounded-lg border border-border/60 bg-muted/20 text-xs text-muted-foreground">
-                          <SpinnerLabel>{t("generating")}</SpinnerLabel>
-                        </div>
-                      ) : qrCodeDataURL ? (
-                        <div className="flex size-[7.5rem] items-center justify-center">
-                          <img className="size-full" src={qrCodeDataURL} alt={t("aria.twoFactorQRCode")} />
-                        </div>
-                      ) : (
-                        <div className="flex size-[7.5rem] items-center justify-center rounded-lg border border-border/60 bg-muted/20 px-3 text-center text-[11px] leading-4 text-muted-foreground">
-                          {qrCodeUnavailable ? t("states.qrUnavailable") : <SpinnerLabel>{t("generating")}</SpinnerLabel>}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 space-y-2.5">
-                      {twoFactorSetup?.secret ? (
-                        <div className="space-y-1.5">
-                          <span className="text-xs font-medium">{t("labels.manualSecret")}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="min-w-0 flex-1 break-all font-mono text-[11px] leading-5 text-muted-foreground">
-                              {twoFactorSetup.secret}
-                            </span>
-                            <CopyActionButton
-                              type="button"
-                              variant="ghost"
-                              size="icon-sm"
-                              className="shrink-0 text-muted-foreground shadow-none"
-                              value={twoFactorSetup.secret}
-                              messages={copyMessages}
-                              copyOptions={{ copied: t("toasts.copied", { label: t("toasts.secret") }) }}
-                              aria-label={t("actions.copySecret")}
-                              title={t("actions.copySecretTitle")}
-                            />
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <label className="block space-y-1.5">
-                        <span className="text-xs font-medium">{t("labels.otp")}</span>
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          autoComplete="one-time-code"
-                          pattern="[0-9]*"
-                          placeholder={t("placeholders.otp")}
-                          value={otp}
-                          maxLength={6}
-                          className="h-8 text-xs"
-                          onInput={(event) => setOtp(event.currentTarget.value.replace(/\D/g, "").slice(0, 6))}
-                          onChange={(event) => setOtp(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                        />
-                      </label>
-                    </div>
-                  </div>
-                )}
-                </div>
-            </div>
-
-            <Onboarding.Navigation aria-label={t("aria.twoFactorNavigation")} className="mt-auto justify-end pt-6">
-              <Button type="button" variant="ghost" className="shadow-none" disabled={savingTwoFactor} onClick={() => void skipTwoFactor()}>
-                {t("skip")}
-              </Button>
-              <Button
-                type="button"
-                disabled={savingTwoFactor || !viewer.twoFactorAvailable || viewer.twoFactorEnabled || !twoFactorSetup}
-                onClick={() => void confirmTwoFactor()}
-              >
-                {savingTwoFactor ? <SpinnerLabel>{t("processing")}</SpinnerLabel> : t("enable")}
-              </Button>
-            </Onboarding.Navigation>
-          </Onboarding.Step>
-
-          <Onboarding.Step step={4} className="flex flex-1 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
-            <div className="flex flex-1 items-center">
-              <div className="w-full space-y-5">
-                <Onboarding.Header className="text-left">
-                  <div className="space-y-2">
                     <h2 className="text-2xl font-semibold tracking-normal">{t("labels.themePreset")}</h2>
                     <p className="text-xs leading-5 text-muted-foreground">
                       {t("themePresetDescription")}
@@ -849,7 +629,7 @@ export function InitialSecurityGuard() {
             </div>
 
             <Onboarding.Navigation aria-label={t("aria.themePresetNavigation")} className="mt-auto justify-end pt-6">
-              <Button type="button" variant="ghost" className="shadow-none" disabled={savingThemePreset} onClick={() => setStep(3)}>
+              <Button type="button" variant="ghost" className="shadow-none" disabled={savingThemePreset} onClick={() => setStep(2)}>
                 {t("back")}
               </Button>
               <Button type="button" disabled={savingThemePreset} onClick={() => void saveThemePresetStep()}>
@@ -858,7 +638,7 @@ export function InitialSecurityGuard() {
             </Onboarding.Navigation>
           </Onboarding.Step>
 
-          <Onboarding.Step step={5} className="flex flex-1 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
+          <Onboarding.Step step={4} className="flex flex-1 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
             <div className="flex flex-1 items-center">
               <div className="w-full space-y-5">
                 <Onboarding.Header className="text-left">
@@ -932,7 +712,7 @@ export function InitialSecurityGuard() {
             </div>
 
             <Onboarding.Navigation aria-label={t("aria.personalizationNavigation")} className="mt-auto justify-end pt-6">
-              <Button type="button" variant="ghost" className="shadow-none" disabled={savingPersonalization} onClick={() => setStep(4)}>
+              <Button type="button" variant="ghost" className="shadow-none" disabled={savingPersonalization} onClick={() => setStep(3)}>
                 {t("back")}
               </Button>
               <Button type="button" disabled={savingPersonalization} onClick={() => void savePersonalizationStep()}>
@@ -941,7 +721,7 @@ export function InitialSecurityGuard() {
             </Onboarding.Navigation>
           </Onboarding.Step>
 
-          <Onboarding.Step step={6} className="flex flex-1 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
+          <Onboarding.Step step={5} className="flex flex-1 flex-col animate-in fade-in-0 slide-in-from-right-2 duration-200">
             <div className="flex flex-1 items-center">
               <div className="w-full space-y-5">
                 <Onboarding.Header className="text-left">
@@ -953,33 +733,11 @@ export function InitialSecurityGuard() {
                   </div>
                 </Onboarding.Header>
 
-                {recoveryCodes.length > 0 ? (
-                  <div className="space-y-2 rounded-lg border border-border/60 bg-muted/20 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <p className="text-xs font-medium">{t("labels.recoveryCodes")}</p>
-                      <CopyActionButton
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="size-7 shadow-none"
-                        value={recoveryCodes.join("\n")}
-                        messages={copyMessages}
-                        copyOptions={{ copied: t("toasts.recoveryCodesCopied"), failedDescription: undefined }}
-                        aria-label={t("actions.copyRecoveryCodes")}
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-1 font-mono text-[11px] text-muted-foreground">
-                      {recoveryCodes.map((code) => (
-                        <span key={code}>{code}</span>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
               </div>
             </div>
 
             <Onboarding.Navigation aria-label={t("aria.finishNavigation")} className="mt-auto justify-end pt-6">
-              <Button type="button" variant="ghost" className="shadow-none" disabled={finishing} onClick={() => setStep(5)}>
+              <Button type="button" variant="ghost" className="shadow-none" disabled={finishing} onClick={() => setStep(4)}>
                 {t("back")}
               </Button>
               <Button type="button" disabled={finishing} onClick={() => void finishInitialSecurity()}>

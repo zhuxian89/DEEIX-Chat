@@ -2,11 +2,15 @@ import type { ComponentProps, ReactNode } from "react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, test, vi } from "vitest";
 
-const { authSession, appLocale, themeState } = vi.hoisted(() => ({
+const { authApi, authSession, appLocale, themeState } = vi.hoisted(() => ({
+  authApi: {
+    completeOnboarding: vi.fn(),
+    startCurrentTwoFactorSetup: vi.fn(),
+  },
   authSession: {
     accessToken: "test-token",
-    user: null as Record<string, unknown> | null,
     refreshUser: vi.fn(),
+    user: null as Record<string, unknown> | null,
   },
   appLocale: {
     locale: "zh-CN",
@@ -79,13 +83,11 @@ vi.mock("@/features/settings/utils/appearance-preferences", () => ({
   serializeAppearancePreferences: () => "",
 }));
 vi.mock("@/shared/api/auth", () => ({
-  cancelCurrentTwoFactorSetup: vi.fn(),
-  completeOnboarding: vi.fn(),
-  confirmCurrentTwoFactorSetup: vi.fn(),
+  completeOnboarding: authApi.completeOnboarding,
   isPasswordReuseNotAllowedError: () => false,
   patchMe: vi.fn(),
   patchUsername: vi.fn(),
-  startCurrentTwoFactorSetup: vi.fn(),
+  startCurrentTwoFactorSetup: authApi.startCurrentTwoFactorSetup,
 }));
 vi.mock("@/shared/auth/account-policy", () => ({
   DISPLAY_NAME_MAX_LENGTH: 64,
@@ -95,10 +97,8 @@ vi.mock("@/shared/auth/account-policy", () => ({
   isPasswordPolicyValid: () => true,
   isUsernamePolicyValid: () => true,
 }));
-vi.mock("@/shared/lib/qr-code", () => ({ createQRCodeDataURL: () => "" }));
 vi.mock("@/shared/lib/time-zone", () => ({ detectCurrentTimeZone: () => "Etc/UTC" }));
 vi.mock("@/shared/components/app-logo", () => ({ AppLogo: () => <div /> }));
-vi.mock("@/shared/components/copy-action", () => ({ CopyActionButton: () => <button type="button" /> }));
 vi.mock("@/shared/components/time-zone-select", () => ({ TimeZoneSelect: () => <select /> }));
 vi.mock("@/components/ui/logo-carousel", () => ({ LogoCarousel: () => <div /> }));
 vi.mock("@/components/ui/spinner", () => ({ SpinnerLabel: ({ children }: { children?: ReactNode }) => <span>{children}</span> }));
@@ -170,7 +170,6 @@ function makeUser(role: string, mustResetPassword: boolean) {
 
 async function renderAccountStep(role: string, mustResetPassword: boolean) {
   authSession.user = makeUser(role, mustResetPassword);
-  authSession.refreshUser.mockResolvedValue(authSession.user);
   render(<InitialSecurityGuard />);
   await waitFor(() => expect(screen.getByRole("button", { name: "开始" })).toBeTruthy());
   fireEvent.click(screen.getByRole("button", { name: "开始" }));
@@ -191,5 +190,55 @@ describe("InitialSecurityGuard account copy", () => {
 
     expect(screen.getByRole("heading", { name: "初始化管理员账户" })).toBeTruthy();
     expect(screen.getByPlaceholderText("设置管理员密码")).toBeTruthy();
+  });
+});
+
+describe("InitialSecurityGuard steps", () => {
+  test("账户步骤后直接进入主题设置且不启动两步验证", async () => {
+    authSession.user = {
+      ...makeUser("user", false),
+      twoFactorAvailable: true,
+    };
+    authApi.startCurrentTwoFactorSetup.mockResolvedValue({
+      otpauthURL: "otpauth://totp/example",
+      secret: "secret",
+    });
+
+    render(<InitialSecurityGuard />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "开始" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "继续" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "继续" }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "labels.themePreset" })).toBeTruthy());
+    expect(screen.getByRole("progressbar").getAttribute("aria-valuemax")).toBe("5");
+    expect(authApi.startCurrentTwoFactorSetup).not.toHaveBeenCalled();
+  });
+
+  test("完成引导前仍刷新当前用户", async () => {
+    authSession.user = makeUser("user", false);
+    authSession.refreshUser.mockResolvedValue(authSession.user);
+    authApi.completeOnboarding.mockResolvedValue({
+      ...authSession.user,
+      initialSecurityRequired: false,
+    });
+
+    render(<InitialSecurityGuard />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "开始" })).toBeTruthy());
+    fireEvent.click(screen.getByRole("button", { name: "开始" }));
+
+    for (const heading of ["labels.themePreset", "personalizationTitle", "已就绪"]) {
+      await waitFor(() => expect(screen.getByRole("button", { name: "继续" })).toBeTruthy());
+      fireEvent.click(screen.getByRole("button", { name: "继续" }));
+      await waitFor(() => expect(screen.getByRole("heading", { name: heading })).toBeTruthy());
+    }
+
+    fireEvent.click(screen.getByRole("button", { name: "完成" }));
+    await waitFor(() => expect(authApi.completeOnboarding).toHaveBeenCalledTimes(1));
+
+    expect(authSession.refreshUser).toHaveBeenCalledTimes(1);
+    expect(authSession.refreshUser.mock.invocationCallOrder[0]).toBeLessThan(
+      authApi.completeOnboarding.mock.invocationCallOrder[0],
+    );
   });
 });
