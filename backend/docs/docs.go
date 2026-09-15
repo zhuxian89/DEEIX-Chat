@@ -10919,6 +10919,37 @@ const docTemplate = `{
                 }
             }
         },
+        "/conversations/default-image-model-candidate": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "返回后台配置的候选模型；客户端仍须与当前用户可用的生图模型目录交叉校验。空值表示使用第一个可用生图模型。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "conversations"
+                ],
+                "summary": "获取生图入口默认模型",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ConversationDefaultModelCandidateResponseDoc"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/Envelope"
+                        }
+                    }
+                }
+            }
+        },
         "/conversations/default-model-candidate": {
             "get": {
                 "security": [

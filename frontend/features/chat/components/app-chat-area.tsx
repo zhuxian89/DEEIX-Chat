@@ -43,6 +43,7 @@ import {
 } from "@/features/chat/hooks/use-chat-composer-state";
 import { useChatData } from "@/features/chat/hooks/use-chat-data";
 import { useChatModelOptions } from "@/features/chat/hooks/use-chat-model-options";
+import { imageConversationModels } from "@/features/chat/model/image-conversation-models";
 import { useChatRuntime } from "@/features/chat/hooks/use-chat-runtime";
 import { useChatScreenshot } from "@/features/chat/hooks/use-chat-screenshot";
 import { useChatViewerProfile } from "@/features/chat/hooks/use-chat-viewer-profile";
@@ -82,11 +83,13 @@ export function AppChatArea() {
     detachConversationRun,
     finishConversationRun,
     newConversationRevision,
+    newConversationImageDefault,
     newConversationProjectID: requestedNewConversationProjectID,
     registerConversationRun,
     requestNewConversation,
   } = useChatSession();
   const [locallyCreatedConversationID, setLocallyCreatedConversationID] = React.useState<string | null>(null);
+  const [imageConversation, setImageConversation] = React.useState<{ id: string; revision: number } | null>(null);
   const [newConversationOverride, setNewConversationOverride] = React.useState<{
     ignoredConversationID: string | null;
   } | null>(null);
@@ -244,7 +247,7 @@ export function AppChatArea() {
   );
 
   const {
-    modelOptions,
+    modelOptions: availableModelOptions,
     refreshModelCatalog,
     refreshModelOption,
     modelsLoading,
@@ -269,7 +272,15 @@ export function AppChatArea() {
     conversationPublicID: conversationID,
     conversationModel: currentConversation?.model ?? null,
     resetToken: newConversationRevision,
+    imageDefault: newConversationImageDefault,
   });
+  const imageEntry = newConversationImageDefault && (!conversationID || (
+    imageConversation?.id === conversationID && imageConversation.revision === newConversationRevision
+  ));
+  const modelOptions = React.useMemo(
+    () => imageConversationModels(availableModelOptions, imageEntry),
+    [availableModelOptions, imageEntry],
+  );
   const {
     conversationKey,
     draft,
@@ -304,6 +315,11 @@ export function AppChatArea() {
     reuseModelOptions,
     refreshModelOption,
   });
+  const effectiveOptions = modelOptionPolicyDisabled ? EMPTY_CONVERSATION_OPTIONS : options;
+  const onConversationCreated = React.useCallback((id: string) => {
+    setLocallyCreatedConversationID(id);
+    if (newConversationImageDefault) setImageConversation({ id, revision: newConversationRevision });
+  }, [newConversationImageDefault, newConversationRevision]);
   const {
     selectedToolIDs,
     selectedSkills,
@@ -429,7 +445,7 @@ export function AppChatArea() {
     selectedSkills,
     selectedKnowledgeBaseIDs,
     htmlVisualPromptEnabled: htmlVisualPrompt.enabled,
-    options: modelOptionPolicyDisabled ? EMPTY_CONVERSATION_OPTIONS : options,
+    options: effectiveOptions,
     draft,
     attachments,
     maxFilesPerMessage,
@@ -437,7 +453,7 @@ export function AppChatArea() {
     restoreDraftOnFailure,
     autoGenerateLabels,
     prependNewConversation: prependNewConversationInContext,
-    onConversationCreated: setLocallyCreatedConversationID,
+    onConversationCreated,
     onConversationForked: handleConversationForked,
     touchByPublicID,
     reload,
@@ -620,7 +636,6 @@ export function AppChatArea() {
     ];
   }, [conversationID, modelsErrorMsg, t, visibleMessages]);
 
-  const effectiveOptions = modelOptionPolicyDisabled ? EMPTY_CONVERSATION_OPTIONS : options;
   const temporaryAvailableTools = React.useMemo(
     () => availableTools.filter((tool) => tool.attachmentInputMode !== "image"),
     [availableTools],
@@ -752,7 +767,7 @@ export function AppChatArea() {
       {shouldUseCenteredComposer ? (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <ChatEmptyState
-            greetingTitle={activeRouteProject?.name || greetingTitle}
+            greetingTitle={imageEntry ? t("imageGreeting") : activeRouteProject?.name || greetingTitle}
             badgeLabel={activeRouteProject ? t("projectMode") : undefined}
             badgeTooltip={activeRouteProject ? t("projectModeTooltip") : undefined}
             titleAdornment={temporaryMode ? (

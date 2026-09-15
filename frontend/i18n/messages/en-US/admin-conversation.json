@@ -17,6 +17,10 @@
     "disabled": "Disabled"
   },
   "fields": {
+    "defaultImageModel": {
+      "label": "Default image model",
+      "description": "Used by the Create image sidebar entry. Leave empty to use the first available image generation model. An unavailable configured model will show an error instead of switching models."
+    },
     "defaultModel": {
       "label": "New conversation default model",
       "description": "Used first when users choose System recommended or have no personal default model. Leave empty to fall back to the first available model."

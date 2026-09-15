@@ -9,6 +9,7 @@ func (m *Module) RegisterRoutes(authRequired *gin.RouterGroup) {
 	authRequired.GET("/conversations/search", m.Handler.SearchConversations)
 	authRequired.POST("/conversations/shares/revoke", m.Handler.RevokeConversationShares)
 	authRequired.GET("/conversations/default-model-candidate", m.Handler.GetConversationDefaultModelCandidate)
+	authRequired.GET("/conversations/default-image-model-candidate", m.Handler.GetConversationDefaultImageModel)
 	authRequired.GET("/conversation-projects", m.Handler.ListConversationProjects)
 	authRequired.POST("/conversation-projects", m.Handler.CreateConversationProject)
 	authRequired.POST("/conversation-projects/reorder", m.Handler.ReorderConversationProjects)

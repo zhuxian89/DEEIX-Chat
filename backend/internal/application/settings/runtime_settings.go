@@ -167,6 +167,8 @@ func (r *RuntimeSettings) applyItem(cfg *config.Config, item domainsettings.Syst
 		cfg.ContextCompactPreserve = toInt(item.Value, cfg.ContextCompactPreserve)
 	case "chat:conversation_default_model":
 		cfg.ConversationDefaultModel = strings.TrimSpace(item.Value)
+	case "chat:conversation_default_image_model":
+		cfg.ConversationDefaultImageModel = strings.TrimSpace(item.Value)
 	case "chat:conversation_task_model":
 		cfg.ConversationTaskModel = item.Value
 	case "chat:conversation_title_prompt":

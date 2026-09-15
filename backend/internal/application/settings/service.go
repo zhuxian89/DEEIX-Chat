@@ -561,6 +561,8 @@ func validatePatchItem(item PatchItem) error {
 		return validateStringMax(value, 512, key)
 	case "chat:conversation_default_model":
 		return validateStringMax(value, 255, key)
+	case "chat:conversation_default_image_model":
+		return validateStringMax(value, 255, key)
 	case "chat:default_system_prompt", "chat:skills_prompt":
 		return validateStringMax(value, 20000, key)
 	case "auth:smtp_port":

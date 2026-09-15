@@ -42,6 +42,7 @@
     "copyFailed": "Copy failed. Please select the content manually."
   },
   "navigation": {
+    "createImage": "Create image",
     "newChat": "New chat",
     "search": "Search",
     "recent": "Recent",

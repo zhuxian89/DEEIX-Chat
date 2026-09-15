@@ -8927,6 +8927,22 @@ export namespace Conversations {
   }
 
   /**
+   * @description 返回后台配置的候选模型；客户端仍须与当前用户可用的生图模型目录交叉校验。空值表示使用第一个可用生图模型。
+   * @tags conversations
+   * @name DefaultImageModelCandidateList
+   * @summary 获取生图入口默认模型
+   * @request GET:/conversations/default-image-model-candidate
+   * @secure
+   */
+  export namespace DefaultImageModelCandidateList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ConversationDefaultModelCandidateResponseDoc;
+  }
+
+  /**
    * @description 返回后台配置的新会话系统推荐模型；未配置时返回空候选
    * @tags chat
    * @name DefaultModelCandidateList

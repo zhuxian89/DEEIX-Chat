@@ -29,6 +29,7 @@ import {
   toEditorField,
 } from "@/features/admin/model/conversation-settings";
 import { buildTaskModelOptions } from "@/features/admin/model/task-model-options";
+import { buildImageModelOptions } from "@/features/admin/model/image-model-options";
 import { resolveAdminErrorMessage } from "@/features/admin/utils/admin-error";
 import type { PatchSettingItem } from "@/shared/api/settings.types";
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
@@ -384,6 +385,7 @@ export function AdminConversationSettingsPage() {
     }),
   );
   const [exporting, setExporting] = React.useState(false);
+  const [imageModelOptions, setImageModelOptions] = React.useState<ModelOption[]>([]);
 
   const handleExportConversations = React.useCallback(async () => {
     setExporting(true);
@@ -430,6 +432,7 @@ export function AdminConversationSettingsPage() {
       const flattened = flattenConversationSettings(grouped);
       setTaskModelOptions(nextModelOptions);
       setDefaultModelOptions(nextDefaultModelOptions);
+      setImageModelOptions(buildImageModelOptions(referenceData?.models ?? [], t("defaultModel.systemRecommended")));
       setSettingsMap(flattened);
       setSavedMap(flattened);
     } catch (error) {
@@ -558,7 +561,7 @@ export function AdminConversationSettingsPage() {
           t={t}
         />
       ) : undefined;
-    const content = id === "chat.conversation_default_model" ? (
+    const content = id === "chat.conversation_default_model" || id === "chat.conversation_default_image_model" ? (
       <TaskModelField
         id={id}
         label={field.label}
@@ -567,7 +570,7 @@ export function AdminConversationSettingsPage() {
         fallbackValue={CONVERSATION_DEFAULT_MODEL_SYSTEM}
         dirty={(settingsMap[id] ?? "") !== (savedMap[id] ?? "")}
         disabled={loading || saving}
-        modelOptions={defaultModelOptions}
+        modelOptions={id === "chat.conversation_default_image_model" ? imageModelOptions : defaultModelOptions}
         onChange={(value) => setSettingsMap((prev) => ({ ...prev, [id]: value }))}
       />
     ) : id === "chat.conversation_task_model" || id === "chat.compact_task_model" ? (

@@ -28,6 +28,7 @@ import {
   parseChatContentWidth,
 } from "@/shared/model/chat-content-width";
 import { resolveConversationDefaultModel } from "@/shared/model/conversation-default-model";
+import { resolveConversationDefaultImageModel } from "@/shared/model/conversation-default-image-model";
 import { parseKindsJSON } from "@/shared/model/llm-schema";
 import { useUserSettings } from "@/shared/model/user-settings-store";
 
@@ -391,16 +392,21 @@ export function useChatModelOptions({
   conversationPublicID,
   conversationModel,
   resetToken,
+  imageDefault = false,
 }: {
   conversationPublicID: string | null;
   conversationModel?: string | null;
   resetToken?: number;
+  imageDefault?: boolean;
 }) {
   const t = useTranslations("chat.models");
   const { settings: userSettings } = useUserSettings();
   const [availableModels, setAvailableModels] = React.useState<PublicModelDTO[]>([]);
   const [modelsLoading, setModelsLoading] = React.useState(true);
   const [modelsErrorMsg, setModelsErrorMsg] = React.useState("");
+  const [imageDefaultLoading, setImageDefaultLoading] = React.useState(false);
+  const [imageDefaultError, setImageDefaultError] = React.useState("");
+  const previousImageDefaultRef = React.useRef(false);
   const [selectedPlatformModelName, setSelectedPlatformModelName] = React.useState("");
   const [billingCostAvailable, setBillingCostAvailable] = React.useState(false);
   const [billingDisplayCurrency, setBillingDisplayCurrency] = React.useState<BillingDisplayCurrency>("USD");
@@ -429,7 +435,8 @@ export function useChatModelOptions({
   const selectPlatformModelName = React.useCallback((platformModelName: string) => {
     userSelectedModelRef.current = true;
     setSelectedPlatformModelName(platformModelName);
-  }, []);
+    if (imageDefault) setImageDefaultError("");
+  }, [imageDefault]);
 
   const loadModelCatalog = React.useCallback((accessToken?: string): Promise<ModelCatalogRefreshResult> => {
     if (modelCatalogRequestRef.current) {
@@ -524,6 +531,17 @@ export function useChatModelOptions({
   }, [applyModelCatalog, loadModelCatalog, t]);
 
   React.useEffect(() => {
+    // Only the new image entry resets selection. Ordinary new-chat behavior stays unchanged.
+    if (imageDefault || previousImageDefaultRef.current) {
+      userSelectedModelRef.current = false;
+      setSelectedPlatformModelName("");
+      setImageDefaultError("");
+      setImageDefaultLoading(false);
+    }
+    previousImageDefaultRef.current = imageDefault;
+  }, [imageDefault, resetToken]);
+
+  React.useEffect(() => {
     const normalizedConversationID = conversationPublicID?.trim() || null;
     if (!normalizedConversationID) {
       // 无会话状态也可能来自当前页点击“新对话”，要保留用户刚在选择器里切换的模型。
@@ -572,10 +590,12 @@ export function useChatModelOptions({
   }, [conversationModel, conversationPublicID, resetToken]);
 
   React.useEffect(() => {
-    if (availableModels.length === 0) {
+    if (conversationPublicID?.trim()) {
+      setImageDefaultLoading(false);
+      setImageDefaultError("");
       return;
     }
-    if (conversationPublicID?.trim()) {
+    if (availableModels.length === 0 && (!imageDefault || modelsLoading)) {
       return;
     }
 
@@ -583,6 +603,16 @@ export function useChatModelOptions({
     async function applyDefaultModel() {
       const token = await resolveAccessToken();
       if (!token || cancelled || userSelectedModelRef.current) {
+        return;
+      }
+      if (imageDefault) {
+        setImageDefaultLoading(true);
+        setImageDefaultError("");
+        const model = await resolveConversationDefaultImageModel(token, availableModels);
+        if (!cancelled && !userSelectedModelRef.current) {
+          setSelectedPlatformModelName(model);
+          setImageDefaultError(model ? "" : t("imageDefaultUnavailable"));
+        }
         return;
       }
       const result = await resolveConversationDefaultModel({
@@ -597,13 +627,16 @@ export function useChatModelOptions({
 
     void applyDefaultModel().catch(() => {
       if (!cancelled && !userSelectedModelRef.current) {
-        setSelectedPlatformModelName(availableModels[0]?.platformModelName ?? "");
+        setSelectedPlatformModelName(imageDefault ? "" : availableModels[0]?.platformModelName ?? "");
+        if (imageDefault) setImageDefaultError(t("imageDefaultLoadFailed"));
       }
+    }).finally(() => {
+      if (!cancelled) setImageDefaultLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [availableModels, conversationPublicID, resetToken, userDefaultModel]);
+  }, [availableModels, conversationPublicID, resetToken, userDefaultModel, imageDefault, modelsLoading, t]);
 
   const modelOptions = React.useMemo<ChatModelOption[]>(
     () =>
@@ -615,8 +648,8 @@ export function useChatModelOptions({
     modelOptions,
     refreshModelCatalog,
     refreshModelOption,
-    modelsLoading,
-    modelsErrorMsg,
+    modelsLoading: modelsLoading || imageDefaultLoading,
+    modelsErrorMsg: modelsErrorMsg || (imageDefault && !conversationPublicID ? imageDefaultError : ""),
     sendShortcut,
     restoreDraftOnFailure,
     preserveConversationDrafts,

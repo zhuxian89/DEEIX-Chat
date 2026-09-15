@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sidebar";
 import { useSidebarConversationField } from "@/entities/conversation";
 import { NavMainItem } from "@/features/layouts/components/navigation/nav-main-item";
+import { NewImageConversation } from "@/features/layouts/components/navigation/new-image-conversation";
 import { NavigationSearch } from "@/features/layouts/components/navigation/navigation-search";
 import {
   useLayoutNavigationSearch,
@@ -60,16 +61,20 @@ export function NavMain({
       <SidebarGroup className="px-2 py-2">
         <SidebarMenu className="gap-0.5">
           {NAVIGATION_ITEMS.filter((item) => item.group === "primary").map((item) => (
-            <NavMainItem
-              key={item.id}
-              item={item}
-              title={t(item.id)}
-              isCollapsed={isCollapsed}
-              isMobile={isMobile}
-              onCreateConversation={onCreateConversation}
-              onOpenSearch={search.openSearch}
-              onCloseMobileSidebar={onCloseMobileSidebar}
-            />
+            <React.Fragment key={item.id}>
+              <NavMainItem
+                item={item}
+                title={t(item.id)}
+                isCollapsed={isCollapsed}
+                isMobile={isMobile}
+                onCreateConversation={onCreateConversation}
+                onOpenSearch={search.openSearch}
+                onCloseMobileSidebar={onCloseMobileSidebar}
+              />
+              {item.id === "newChat" ? (
+                <NewImageConversation isCollapsed={isCollapsed} onCloseMobileSidebar={onCloseMobileSidebar} />
+              ) : null}
+            </React.Fragment>
           ))}
         </SidebarMenu>
 

@@ -13,6 +13,7 @@ export type ConversationSettingsField = {
   namespace: "chat";
   key:
     | "conversation_default_model"
+    | "conversation_default_image_model"
     | "conversation_task_model"
     | "default_system_prompt"
     | "conversation_title_prompt"
@@ -215,6 +216,15 @@ export function buildConversationSettingsFields(t: ConversationSettingsTranslato
       description: t("fields.defaultModel.description"),
       type: "select",
       options: [{ label: t("defaultModel.systemRecommended"), value: CONVERSATION_DEFAULT_MODEL_SYSTEM }],
+    },
+    {
+      section: "conversation",
+      namespace: "chat",
+      key: "conversation_default_image_model",
+      label: t("fields.defaultImageModel.label"),
+      description: t("fields.defaultImageModel.description"),
+      type: "select",
+      options: [{ label: t("defaultModel.systemRecommended"), value: "" }],
     },
     {
       section: "conversation",

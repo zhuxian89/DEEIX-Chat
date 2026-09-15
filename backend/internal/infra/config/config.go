@@ -451,6 +451,8 @@ type Config struct {
 	ModelOptionPolicyMode        string
 	ModelOptionAllowedPaths      string
 	ModelOptionDeniedPaths       string
+	// 生图入口配置，与普通新会话默认模型独立。
+	ConversationDefaultImageModel string
 	// 存储配置
 	UserStorageQuotaBytes int64
 	MaxUploadFileBytes    int64

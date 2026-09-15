@@ -1,4 +1,5 @@
 {
+  "imageGreeting": "你想画什么？",
   "newChat": "新对话",
   "untitledConversation": "新对话",
   "modelListLoadFailed": "模型列表加载失败",
@@ -344,6 +345,8 @@
     "loadFailed": "加载会话消息失败"
   },
   "models": {
+    "imageDefaultUnavailable": "默认生图模型不可用或暂无生图模型，请联系管理员检查配置与模型权限。",
+    "imageDefaultLoadFailed": "无法加载默认生图模型，请稍后重试。",
     "signInRequired": "未登录，无法加载模型列表",
     "loadFailed": "模型列表加载失败，请稍后重试"
   },

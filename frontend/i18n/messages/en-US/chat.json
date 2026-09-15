@@ -1,4 +1,5 @@
 {
+  "imageGreeting": "What would you like to draw?",
   "newChat": "New chat",
   "untitledConversation": "New chat",
   "modelListLoadFailed": "Could not load models.",
@@ -344,6 +345,8 @@
     "loadFailed": "Failed to load conversation messages"
   },
   "models": {
+    "imageDefaultUnavailable": "The default image model is unavailable, or no image generation models are available. Contact an administrator to check the configuration and model access.",
+    "imageDefaultLoadFailed": "Could not load the default image model. Please try again later.",
     "signInRequired": "Sign in before loading models.",
     "loadFailed": "Failed to load models. Please try again later."
   },

@@ -42,6 +42,7 @@
     "copyFailed": "复制失败，请手动选择内容复制。"
   },
   "navigation": {
+    "createImage": "生图",
     "newChat": "新对话",
     "search": "搜索",
     "recent": "对话",
