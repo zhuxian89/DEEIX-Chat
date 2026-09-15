@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/shared/response"
 	"github.com/gin-gonic/gin"
 )
 
@@ -14,7 +15,9 @@ func TestDefaultImageModelRouteUsesAuthenticatedGroup(t *testing.T) {
 	router := gin.New()
 	group := router.Group("/api/v1", func(c *gin.Context) {
 		if c.GetHeader("Authorization") != "Bearer test" {
-			c.AbortWithStatus(http.StatusUnauthorized)
+			response.Error(c, http.StatusUnauthorized, "unauthorized")
+			c.Abort()
+			return
 		}
 	})
 	module := &Module{Handler: &Handler{}}
@@ -30,6 +33,13 @@ func TestDefaultImageModelRouteUsesAuthenticatedGroup(t *testing.T) {
 			if !authorized {
 				if recorder.Code != http.StatusUnauthorized {
 					t.Fatalf("unauthenticated %s returned %d", path, recorder.Code)
+				}
+				var result response.Envelope
+				if err := json.Unmarshal(recorder.Body.Bytes(), &result); err != nil {
+					t.Fatalf("unauthenticated %s returned invalid error envelope: %v", path, err)
+				}
+				if result.ErrorCode != response.CodeAuthUnauthorized || result.ErrorMsg != "unauthorized" || result.Data != nil {
+					t.Fatalf("unauthenticated %s returned unexpected error envelope: %+v", path, result)
 				}
 				continue
 			}
