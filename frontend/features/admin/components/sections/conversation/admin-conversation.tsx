@@ -28,8 +28,8 @@ import {
   resolveVisibleConversationFields,
   toEditorField,
 } from "@/features/admin/model/conversation-settings";
-import { buildTaskModelOptions } from "@/features/admin/model/task-model-options";
 import { buildImageModelOptions } from "@/features/admin/model/image-model-options";
+import { buildTaskModelOptions } from "@/features/admin/model/task-model-options";
 import { resolveAdminErrorMessage } from "@/features/admin/utils/admin-error";
 import type { PatchSettingItem } from "@/shared/api/settings.types";
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
@@ -385,7 +385,9 @@ export function AdminConversationSettingsPage() {
     }),
   );
   const [exporting, setExporting] = React.useState(false);
-  const [imageModelOptions, setImageModelOptions] = React.useState<ModelOption[]>([]);
+  const [imageModelOptions, setImageModelOptions] = React.useState<ModelOption[]>(() =>
+    buildImageModelOptions([], t("defaultModel.systemRecommended")),
+  );
 
   const handleExportConversations = React.useCallback(async () => {
     setExporting(true);
