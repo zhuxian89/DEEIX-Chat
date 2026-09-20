@@ -61,16 +61,21 @@ func (n *Notifier) loadConfig(ctx context.Context) (Config, bool) {
 	return Config{BotToken: values[KeyBotToken], ChatID: values[KeyChatID]}, true
 }
 
-// NotifyRegistration 异步通知管理员有新用户注册。
+// NotifyRegistration 异步通知管理员有网站新用户注册（包括第三方登录注册）。
 func (n *Notifier) NotifyRegistration(userID uint, username string, email string) {
-	header := "🔔 新用户注册"
+	n.notifyRegistration("Web", userID, username, email)
+}
+
+func (n *Notifier) notifyRegistration(source string, userID uint, username string, email string) {
+	header := "🔔 " + source + " 新用户注册"
 	if userID > 0 {
 		header += " (#" + strconv.FormatUint(uint64(userID), 10) + ")"
 	}
-	text := header + "\n" +
-		"用户名: " + username + "\n" +
-		"邮箱: " + email + "\n" +
-		"时间: " + time.Now().Format("2006-01-02 15:04:05")
+	text := header + "\n用户名: " + username + "\n"
+	if email != "" {
+		text += "邮箱: " + email + "\n"
+	}
+	text += "时间: " + time.Now().Format("2006-01-02 15:04:05")
 	n.dispatch(text)
 }
 

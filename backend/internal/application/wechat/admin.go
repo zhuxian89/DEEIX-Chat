@@ -20,7 +20,10 @@ type ActionOption struct {
 	Label string
 }
 
-var actionOptions = []ActionOption{{Key: domainwechat.ActionIssueRegistrationCode, Label: "发放注册码"}}
+var actionOptions = []ActionOption{
+	{Key: domainwechat.ActionIssueRegistrationCode, Label: "发放注册码"},
+	{Key: domainwechat.ActionReplyImage, Label: "回复图片"},
+}
 
 var templatePlaceholderPattern = regexp.MustCompile(`\{\{[^{}]+\}\}`)
 
@@ -53,6 +56,10 @@ func (s *AdminService) SaveRule(ctx context.Context, item domainwechat.KeywordRu
 		(!template.Enabled || template.ResponseType != domainwechat.ResponseTypeText || !isValidRegistrationTemplate(template.Content)) {
 		return repository.ErrInvalidInput
 	}
+	if item.Action == domainwechat.ActionReplyImage &&
+		(!template.Enabled || !validImageTemplate(template.ResponseType, strings.TrimSpace(template.Content))) {
+		return repository.ErrInvalidInput
+	}
 	if item.ID == 0 {
 		if !item.Enabled {
 			item.Enabled = true
@@ -77,10 +84,20 @@ func (s *AdminService) ListTemplates(ctx context.Context, page, pageSize int) ([
 func (s *AdminService) SaveTemplate(ctx context.Context, item domainwechat.ReplyTemplate) error {
 	item.Name = strings.TrimSpace(item.Name)
 	item.ResponseType = strings.TrimSpace(item.ResponseType)
-	if item.Name == "" || item.ResponseType != domainwechat.ResponseTypeText || strings.TrimSpace(item.Content) == "" {
+	if item.Name == "" || strings.TrimSpace(item.Content) == "" {
 		return repository.ErrInvalidInput
 	}
-	if !isValidRegistrationTemplate(item.Content) {
+	switch item.ResponseType {
+	case domainwechat.ResponseTypeText:
+		if !isValidRegistrationTemplate(item.Content) {
+			return repository.ErrInvalidInput
+		}
+	case domainwechat.ResponseTypeImage:
+		item.Content = strings.TrimSpace(item.Content)
+		if !validImageTemplate(item.ResponseType, item.Content) {
+			return repository.ErrInvalidInput
+		}
+	default:
 		return repository.ErrInvalidInput
 	}
 	if item.ID == 0 {
@@ -88,6 +105,14 @@ func (s *AdminService) SaveTemplate(ctx context.Context, item domainwechat.Reply
 			item.Enabled = true
 		}
 		return s.repo.CreateReplyTemplate(ctx, &item)
+	}
+	// Changing a shared template's type would invalidate its existing keyword rules.
+	existing, err := s.repo.GetReplyTemplate(ctx, item.ID)
+	if err != nil {
+		return err
+	}
+	if existing.ResponseType != item.ResponseType {
+		return repository.ErrInvalidInput
 	}
 	return s.repo.UpdateReplyTemplate(ctx, item.ID, item.Name, item.ResponseType, item.Content)
 }

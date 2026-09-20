@@ -11,6 +11,12 @@ import (
 
 const WeChatMiniAppUserAgentPrefix = "DEEIX-WeChat-MiniApp"
 
+// miniAppRegistrationNotifier extends the existing website notifier without
+// changing the upstream authentication interface or website registration flow.
+type miniAppRegistrationNotifier interface {
+	NotifyMiniAppRegistration(userID uint, username string)
+}
+
 // IssueWeChatMiniAppLogin signs a normal DEEIX session after the Mini Program
 // service has authoritatively resolved its OpenID binding.
 func (s *Service) IssueWeChatMiniAppLogin(
@@ -53,8 +59,8 @@ func (s *Service) IssueWeChatMiniAppLogin(
 		normalizedAuditCtx.UserAgent,
 		marshalAuthEventDetail(map[string]interface{}{"session_id": result.SessionID}),
 	)
-	if created && s.telegramNotifier != nil {
-		s.telegramNotifier.NotifyRegistration(userID, result.User.Username, "")
+	if notifier, ok := s.telegramNotifier.(miniAppRegistrationNotifier); created && ok {
+		notifier.NotifyMiniAppRegistration(userID, result.User.Username)
 	}
 	return result, nil
 }

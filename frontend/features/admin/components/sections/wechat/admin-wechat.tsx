@@ -39,10 +39,10 @@ import {
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
 
 type RuleDraft = { id?: number; keyword: string; action: string; templateId: string; enabled: boolean };
-type TemplateDraft = { id?: number; name: string; content: string; enabled: boolean };
+type TemplateDraft = { id?: number; name: string; responseType: string; content: string; enabled: boolean };
 
 const emptyRule: RuleDraft = { keyword: "", action: "issue_registration_code", templateId: "", enabled: true };
-const emptyTemplate: TemplateDraft = { name: "", content: "", enabled: true };
+const emptyTemplate: TemplateDraft = { name: "", responseType: "text", content: "", enabled: true };
 
 function formatDate(value: string | null | undefined) {
   if (!value) return "-";
@@ -195,7 +195,7 @@ export function AdminWeChatPage() {
       return;
     }
     try {
-      const payload = { name: templateDraft.name.trim(), responseType: "text", content: templateDraft.content, enabled: templateDraft.enabled };
+      const payload = { name: templateDraft.name.trim(), responseType: templateDraft.responseType, content: templateDraft.content, enabled: templateDraft.enabled };
       if (templateDraft.id) await updateAdminWeChatTemplate(token, templateDraft.id, payload);
       else await createAdminWeChatTemplate(token, payload);
       setTemplateDraft(null);
@@ -311,7 +311,7 @@ export function AdminWeChatPage() {
           <SectionHeader title="绑定关系" description="关键词规则是唯一关系来源；这里用于总览和跳转编辑。" />
           <BindingTable items={rules} actions={actions} onEditRule={setRuleDraft} onEditTemplate={(id) => {
             const item = templates.find((template) => template.id === id);
-            if (item) setTemplateDraft({ id: item.id, name: item.name, content: item.content, enabled: item.enabled });
+            if (item) setTemplateDraft({ id: item.id, name: item.name, responseType: item.responseType, content: item.content, enabled: item.enabled });
           }} />
         </TabsContent>
 
@@ -332,9 +332,9 @@ export function AdminWeChatPage() {
         <DialogContent>
           <DialogHeader><DialogTitle>{ruleDraft?.id ? "编辑关键词规则" : "新增关键词规则"}</DialogTitle><DialogDescription>一次完成关键词、功能和回复模板绑定。</DialogDescription></DialogHeader>
           {ruleDraft ? <div className="space-y-4">
-            <label className="grid gap-1 text-sm"><span>关键词</span><Input value={ruleDraft.keyword} onChange={(event) => setRuleDraft({ ...ruleDraft, keyword: event.target.value })} placeholder="例如 13004" /></label>
-            <label className="grid gap-1 text-sm"><span>功能</span><select className="h-8 rounded-md border border-input/40 bg-transparent px-3 text-xs" value={ruleDraft.action} onChange={(event) => setRuleDraft({ ...ruleDraft, action: event.target.value })}>{actions.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
-            <label className="grid gap-1 text-sm"><span>回复模板</span><select className="h-8 rounded-md border border-input/40 bg-transparent px-3 text-xs" value={ruleDraft.templateId} onChange={(event) => setRuleDraft({ ...ruleDraft, templateId: event.target.value })}><option value="">选择模板</option>{templates.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>
+            <label className="grid gap-1 text-sm"><span>关键词</span><Input value={ruleDraft.keyword} onChange={(event) => setRuleDraft({ ...ruleDraft, keyword: event.target.value })} placeholder="例如 13004 或 小程序" /></label>
+            <label className="grid gap-1 text-sm"><span>功能</span><select className="h-8 rounded-md border border-input/40 bg-transparent px-3 text-xs" value={ruleDraft.action} onChange={(event) => setRuleDraft({ ...ruleDraft, action: event.target.value, templateId: "" })}>{actions.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
+            <label className="grid gap-1 text-sm"><span>回复模板</span><select className="h-8 rounded-md border border-input/40 bg-transparent px-3 text-xs" value={ruleDraft.templateId} onChange={(event) => setRuleDraft({ ...ruleDraft, templateId: event.target.value })}><option value="">选择模板</option>{templates.filter((item) => item.responseType === (ruleDraft.action === "reply_image" ? "image" : "text")).map((item) => <option key={item.id} value={item.id} disabled={!item.enabled}>{item.name}{item.enabled ? "" : "（已停用）"}</option>)}</select></label>
           </div> : null}
           <DialogFooter><Button variant="outline" onClick={() => setRuleDraft(null)}>取消</Button><Button onClick={() => void saveRule()}>保存</Button></DialogFooter>
         </DialogContent>
@@ -342,10 +342,15 @@ export function AdminWeChatPage() {
 
       <Dialog open={templateDraft !== null} onOpenChange={(open) => { if (!open) setTemplateDraft(null); }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>{templateDraft?.id ? "编辑回复模板" : "新增回复模板"}</DialogTitle><DialogDescription>首期支持文本、表情、URL 和 action 声明的占位符。</DialogDescription></DialogHeader>
+          <DialogHeader><DialogTitle>{templateDraft?.id ? "编辑回复模板" : "新增回复模板"}</DialogTitle><DialogDescription>文字模板用于发放注册码，图片模板用于回复小程序码等公众号永久图片素材。</DialogDescription></DialogHeader>
           {templateDraft ? <div className="space-y-4">
             <label className="grid gap-1 text-sm"><span>模板名称</span><Input value={templateDraft.name} onChange={(event) => setTemplateDraft({ ...templateDraft, name: event.target.value })} /></label>
-            <label className="grid gap-1 text-sm"><span>模板内容</span><Textarea rows={6} value={templateDraft.content} onChange={(event) => setTemplateDraft({ ...templateDraft, content: event.target.value })} placeholder="你的专属注册码：{{CODE}}" /></label>
+            <label className="grid gap-1 text-sm"><span>回复类型</span><select className="h-8 rounded-md border border-input/40 bg-transparent px-3 text-xs disabled:opacity-60" value={templateDraft.responseType} disabled={Boolean(templateDraft.id)} onChange={(event) => setTemplateDraft({ ...templateDraft, responseType: event.target.value, content: "" })}><option value="text">文字</option><option value="image">图片</option></select></label>
+            {templateDraft.id ? <p className="text-xs text-muted-foreground">如需更换回复类型，请新建模板后重新绑定关键词。</p> : null}
+            {templateDraft.responseType === "image" ? <>
+              <label className="grid gap-1 text-sm"><span>图片素材 ID（media_id）</span><Input value={templateDraft.content} onChange={(event) => setTemplateDraft({ ...templateDraft, content: event.target.value })} placeholder="填写本公众号永久图片素材的 media_id" /></label>
+              <p className="text-xs text-muted-foreground">先将正式版小程序码上传为本公众号的永久图片素材，再填写返回的 media_id。图片网址或临时素材不能作为长期入口。</p>
+            </> : <label className="grid gap-1 text-sm"><span>模板内容</span><Textarea rows={6} value={templateDraft.content} onChange={(event) => setTemplateDraft({ ...templateDraft, content: event.target.value })} placeholder="你的专属注册码：{{CODE}}" /></label>}
           </div> : null}
           <DialogFooter><Button variant="outline" onClick={() => setTemplateDraft(null)}>取消</Button><Button onClick={() => void saveTemplate()}>保存</Button></DialogFooter>
         </DialogContent>
@@ -367,7 +372,7 @@ function RuleTable({ items, actions, onEdit, onToggle }: { items: WeChatKeywordR
 }
 
 function TemplateTable({ items, rules, onEdit, onToggle }: { items: WeChatReplyTemplate[]; rules: WeChatKeywordRule[]; onEdit: (draft: TemplateDraft) => void; onToggle: (item: WeChatReplyTemplate) => void }) {
-  return <div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>模板</TableHead><TableHead>内容</TableHead><TableHead>绑定关键词</TableHead><TableHead>状态</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader><TableBody>{items.length === 0 ? <TableRow><TableCell colSpan={5}>暂无回复模板。</TableCell></TableRow> : items.map((item) => { const bound = rules.filter((rule) => rule.templateId === item.id); return <TableRow key={item.id}><TableCell>{item.name}</TableCell><TableCell className="max-w-sm whitespace-pre-wrap text-sm text-muted-foreground">{item.content}</TableCell><TableCell>{bound.length ? bound.map((rule) => rule.keyword).join("、") : "-"}</TableCell><TableCell>{statusBadge(item.enabled)}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" title="编辑" onClick={() => onEdit({ id: item.id, name: item.name, content: item.content, enabled: item.enabled })}><Pencil className="size-4" /></Button><Button size="icon" variant="ghost" title={item.enabled ? "停用" : "启用"} onClick={() => onToggle(item)}><Power className="size-4" /></Button></div></TableCell></TableRow>; })}</TableBody></Table></div>;
+  return <div className="overflow-x-auto rounded-md border"><Table><TableHeader><TableRow><TableHead>模板</TableHead><TableHead>类型</TableHead><TableHead>内容</TableHead><TableHead>绑定关键词</TableHead><TableHead>状态</TableHead><TableHead className="text-right">操作</TableHead></TableRow></TableHeader><TableBody>{items.length === 0 ? <TableRow><TableCell colSpan={6}>暂无回复模板。</TableCell></TableRow> : items.map((item) => { const bound = rules.filter((rule) => rule.templateId === item.id); return <TableRow key={item.id}><TableCell>{item.name}</TableCell><TableCell>{item.responseType === "image" ? "图片" : "文字"}</TableCell><TableCell className="max-w-sm break-all whitespace-pre-wrap text-sm text-muted-foreground">{item.content}</TableCell><TableCell>{bound.length ? bound.map((rule) => rule.keyword).join("、") : "-"}</TableCell><TableCell>{statusBadge(item.enabled)}</TableCell><TableCell className="text-right"><div className="flex justify-end gap-1"><Button size="icon" variant="ghost" title="编辑" onClick={() => onEdit({ id: item.id, name: item.name, responseType: item.responseType, content: item.content, enabled: item.enabled })}><Pencil className="size-4" /></Button><Button size="icon" variant="ghost" title={item.enabled ? "停用" : "启用"} onClick={() => onToggle(item)}><Power className="size-4" /></Button></div></TableCell></TableRow>; })}</TableBody></Table></div>;
 }
 
 function BindingTable({ items, actions, onEditRule, onEditTemplate }: { items: WeChatKeywordRule[]; actions: WeChatActionOption[]; onEditRule: (draft: RuleDraft) => void; onEditTemplate: (id: number) => void }) {

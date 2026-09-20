@@ -60,6 +60,8 @@ func IsRegistrationKeyword(content string) bool { return strings.TrimSpace(conte
 type MessageResult struct {
 	Matched            bool
 	Content            string
+	ResponseType       string
+	MediaID            string
 	Keyword            string
 	Action             string
 	TemplateID         uint
@@ -113,6 +115,9 @@ func (s *Service) HandleTextMessage(ctx context.Context, openID, content string)
 		return MessageResult{}, nil
 	}
 	result := MessageResult{Matched: true, Keyword: rule.Keyword, Action: rule.Action, TemplateID: rule.TemplateID}
+	if rule.Action == domainwechat.ActionReplyImage {
+		return s.replyImage(ctx, adminRepo, openID, result, rule)
+	}
 	if rule.Action != domainwechat.ActionIssueRegistrationCode {
 		return result, s.logFailure(ctx, adminRepo, openID, result, "unsupported_action", "unsupported WeChat action")
 	}

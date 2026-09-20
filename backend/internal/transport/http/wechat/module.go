@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"sort"
 	"strings"
-	"time"
 
 	appwechat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/wechat"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
@@ -136,11 +135,7 @@ func (h *Handler) Receive(c *gin.Context) {
 		c.String(http.StatusOK, "success")
 		return
 	}
-	reply, err := xml.Marshal(textReply{
-		ToUserName: message.FromUserName, FromUserName: message.ToUserName,
-		CreateTime: time.Now().Unix(), MsgType: "text",
-		Content: result.Content,
-	})
+	reply, err := marshalReply(message, result)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "build wechat reply failed")
 		return
