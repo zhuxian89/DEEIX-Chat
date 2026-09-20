@@ -33,8 +33,8 @@ func TestSpeechRemainsAuthenticatedWhenCompanionIsDisabled(t *testing.T) {
 		}
 	}
 	tables, err := db.Migrator().GetTables()
-	if err != nil || len(tables) != 5 {
-		t.Fatal("only the five independent TODO tables should be registered", tables, err)
+	if err != nil || len(tables) != 6 {
+		t.Fatal("only the six independent TODO tables should be registered", tables, err)
 	}
 	for _, table := range tables {
 		if !strings.HasPrefix(table, "miniapp_") {

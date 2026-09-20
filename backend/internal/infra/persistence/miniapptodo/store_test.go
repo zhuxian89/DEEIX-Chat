@@ -72,8 +72,8 @@ func TestMigrationUnlockAndOwnerIsolation(t *testing.T) {
 	if err := db.Raw("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").Scan(&tables).Error; err != nil {
 		t.Fatal(err)
 	}
-	if len(tables) != 5 {
-		t.Fatalf("expected exactly five isolated tables, got %v", tables)
+	if len(tables) != 6 {
+		t.Fatalf("expected exactly six isolated tables, got %v", tables)
 	}
 }
 

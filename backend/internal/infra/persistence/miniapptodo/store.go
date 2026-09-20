@@ -28,7 +28,7 @@ func NewStore(db *gorm.DB) (*Store, error) {
 				return err
 			}
 		}
-		return tx.AutoMigrate(&unlockRecord{}, &listRecord{}, &taskRecord{}, &operationRecord{}, &feedbackRecord{})
+		return tx.AutoMigrate(&unlockRecord{}, &listRecord{}, &taskRecord{}, &operationRecord{}, &feedbackRecord{}, &registrationCodeBinding{})
 	})
 	if err != nil {
 		return nil, fmt.Errorf("migrate miniapp TODO tables: %w", err)

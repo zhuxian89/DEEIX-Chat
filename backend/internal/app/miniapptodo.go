@@ -21,7 +21,8 @@ func registerMiniappTodo(engine *gin.Engine, db *gorm.DB, cfg *config.Runtime, a
 	}
 	parameters := settings.NewService(settingsrepo.NewRepo(db), cfg.Snapshot().DataEncryptionKey)
 	service := todoapp.NewService(store, todoapp.Config{
-		CurrentAppID: func() string { return cfg.Snapshot().WeChatMiniAppAppID },
+		RedeemRegistrationCode: store.RedeemRegistrationCode,
+		CurrentAppID:           func() string { return cfg.Snapshot().WeChatMiniAppAppID },
 		FeedbackCode: func(ctx context.Context) (string, error) {
 			values, err := parameters.RuntimeValuesByNamespace(ctx, "miniapp_todo")
 			return values["feedback_code"], err

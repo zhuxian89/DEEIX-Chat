@@ -13,7 +13,7 @@ import (
 
 const keyword = "13004"
 
-const usedRegistrationCodeMessage = "\n该注册码已使用。"
+const usedRegistrationCodeMessage = "\n该码已用于网站注册，不影响小程序开通资格。"
 
 type Service struct {
 	repo    repository.WeChatRegistrationRepository

@@ -14,9 +14,10 @@ import (
 )
 
 type Config struct {
-	AppID        string
-	CurrentAppID func() string
-	FeedbackCode func(context.Context) (string, error)
+	AppID                  string
+	CurrentAppID           func() string
+	FeedbackCode           func(context.Context) (string, error)
+	RedeemRegistrationCode func(context.Context, domain.Owner, string, time.Time) (time.Time, error)
 }
 type Service struct {
 	store  domain.Repository
@@ -55,7 +56,22 @@ func (s *Service) Feedback(ctx context.Context, userID uint, content string) (do
 		return domain.EntryStatus{}, err
 	}
 	status := domain.EntryStatus{OwnerKey: o.Key(), Unlocked: at != nil, UnlockedAt: at}
-	if status.Unlocked || s.config.FeedbackCode == nil {
+	if status.Unlocked {
+		return status, nil
+	}
+	if strings.HasPrefix(strings.ToUpper(content), "REG-") {
+		// Registration codes must never fall back to the shared feedback password.
+		if s.config.RedeemRegistrationCode == nil {
+			return domain.EntryStatus{}, domain.ErrInvalidCode
+		}
+		unlockedAt, err := s.config.RedeemRegistrationCode(ctx, o, content, time.Now().UTC())
+		if err != nil {
+			return domain.EntryStatus{}, err
+		}
+		status.Unlocked, status.UnlockedAt = true, &unlockedAt
+		return status, nil
+	}
+	if s.config.FeedbackCode == nil {
 		return status, nil
 	}
 	code, err := s.config.FeedbackCode(ctx)

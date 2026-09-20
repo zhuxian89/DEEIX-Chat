@@ -128,3 +128,34 @@ func TestHTTPFailuresUseTODOErrorCodes(t *testing.T) {
 		})
 	}
 }
+
+func TestRegistrationFeedbackUsesAuthenticatedIdentity(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &handlerStore{}
+	engine := gin.New()
+	group := engine.Group("/api/v1", func(c *gin.Context) { c.Set(middleware.ContextKeyUserID, uint(7)) })
+	config := app.Config{AppID: "app", RedeemRegistrationCode: func(ctx context.Context, owner domain.Owner, code string, at time.Time) (time.Time, error) {
+		if owner != (domain.Owner{AppID: "app", OpenID: "server-openid"}) {
+			t.Fatal("client controlled binding identity", owner)
+		}
+		if code != "REG-VALID" {
+			return time.Time{}, domain.ErrInvalidCode
+		}
+		return store.Unlock(ctx, owner, at)
+	}}
+	NewHandler(app.NewService(store, config)).RegisterRoutes(group)
+	for _, code := range []string{"REG-INVALID", "REG-VALID"} {
+		body := `{"content":"` + code + `","openid":"attacker","app_id":"attacker","user_id":99}`
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/miniapp-todo/feedback", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		recorder := httptest.NewRecorder()
+		engine.ServeHTTP(recorder, req)
+		if code == "REG-INVALID" {
+			if recorder.Code != 400 || !strings.Contains(recorder.Body.String(), "miniapp_todo.invalid_code") || store.grant != nil {
+				t.Fatal(recorder.Code, recorder.Body.String())
+			}
+		} else if recorder.Code != 200 || !strings.Contains(recorder.Body.String(), `"unlocked":true`) || strings.Contains(recorder.Body.String(), "server-openid") {
+			t.Fatal(recorder.Code, recorder.Body.String())
+		}
+	}
+}

@@ -68,7 +68,7 @@ func TestHandleTextMessageUsesFixedMessagesForUsedCodeStates(t *testing.T) {
 		result  domainwechat.IssueResult
 		content string
 	}{
-		{name: "existing user", result: domainwechat.IssueResult{Code: "REG-USED", Used: true}, content: "你的专属注册码：REG-USED\n该注册码已使用。"},
+		{name: "existing user", result: domainwechat.IssueResult{Code: "REG-USED", Used: true}, content: "你的专属注册码：REG-USED\n该码已用于网站注册，不影响小程序开通资格。"},
 		{name: "deleted user", result: domainwechat.IssueResult{Code: "REG-DELETED", Used: true, DeletedUser: true}, content: "该微信曾注册的账号已被注销，无法自动领取新注册码。\n如需重新注册，请添加管理员微信：zhuxian1005，并说明“申请新注册码”。"},
 		{name: "never registered", result: domainwechat.IssueResult{Code: "REG-NEW", Created: true}, content: "你的专属注册码：REG-NEW"},
 	}
