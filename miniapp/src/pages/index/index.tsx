@@ -15,7 +15,7 @@ import { DailyCheckinEntry, DailyCheckinWheel } from "@/components/daily-checkin
 import { Markdown } from "@/components/markdown";
 import { ConversationTrace } from "@/components/conversation-trace";
 import { CompanionEntry, CompanionPanel } from "@/components/companion/companion";
-import { ReminderHomeCard, ReminderNotice, useReminderNotice } from "@/components/companion/reminder-notice";
+import { ReminderNotice, useReminderNotice } from "@/components/companion/reminder-notice";
 import type { CompanionState } from "@/product/companion-client";
 import { resolveMiniAppConfig } from "@/product/runtime-config";
 import {
@@ -1749,7 +1749,7 @@ export default function HomePage() {
     setScreen("companion");
   };
 
-  // Keep the notice outside scroll containers and mounted across every workspace screen.
+  // Workspace banners stay outside scroll containers; home uses the companion entry.
   const content = (() => {
   if (screen === "companion" && sessionRef.current && !booting && !bootError) {
     return <CompanionPanel session={sessionRef.current} initial={companionState} onState={setCompanionState} reminderInboxRequest={reminderInboxRequest} onBack={() => {
@@ -2494,11 +2494,14 @@ export default function HomePage() {
           <Text>{(user.displayName || "友").slice(0, 1)}</Text>
         </View>
       </View>
-      <ReminderHomeCard events={reminderNotice.due} onOpen={openReminderInbox} />
       <Text className="homeTitle">今天想做什么？</Text>
 
       {sessionRef.current && <CompanionEntry session={sessionRef.current}
-        lastInteraction={companionInteraction} onState={setCompanionState} onOpen={() => { setReminderInboxRequest(0); setScreen("companion"); }} />}
+        dueReminders={reminderNotice.due} lastInteraction={companionInteraction} onState={setCompanionState}
+        onOpen={() => {
+          if (reminderNotice.due.length) { openReminderInbox(); return; }
+          setReminderInboxRequest(0); setScreen("companion");
+        }} />}
 
       {dailyCheckin?.enabled && !dailyCheckin.claimed ? (
         <DailyCheckinEntry
@@ -2581,7 +2584,7 @@ export default function HomePage() {
     </View>
   );
   })();
-  return <>{content}<ReminderNotice events={reminderNotice.visible} onOpen={openReminderInbox} onDismiss={reminderNotice.dismiss} /></>;
+  return <>{content}{screen !== "home" && <ReminderNotice events={reminderNotice.visible} onOpen={openReminderInbox} onDismiss={reminderNotice.dismiss} />}</>;
 }
 
 function AccountMetric({ label, value }: { label: string; value: string }) {

@@ -73,7 +73,7 @@ test("foreground reminders remain visible whether the WeChat send succeeds or la
   assert.deepEqual(dueReminderEvents(state), []);
 });
 
-test("dismissal only hides the banner; pending reminders stay on the home card without repeated vibration", () => {
+test("dismissal only hides the banner; pending reminders stay in the companion entry without repeated vibration", () => {
   const tracker = new ReminderAttention();
   const state = attentionState();
   assert.equal(tracker.accept(state), true);

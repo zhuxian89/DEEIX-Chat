@@ -19,14 +19,6 @@
 .reminderNoticeDismiss { margin: 0 0 0 auto; padding: 0 12px; color: #e5ece8; background: transparent; font-size: 24px; line-height: 2; }
 .reminderNoticeOpen { flex-shrink: 0; margin: 0; padding: 0 26px; line-height: 2.5; font-size: 26px; font-weight: 600; color: #332a16; background: #ffcf7d; border-radius: 16px; }
 .reminderNoticeDismiss::after, .reminderNoticeOpen::after { border: 0; }
-.reminderHomeCard { margin: 24px 0; padding: 28px; background: #fff0d7; color: #583713; border: 3px solid #edac45; border-radius: 26px; box-shadow: 0 8px 24px rgba(168, 108, 31, 0.12); }
-.reminderHomeHeading { display: flex; justify-content: space-between; align-items: center; gap: 16px; font-size: 25px; font-weight: 600; }
-.reminderHomeBadge { padding: 8px 18px; border-radius: 12px; color: #fff; background: #a75117; font-size: 27px; }
-.reminderHomeItem { display: flex; flex-direction: column; gap: 6px; margin-top: 22px; }
-.reminderHomeTitle { font-size: 35px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
-.reminderHomeTime { color: #805c32; font-size: 24px; }
-.reminderHomeAction { display: flex; justify-content: space-between; gap: 16px; margin-top: 26px; padding-top: 22px; border-top: 1px solid #e5c69b; font-size: 25px; }
-.reminderHomeAction text:last-child { flex-shrink: 0; font-weight: 700; color: #9b410d; }
 .reminderSubscription { flex-shrink: 0; display: flex; flex-direction: column; gap: 10px; margin: 8px 24px 16px; padding: 16px 20px; border: 1px solid #e7b56c; border-radius: 16px; background: #fff1dc; color: #784111; font-size: 23px; line-height: 1.5; }
 .reminderSubscriptionReady { background: #edf4eb; color: #416448; border-color: #c7dac3; }
 .reminderSubscriptionHint { font-size: 21px; }

@@ -1,4 +1,4 @@
-import type { ConversationResponse, MessageResponse, ReminderState, ReminderPlan } from "@deeix/api-contract";
+import type { ConversationResponse, MessageResponse, ReminderState, ReminderPlan, ReminderEvent } from "@deeix/api-contract";
 import { Button, Image, ScrollView, Switch, Text, Textarea, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -30,9 +30,10 @@ function CompanionAvatar({ size }: { size: "entry" | "header" | "message" }) {
 }
 
 // Refresh persisted greetings and server-generated follow-ups while foregrounded.
-export function CompanionEntry({ session, onState, onOpen, lastInteraction }: SharedProps & {
+export function CompanionEntry({ session, onState, onOpen, lastInteraction, dueReminders }: SharedProps & {
   onOpen(): void;
   lastInteraction: { current: number };
+  dueReminders: ReminderEvent[];
 }) {
   const [state, setState] = useState<CompanionState | null>(null);
   const { controller: subscriptions } = useCompanionSubscriptions(session.companion);
@@ -98,6 +99,11 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
     };
   }, [session, lastInteraction]);
 
+  const hasReminder = dueReminders.length > 0;
+  const preview = hasReminder
+    ? `${dueReminders.length > 1 ? `${dueReminders.length} 项提醒` : "提醒"}到时间了：${dueReminders.slice(0, 2).map((event) => event.title).join("、")}`
+    : state ? companionEntryPreview(state) : "不用想好问题，随口聊聊也可以。";
+
   return (
     <View className="companionEntryFrame" onClick={() => { void subscriptions.request(); onOpen(); }}>
       <View className="companionEntry">
@@ -106,8 +112,8 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
         </View>
         <View className="companionEntryBody">
           <Text className="companionEntryTitle">{COMPANION_NAME} <Text className="companionTag">AI 聊天伙伴</Text></Text>
-          <Text className="companionEntryText">{state ? companionEntryPreview(state) : "聊聊今天的心情，或记下想做的事。"}</Text>
-          <Text className="companionEntryAction">和{COMPANION_NAME}聊聊 ›</Text>
+          <Text className={`companionEntryText${hasReminder ? " companionEntryText--reminder" : ""}`}>{preview}</Text>
+          <Text className={`companionEntryAction${hasReminder ? " companionEntryAction--reminder" : ""}`}>{hasReminder ? "查看提醒 ›" : `和${COMPANION_NAME}聊聊 ›`}</Text>
         </View>
       </View>
     </View>

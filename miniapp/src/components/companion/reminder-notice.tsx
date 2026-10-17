@@ -72,14 +72,3 @@ export function ReminderNotice({ events, onOpen, onDismiss }: {
     </View>
   </View>;
 }
-
-export function ReminderHomeCard({ events, onOpen }: { events: ReminderEvent[]; onOpen(): void }) {
-  if (!events.length) return null;
-  return <View className="reminderHomeCard" onClick={onOpen}>
-    <View className="reminderHomeHeading"><Text className="reminderHomeBadge">到期提醒</Text><Text>{events.length} 项待处理</Text></View>
-    {events.slice(0, 3).map((event) => <View className="reminderHomeItem" key={event.id}>
-      <Text className="reminderHomeTitle">{event.title}</Text><Text className="reminderHomeTime">{followupTime(event.dueAt)}</Text>
-    </View>)}
-    <View className="reminderHomeAction"><Text>打开提醒，完成或推迟</Text><Text>立即处理 ›</Text></View>
-  </View>;
-}
