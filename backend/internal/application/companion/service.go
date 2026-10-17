@@ -17,6 +17,7 @@ import (
 type Service struct {
 	Store                  Store
 	Chat                   *chat.Service
+	ReminderModel          ReminderLanguageModel
 	TopicProvider          TopicProvider
 	Notifier               NotificationSender
 	NotificationTemplateID string

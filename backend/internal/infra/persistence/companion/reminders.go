@@ -205,16 +205,54 @@ func materializeReminder(tx *gorm.DB, p *domain.Reminder) (domain.ReminderOccurr
 	return e, nil
 }
 
+// Omit the appended seconds field when unused to keep existing card retry hashes
+// compatible with requests saved before second-based snoozing was introduced.
+type reminderHashCommand struct {
+	RequestID, ConversationID, Input, Action, ID, OccurrenceID, Title, Reply string
+	Schedule                                                                 domain.ReminderSchedule
+	Revision                                                                 uint
+	DelayMinutes                                                             int
+	DelaySeconds                                                             int `json:",omitempty"`
+	IDs                                                                      []string
+}
+
+func reminderCommandHash(c domain.ReminderCommand) string {
+	raw := reminderJSON(reminderHashCommand{RequestID: c.RequestID, ConversationID: c.ConversationID, Input: c.Input, Action: c.Action, ID: c.ID,
+		OccurrenceID: c.OccurrenceID, Title: c.Title, Reply: c.Reply, Schedule: c.Schedule, Revision: c.Revision, DelayMinutes: c.DelayMinutes, DelaySeconds: c.DelaySeconds, IDs: c.IDs})
+	if c.Input != "" {
+		raw = c.ConversationID + "\n" + c.Input
+	}
+	return fmt.Sprintf("%x", sha256.Sum256([]byte(raw)))
+}
+
+// Replay before model inference so network retries preserve the original result
+// even when a model is unavailable or the user's current reminders have changed.
+func (s *Store) ReplayReminder(ctx context.Context, user uint, c domain.ReminderCommand, now time.Time) (*domain.ReminderResult, error) {
+	var prior reminderTurnRecord
+	err := s.db.WithContext(ctx).Where("user_id = ? AND id = ?", user, c.RequestID).First(&prior).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if prior.Hash != reminderCommandHash(c) {
+		return nil, ErrInvalid
+	}
+	out := &domain.ReminderResult{Handled: true}
+	if err := json.Unmarshal([]byte(prior.Data), &out.Turn); err != nil {
+		return nil, err
+	}
+	out.Snapshot, err = s.ReminderSnapshot(ctx, user, c.ConversationID, now)
+	return out, err
+}
+
 func (s *Store) ExecuteReminder(ctx context.Context, user uint, c domain.ReminderCommand, now time.Time) (domain.ReminderResult, error) {
 	out := domain.ReminderResult{Handled: true}
 	if len(c.RequestID) < 8 || len(c.RequestID) > 100 || len([]rune(c.Input)) > 8000 {
 		return out, ErrInvalid
 	}
-	raw := reminderJSON(c)
-	if c.Input != "" {
-		raw = c.ConversationID + "\n" + c.Input
-	}
-	hash := fmt.Sprintf("%x", sha256.Sum256([]byte(raw)))
+	hash := reminderCommandHash(c)
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := lockReminderOwner(tx, user); err != nil {
 			return err
@@ -340,6 +378,30 @@ func (s *Store) ExecuteReminder(ctx context.Context, user uint, c domain.Reminde
 				if c.Title == "" {
 					c.Title = p.Title
 				}
+				if strings.TrimSpace(c.Title) != p.Title && reminderJSON(c.Schedule) == reminderJSON(p.Schedule) {
+					if strings.TrimSpace(c.Title) == "" || len([]rune(c.Title)) > 120 {
+						return ErrInvalid
+					}
+					p.Title = strings.TrimSpace(c.Title)
+					var events []reminderEvent
+					if err := tx.Where("user_id = ? AND reminder_id = ? AND status IN ?", user, p.ID, []string{"pending", "due", "suspended"}).Find(&events).Error; err != nil {
+						return err
+					}
+					for _, event := range events {
+						var e domain.ReminderOccurrence
+						if err := json.Unmarshal([]byte(event.Data), &e); err != nil {
+							return err
+						}
+						e.Title = p.Title
+						e.NotificationStatus = event.NotificationStatus
+						e.Revision++
+						if err := tx.Model(&reminderEvent{}).Where("id = ? AND user_id = ?", e.ID, user).Updates(map[string]interface{}{"data": reminderJSON(e), "revision": e.Revision}).Error; err != nil {
+							return err
+						}
+					}
+					t.Reply = "已将提醒名称改为「" + p.Title + "」。"
+					break
+				}
 				if !validReminderSchedule(c, now) {
 					return ErrInvalid
 				}
@@ -379,14 +441,18 @@ func (s *Store) ExecuteReminder(ctx context.Context, user uint, c domain.Reminde
 					return err
 				}
 				if c.Action == "snooze" {
-					if c.DelayMinutes < 1 || c.DelayMinutes > 10080 {
+					seconds := c.DelaySeconds
+					if seconds == 0 && c.DelayMinutes >= 1 && c.DelayMinutes <= 10080 {
+						seconds = c.DelayMinutes * 60
+					}
+					if seconds < 1 || seconds > 7*86400 || c.DelaySeconds != 0 && c.DelayMinutes != 0 {
 						return ErrInvalid
 					}
 					base := now
 					if e.DueAt.After(base) {
 						base = e.DueAt
 					}
-					e.DueAt = base.Add(time.Duration(c.DelayMinutes) * time.Minute)
+					e.DueAt = base.Add(time.Duration(seconds) * time.Second)
 					e.Status = "pending"
 					e.NotificationStatus = ""
 					e.NotifiedAt = time.Time{}

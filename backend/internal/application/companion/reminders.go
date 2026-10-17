@@ -35,7 +35,7 @@ func (s *Service) ReminderCommand(ctx context.Context, user uint, c domain.Remin
 	if !ok {
 		return domain.ReminderResult{}, ErrNotFound
 	}
-	if len(c.RequestID) < 8 || len(c.RequestID) > 100 || len([]rune(c.Input)) > 8000 {
+	if len(c.RequestID) < 8 || len(c.RequestID) > 100 || len([]rune(c.Input)) > 8000 || c.Action != "" && c.Input != "" {
 		return domain.ReminderResult{}, ErrInvalid
 	}
 	p, err := s.Store.Profile(ctx, user)
@@ -48,18 +48,45 @@ func (s *Service) ReminderCommand(ctx context.Context, user uint, c domain.Remin
 	c.ConversationID = p.ConversationPublicID
 	now := time.Now()
 	if c.Action == "" {
+		if strings.TrimSpace(c.Input) == "" {
+			return domain.ReminderResult{}, ErrInvalid
+		}
+		if replay, ok := store.(reminderReplayStore); ok {
+			prior, err := replay.ReplayReminder(ctx, user, c, now)
+			if err != nil || prior != nil {
+				if prior != nil {
+					return *prior, err
+				}
+				return domain.ReminderResult{}, err
+			}
+		}
 		state, err := store.ReminderSnapshot(ctx, user, c.ConversationID, now)
 		if err != nil {
 			return domain.ReminderResult{}, err
 		}
-		parsed := ParseReminderCommand(c.Input, state, now)
+		parsed, err := s.interpretReminder(ctx, p, c, state, now)
+		if err != nil {
+			return domain.ReminderResult{}, err
+		}
 		if parsed.Action == "" {
 			return domain.ReminderResult{Handled: false}, nil
 		}
+		current, err := s.Store.Profile(ctx, user)
+		if err != nil {
+			return domain.ReminderResult{}, err
+		}
+		if current.Revision != p.Revision || current.ConversationPublicID != p.ConversationPublicID {
+			return domain.ReminderResult{}, ErrBusy
+		}
 		parsed.RequestID, parsed.ConversationID, parsed.Input = c.RequestID, c.ConversationID, c.Input
 		c = parsed
+		now = time.Now()
 	}
 	return store.ExecuteReminder(ctx, user, c, now)
+}
+
+type reminderReplayStore interface {
+	ReplayReminder(context.Context, uint, domain.ReminderCommand, time.Time) (*domain.ReminderResult, error)
 }
 
 // The scheduler has no chat/model dependency, profile lease or proactivity gate.
@@ -293,6 +320,7 @@ func namedReminderMatches(text, quotedTitle string, plans []domain.Reminder) []d
 	return matches
 }
 
+// ParseReminderCommand is the legacy rule parser. Conversational requests use interpretReminder.
 func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.Time) domain.ReminderCommand {
 	text := strings.TrimSpace(input)
 	var last *domain.ReminderTurn
@@ -665,7 +693,7 @@ func parseReminderSchedule(text string, now time.Time) (domain.ReminderSchedule,
 
 func reminderContextText(snapshot domain.ReminderSnapshot) string {
 	var b strings.Builder
-	b.WriteString("\n提醒由专用功能实际保存。不得声称已创建、修改或删除未经执行的提醒。以下是当前已保存的提醒；没有记录就不能说已经安排：\n")
+	b.WriteString("\n你支持在对话中创建、查询、改期、暂停和删除提醒，支持秒级单次提醒和每天等重复提醒，例如“30秒后通知我写作业”。提醒由专用功能实际保存；不要说聊天不能创建提醒，也不要要求用户必须去其他页面。未经执行不得声称已安排或已修改；表达不清时询问具体事项和时间。微信通知还取决于订阅授权，不能保证一定送达。以下是当前已保存的提醒；没有记录就不能说已经安排：\n")
 	for _, p := range snapshot.Plans {
 		if p.Status == "active" || p.Status == "paused" {
 			fmt.Fprintf(&b, "%s；%s；状态%s；下次%s\n", p.Title, p.Schedule.Description(), p.Status, domain.ReminderTime(p.NextAt))

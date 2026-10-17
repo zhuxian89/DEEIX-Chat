@@ -1,10 +1,16 @@
 package companion
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
+	app "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/companion"
+	chat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/conversation"
 	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
+	domainchat "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/conversation"
+	"github.com/google/uuid"
 )
 
 func reminderDeliveryFixture(t *testing.T) *Store {
@@ -157,6 +163,57 @@ func TestReminderDailyCompletionPreservesNextDayAcrossReopen(t *testing.T) {
 				if event.DueAt.Equal(due) && event.Status != "completed" || event.DueAt.Equal(due.AddDate(0, 0, 1)) && event.Status != "due" {
 					t.Fatalf("wrong daily occurrence: %+v", event)
 				}
+			}
+		})
+	}
+}
+
+type interpretedReminderModel struct{ input, title string }
+
+func (m interpretedReminderModel) CompanionMessages(context.Context, uint, uint, int) ([]domainchat.Message, error) {
+	return nil, nil
+}
+
+func (m interpretedReminderModel) StreamTemporaryChat(context.Context, chat.TemporaryChatInput, func(string) error) (*chat.SendMessageResult, error) {
+	raw, _ := json.Marshal(map[string]interface{}{"action": "create", "evidence": m.input, "title": m.title, "schedule": map[string]interface{}{"kind": "once", "delay_seconds": 30}})
+	return &chat.SendMessageResult{AssistantMessage: domainchat.Message{Content: string(raw)}}, nil
+}
+
+func TestInterpretedSecondsReminderPersistsAndQueuesWhileChatBusy(t *testing.T) {
+	for _, tt := range []struct{ input, title string }{{"30秒之后提醒我 测试", "测试"}, {"30秒后通知我写作业", "写作业"}} {
+		t.Run(tt.input, func(t *testing.T) {
+			s := reminderDeliveryFixture(t)
+			if err := s.db.Exec("UPDATE companion_profiles SET model='configured-model' WHERE user_id=1").Error; err != nil {
+				t.Fatal(err)
+			}
+			service := app.Service{Store: s, ReminderModel: interpretedReminderModel{input: tt.input, title: tt.title}}
+			before := time.Now()
+			created, err := service.ReminderCommand(t.Context(), 1, domain.ReminderCommand{RequestID: uuid.NewString(), Input: tt.input})
+			if err != nil || !created.Handled || len(created.Snapshot.Plans) != 1 {
+				t.Fatalf("request was not saved: %+v, %v", created, err)
+			}
+			p := created.Snapshot.Plans[0]
+			if p.Title != tt.title || p.NextAt.Before(before.Add(30*time.Second)) || p.NextAt.After(time.Now().Add(30*time.Second)) {
+				t.Fatalf("incorrect saved reminder: %+v", p)
+			}
+			s = reopenReminderStore(t, s)
+			lease, err := s.Acquire(t.Context(), 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Release(1, lease)
+			if err := s.TickReminders(t.Context(), p.NextAt.Add(-time.Second), "template"); err != nil {
+				t.Fatal(err)
+			}
+			if delivery, _, err := s.ClaimReminderNotification(t.Context(), p.NextAt.Add(-time.Second), "template"); err != nil || delivery != nil {
+				t.Fatalf("reminded early: %+v, %v", delivery, err)
+			}
+			if err := s.TickReminders(t.Context(), p.NextAt, "template"); err != nil {
+				t.Fatal(err)
+			}
+			delivery, _, err := s.ClaimReminderNotification(t.Context(), p.NextAt, "template")
+			if err != nil || delivery == nil || delivery.Title != tt.title || !delivery.DueAt.Equal(p.NextAt) {
+				t.Fatalf("chat activity blocked the reminder: %+v, %v", delivery, err)
 			}
 		})
 	}

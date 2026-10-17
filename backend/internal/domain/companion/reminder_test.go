@@ -45,3 +45,10 @@ func TestReminderCalendarAndAnchoring(t *testing.T) {
 		t.Fatal("end date ignored")
 	}
 }
+
+func TestReminderTimePreservesSecondsAcrossBeijingMidnight(t *testing.T) {
+	at := time.Date(2026, 10, 17, 15, 59, 50, 0, time.UTC).Add(30 * time.Second)
+	if got := ReminderTime(at); got != "2026-10-18 00:00:20" {
+		t.Fatal(got)
+	}
+}

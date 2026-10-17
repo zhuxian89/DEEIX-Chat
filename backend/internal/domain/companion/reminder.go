@@ -49,6 +49,7 @@ type ReminderCommand struct {
 	Schedule                                                                 ReminderSchedule
 	Revision                                                                 uint
 	DelayMinutes                                                             int
+	DelaySeconds                                                             int
 	IDs                                                                      []string
 }
 
@@ -177,6 +178,9 @@ func (s ReminderSchedule) Next(after time.Time, generated int) time.Time {
 func ReminderTime(t time.Time) string {
 	if t.IsZero() {
 		return "暂无下次提醒"
+	}
+	if t.Second() != 0 {
+		return t.In(ReminderZone).Format("2006-01-02 15:04:05")
 	}
 	return t.In(ReminderZone).Format("2006-01-02 15:04")
 }

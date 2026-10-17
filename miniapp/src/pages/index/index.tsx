@@ -2497,7 +2497,7 @@ export default function HomePage() {
       <ReminderHomeCard events={reminderNotice.due} onOpen={openReminderInbox} />
       <Text className="homeTitle">今天想做什么？</Text>
 
-      {sessionRef.current && presets.chatModel && <CompanionEntry session={sessionRef.current}
+      {sessionRef.current && <CompanionEntry session={sessionRef.current}
         lastInteraction={companionInteraction} onState={setCompanionState} onOpen={() => { setReminderInboxRequest(0); setScreen("companion"); }} />}
 
       {dailyCheckin?.enabled && !dailyCheckin.claimed ? (

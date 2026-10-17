@@ -40,5 +40,6 @@ export function reminderRequestID(): string {
 
 export function reminderError(cause: unknown): string {
   const message = cause instanceof Error ? cause.message : "操作未完成，请重试。";
-  return ({ "resource conflict": "提醒已更新，请刷新后重试。", "resource not found": "提醒已删除或暂不可用，请刷新。", "invalid request": "请检查提醒时间，或刷新后重新操作。" } as Record<string, string>)[message] ?? message;
+  const reason = message.replace(/（[^（）]+）$/u, "").trim();
+  return ({ "resource conflict": "提醒已更新，请刷新后重试。", "resource not found": "提醒已删除或暂不可用，请刷新。", "invalid request": "请检查提醒时间，或刷新后重新操作。", "service unavailable": "暂时未能处理这条消息，请稍后重试。提醒尚未创建或修改。" } as Record<string, string>)[reason] ?? message;
 }

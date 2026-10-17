@@ -139,6 +139,9 @@ func fail(c *gin.Context, err error) {
 	if errors.Is(err, app.ErrInvalid) {
 		status = http.StatusBadRequest
 	}
+	if errors.Is(err, app.ErrReminderUnderstanding) {
+		status = http.StatusServiceUnavailable
+	}
 	response.Error(c, status, err.Error())
 }
 

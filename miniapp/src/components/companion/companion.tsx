@@ -84,7 +84,7 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
             stateCallback.current(updated);
           });
         })
-        .catch(() => { /* The entry stays hidden until the backend enables it. */ })
+        .catch(() => { /* Keep the entry available; the chat panel handles load errors. */ })
         .finally(() => { working.current = false; });
     }, 1000);
     return () => {
@@ -96,8 +96,6 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
     };
   }, [session, lastInteraction]);
 
-  if (!state) return null;
-
   return (
     <View className="companionEntryFrame" onClick={onOpen}>
       <View className="companionEntry">
@@ -106,7 +104,7 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
         </View>
         <View className="companionEntryBody">
           <Text className="companionEntryTitle">{COMPANION_NAME} <Text className="companionTag">AI 聊天伙伴</Text></Text>
-          <Text className="companionEntryText">{companionEntryPreview(state)}</Text>
+          <Text className="companionEntryText">{state ? companionEntryPreview(state) : "聊聊今天的心情，或记下想做的事。"}</Text>
           <Text className="companionEntryAction">和{COMPANION_NAME}聊聊 ›</Text>
         </View>
       </View>

@@ -1,8 +1,14 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { ReminderEvent, ReminderState } from "@deeix/api-contract";
-import { reminderCardOccurrence, reminderCountdown, reminderMessages } from "./companion-reminders";
+import { reminderCardOccurrence, reminderCountdown, reminderError, reminderMessages } from "./companion-reminders";
 import { dueReminderEvents, ReminderAttention } from "./reminder-attention";
+
+test("reminder errors translate standard error envelopes and preserve unexpected details", () => {
+  assert.equal(reminderError(new Error("service unavailable（service.unavailable）")), "暂时未能处理这条消息，请稍后重试。提醒尚未创建或修改。");
+  assert.equal(reminderError(new Error("resource conflict（resource.conflict）")), "提醒已更新，请刷新后重试。");
+  assert.equal(reminderError(new Error("网络连接中断")), "网络连接中断");
+});
 
 test("countdown uses server time, crosses days and never goes negative", () => {
   const now = Date.parse("2026-10-16T15:30:00Z");
