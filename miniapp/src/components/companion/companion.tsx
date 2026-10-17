@@ -16,6 +16,7 @@ import companionAvatar from "./assets/xiaohe-portrait.png";
 import "./companion.scss";
 import { AssistantSettings } from "./assistant-settings";
 import { ReminderCards, type ReminderAction } from "./reminder-cards";
+import { ReminderSubscription } from "./reminder-subscription";
 import { reminderMessages, reminderRequestID, reminderError } from "@/product/companion-reminders";
 
 const COMPANION_NAME = "小禾";
@@ -33,7 +34,6 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
   lastInteraction: { current: number };
 }) {
   const [state, setState] = useState<CompanionState | null>(null);
-  const [reminderPreview, setReminderPreview] = useState("");
   const foreground = useRef(true);
   const working = useRef(false);
   const refreshAt = useRef(0);
@@ -71,13 +71,6 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
           if (disposed || !foreground.current) return;
           setState(next);
           stateCallback.current(next);
-          const reminderState = await session.companion.reminders(next.conversationPublicID).catch(() => null);
-          if (disposed || !foreground.current) return;
-          if (reminderState) {
-            const due = reminderState.occurrences.filter((item) => item.status === "due")
-              .sort((a, b) => Date.parse(b.dueAt) - Date.parse(a.dueAt))[0];
-            setReminderPreview(due ? `提醒：${due.title}已到时间` : "");
-          }
           const eligible = () => !disposed && foreground.current && lastInteraction.current === interactionAt && !next.quiet;
           if (!eligible()) return;
           if (!next.initiativeVersion) {
@@ -113,7 +106,7 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
         </View>
         <View className="companionEntryBody">
           <Text className="companionEntryTitle">{COMPANION_NAME} <Text className="companionTag">AI 聊天伙伴</Text></Text>
-          <Text className="companionEntryText">{reminderPreview || companionEntryPreview(state)}</Text>
+          <Text className="companionEntryText">{companionEntryPreview(state)}</Text>
           <Text className="companionEntryAction">和{COMPANION_NAME}聊聊 ›</Text>
         </View>
       </View>
@@ -156,7 +149,9 @@ function errorMessage(error: unknown): string {
   return message;
 }
 
-export function CompanionPanel({ session, onState, onBack, initial }: SharedProps & { onBack(): void; initial: CompanionState | null }) {
+export function CompanionPanel({ session, onState, onBack, initial, reminderInboxRequest = 0 }: SharedProps & {
+  onBack(): void; initial: CompanionState | null; reminderInboxRequest?: number;
+}) {
   const [state, setState] = useState(initial);
   const [conversation, setConversation] = useState<ConversationResponse | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -277,18 +272,25 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   };
 
   useEffect(() => {
+    if (reminderInboxRequest > 0) { setMemoryOpen(false); setReminderOpen(true); }
+  }, [reminderInboxRequest]);
+
+  useEffect(() => session.companion.subscribeReminders((next) => {
+    if (!mounted.current) return;
+    reminderOffset.current = Date.parse(next.serverTime) - Date.now();
+    setReminderNow(Date.now() + reminderOffset.current);
+    // The global feed has no conversation turns; preserve the current chat history.
+    setReminders((current) => current ? { ...current, plans: next.plans, occurrences: next.occurrences, serverTime: next.serverTime } : current);
+  }), [session]);
+
+  useEffect(() => {
     if (!conversation) return;
     let disposed = false;
-    let refreshing = false;
-    let refreshAt = 0;
     const tick = () => {
       if (disposed || !initiativeForeground.current) return;
       setReminderNow(Date.now() + reminderOffset.current);
-      if (busyRef.current || refreshing || Date.now() < refreshAt) return;
-      refreshing = true; refreshAt = Date.now() + 10_000;
-      void refreshReminders(conversation.publicID).catch(() => {}).finally(() => { refreshing = false; });
     };
-    const show = () => { refreshAt = 0; tick(); };
+    const show = () => { tick(); void refreshReminders(conversation.publicID).catch(() => {}); };
     const timer = setInterval(tick, 1000);
     Taro.onAppShow(show);
     return () => { disposed = true; clearInterval(timer); Taro.offAppShow(show); reminderVersion.current++; };
@@ -621,7 +623,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
       {reminderOpen ? <ScrollView scrollY enhanced bounces={false} scrollAnchoring={false} className="companionHistory">
         <View className="reminderManage">
           <Text className="reminderHint">可以在对话中创建、查询、改期或删除。每天重复的提醒，完成本次后仍会继续。</Text>
-          <Text className="reminderHint">关闭小程序后的微信通知，需要在“记忆与跟进”中授权。</Text>
+          <ReminderSubscription client={session.companion} reminders={reminders} />
           {reminders && <ReminderCards state={reminders} now={reminderNow} busy={busy} onAction={(action) => void reminderAction(action)} onEdit={editReminder} />}
         </View>
       </ScrollView> : memoryOpen ? (
@@ -657,6 +659,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
         </ScrollView>
       ) : <>
         <Text className="reminderManageLink" onClick={() => setReminderOpen(true)}>我的提醒{reminders ? ` · ${reminders.plans.filter((p) => p.status === "active").length} 个进行中` : ""} ›</Text>
+        {Boolean(reminders?.plans.some((plan) => plan.status === "active")) && <ReminderSubscription client={session.companion} reminders={reminders} />}
         <View className="companionHistoryShell">
           <ScrollView id="companionMessages" scrollY enhanced bounces={false} scrollAnchoring={false} className="companionHistory companionChatHistory" scrollTop={scrollTop} scrollWithAnimation={false}
             lowerThreshold={COMPANION_BOTTOM_THRESHOLD_PX}

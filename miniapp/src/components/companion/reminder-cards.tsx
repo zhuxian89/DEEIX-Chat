@@ -1,6 +1,6 @@
 import type { ReminderCommandRequest, ReminderPlan, ReminderState } from "@deeix/api-contract";
 import { Button, Text, View } from "@tarojs/components";
-import { followupTime } from "@/product/companion-assistant";
+import { companionDecisionText, followupTime } from "@/product/companion-assistant";
 import { reminderCardOccurrence, reminderCountdown } from "@/product/companion-reminders";
 import "./reminder-cards.scss";
 
@@ -25,6 +25,7 @@ export function ReminderCards({ state, ids, occurrenceID, now, busy, onAction, o
         <Text className="reminderCountdown">{p.status === "paused" ? "已暂停" : p.status === "ended" ? "已结束" : reminderCountdown(p.nextAt, now)}</Text>
         {p.status === "active" && Date.parse(p.nextAt) > 0 && <Text className="reminderHint">{followupTime(p.nextAt)}</Text>}
         {eventLabel && <Text className="reminderHint">{eventLabel}</Text>}
+        {event?.notificationStatus && <Text className="reminderHint">{companionDecisionText(event.notificationStatus)}</Text>}
         <View className="reminderActions">
           {p.status === "active" && actionable && <>
             <Button disabled={busy} onClick={() => perform("complete")}>完成本次</Button>

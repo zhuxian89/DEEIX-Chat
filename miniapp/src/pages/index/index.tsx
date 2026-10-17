@@ -15,6 +15,7 @@ import { DailyCheckinEntry, DailyCheckinWheel } from "@/components/daily-checkin
 import { Markdown } from "@/components/markdown";
 import { ConversationTrace } from "@/components/conversation-trace";
 import { CompanionEntry, CompanionPanel } from "@/components/companion/companion";
+import { ReminderHomeCard, ReminderNotice, useReminderNotice } from "@/components/companion/reminder-notice";
 import type { CompanionState } from "@/product/companion-client";
 import { resolveMiniAppConfig } from "@/product/runtime-config";
 import {
@@ -219,6 +220,7 @@ export default function HomePage() {
   const sessionRef = useRef<MiniAppSession | null>(null);
   const companionInteraction = useRef(Date.now());
   const [companionState, setCompanionState] = useState<CompanionState | null>(null);
+  const [reminderInboxRequest, setReminderInboxRequest] = useState(0);
   const messageCounter = useRef(0);
   const historyLoadCounter = useRef(0);
   const dailyCheckinRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -285,6 +287,7 @@ export default function HomePage() {
   const [sharedConversation, setSharedConversation] = useState<PublicSharedConversationResponse | null>(null);
   const [sharedMessages, setSharedMessages] = useState<ConversationMessage[]>([]);
   const [sharedLoading, setSharedLoading] = useState(false);
+  const reminderNotice = useReminderNotice(!booting && !bootError && user ? sessionRef.current?.companion ?? null : null);
 
   useShareAppMessage(() => ({
     title: preparedShare?.title ? `${preparedShare.title}｜AI省着用` : "AI省着用",
@@ -1740,9 +1743,18 @@ export default function HomePage() {
     />
   ) : null;
 
+  const openReminderInbox = () => {
+    reminderNotice.dismiss();
+    setReminderInboxRequest((current) => current + 1);
+    setScreen("companion");
+  };
+
+  // Keep the notice outside scroll containers and mounted across every workspace screen.
+  const content = (() => {
   if (screen === "companion" && sessionRef.current && !booting && !bootError) {
-    return <CompanionPanel session={sessionRef.current} initial={companionState} onState={setCompanionState} onBack={() => {
+    return <CompanionPanel session={sessionRef.current} initial={companionState} onState={setCompanionState} reminderInboxRequest={reminderInboxRequest} onBack={() => {
       setScreen("home");
+      setReminderInboxRequest(0);
       companionInteraction.current = Date.now();
       void refreshConversations();
       void refreshBalance();
@@ -2482,10 +2494,11 @@ export default function HomePage() {
           <Text>{(user.displayName || "友").slice(0, 1)}</Text>
         </View>
       </View>
+      <ReminderHomeCard events={reminderNotice.due} onOpen={openReminderInbox} />
       <Text className="homeTitle">今天想做什么？</Text>
 
       {sessionRef.current && presets.chatModel && <CompanionEntry session={sessionRef.current}
-        lastInteraction={companionInteraction} onState={setCompanionState} onOpen={() => setScreen("companion")} />}
+        lastInteraction={companionInteraction} onState={setCompanionState} onOpen={() => { setReminderInboxRequest(0); setScreen("companion"); }} />}
 
       {dailyCheckin?.enabled && !dailyCheckin.claimed ? (
         <DailyCheckinEntry
@@ -2567,6 +2580,8 @@ export default function HomePage() {
       {shareOverlay}
     </View>
   );
+  })();
+  return <>{content}<ReminderNotice events={reminderNotice.visible} onOpen={openReminderInbox} onDismiss={reminderNotice.dismiss} /></>;
 }
 
 function AccountMetric({ label, value }: { label: string; value: string }) {

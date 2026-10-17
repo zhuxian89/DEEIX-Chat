@@ -9,6 +9,10 @@ export type CompanionProactivity = "normal" | "less" | "off";
 
 // Authentication, refresh cookies and error envelopes stay in MiniAppSession.
 export class CompanionClient {
+  private reminderReadVersion = 0;
+  private reminderWrites = 0;
+  private readonly reminderListeners = new Set<(state: ReminderState) => void>();
+
   constructor(private readonly request: <T>(request: ApiRequest) => Promise<T>) {}
 
   state(): Promise<CompanionState> {
@@ -64,12 +68,34 @@ export class CompanionClient {
     return this.request({ path: "/api/v1/companion/assistant" });
   }
 
-  reminders(conversationID = ""): Promise<ReminderState> {
-    return this.request({ path: `/api/v1/companion/reminders?conversationID=${encodeURIComponent(conversationID)}` });
+  subscribeReminders(listener: (state: ReminderState) => void): () => void {
+    this.reminderListeners.add(listener);
+    return () => { this.reminderListeners.delete(listener); };
   }
 
-  reminderCommand(body: Partial<ReminderCommandRequest> & { requestID: string }): Promise<ReminderCommandResult> {
-    return this.request({ path: "/api/v1/companion/reminders/command", method: "POST", body });
+  async reminders(conversationID = ""): Promise<ReminderState> {
+    const version = ++this.reminderReadVersion;
+    const state = await this.request<ReminderState>({ path: `/api/v1/companion/reminders?conversationID=${encodeURIComponent(conversationID)}` });
+    if (version === this.reminderReadVersion && this.reminderWrites === 0) this.publishReminders(state);
+    return state;
+  }
+
+  async reminderCommand(body: Partial<ReminderCommandRequest> & { requestID: string }): Promise<ReminderCommandResult> {
+    this.reminderReadVersion++;
+    this.reminderWrites++;
+    try {
+      const result = await this.request<ReminderCommandResult>({ path: "/api/v1/companion/reminders/command", method: "POST", body });
+      // A successful mutation supersedes reads that began before it committed.
+      this.reminderReadVersion++;
+      if (result.handled) this.publishReminders(result.snapshot);
+      return result;
+    } finally {
+      this.reminderWrites--;
+    }
+  }
+
+  private publishReminders(state: ReminderState): void {
+    for (const listener of this.reminderListeners) listener(state);
   }
 
   contextConversations(query = "", page = 1): Promise<CompanionContextConversation[]> {

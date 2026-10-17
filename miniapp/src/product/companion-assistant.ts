@@ -38,6 +38,8 @@ export function companionDecisionText(reason: string): string {
     source_unavailable: "暂时无法读取事项来源，会稍后重试",
     delivery_failed: "跟进消息暂未写入，会稍后重试",
     sent: "微信通知已发送",
+    queued: "微信通知等待发送",
+    canceled: "本次微信通知已取消",
     uncertain: "未能确认微信是否送达，请在这里查看跟进",
     not_configured: "微信通知暂未配置，已保留应用内提醒",
     not_authorized: "没有可用的微信订阅授权，已保留应用内提醒",
