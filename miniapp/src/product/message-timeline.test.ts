@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { formatMessageTime } from "./message-time";
 import type { MessageResponse } from "@deeix/api-contract";
 import {
   applyImageProgress,
@@ -60,6 +61,7 @@ test("historical image-only assistant messages remain visible", () => {
 
   assert.ok(message);
   assert.equal(message.imageFileID, "file-image-1");
+  assert.equal(message.createdAt, "2026-09-02T00:00:00Z");
   assert.equal(message.imageStatus, "正在加载图片");
 });
 
@@ -106,7 +108,18 @@ test("image stream progress updates the same pending assistant message", () => {
 
   assert.equal(updated.id, pending.id);
   assert.equal(updated.imageSource, "data:image/png;base64,AAAA");
+  assert.ok(pending.createdAt);
+  assert.equal(updated.createdAt, pending.createdAt);
   assert.equal(updated.imageStatus, "正在处理图片");
+});
+
+test("message time uses Beijing time across dates and explicit timezone offsets", () => {
+  assert.equal(formatMessageTime("2026-12-31T16:30:00Z"), "2027-01-01 00:30");
+  assert.equal(formatMessageTime("2026-10-13T14:30:00+08:00"), "2026-10-13 14:30");
+  assert.equal(formatMessageTime("2026-10-12T23:30:00-07:00"), "2026-10-13 14:30");
+  assert.equal(formatMessageTime(), "");
+  assert.equal(formatMessageTime(""), "");
+  assert.equal(formatMessageTime("invalid"), "");
 });
 
 test("pending history preserves the backend run ID for web-compatible resume", () => {

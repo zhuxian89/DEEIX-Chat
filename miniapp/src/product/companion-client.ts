@@ -1,5 +1,7 @@
 import type { Initiative as CompanionInitiative, InitiativeResult, State as CompanionState } from "@deeix/api-contract";
 import type { ApiRequest } from "@/platform/transport";
+import type { CompanionAssistantState, CompanionContextConversation, CompanionContextPreferences, CompanionFollowup, CompanionFollowupRequest } from "@deeix/api-contract";
+import type { ReminderState, ReminderCommandRequest, ReminderCommandResult } from "@deeix/api-contract";
 
 export type { State as CompanionState, Memory as CompanionMemory, Initiative as CompanionInitiative } from "@deeix/api-contract";
 
@@ -56,6 +58,34 @@ export class CompanionClient {
 
   async topicFeedback(topicURL: string, preference: "like" | "avoid"): Promise<void> {
     await this.request({ path: "/api/v1/companion/topics/feedback", method: "POST", body: { topicURL, preference } });
+  }
+
+  assistant(): Promise<CompanionAssistantState> {
+    return this.request({ path: "/api/v1/companion/assistant" });
+  }
+
+  reminders(conversationID = ""): Promise<ReminderState> {
+    return this.request({ path: `/api/v1/companion/reminders?conversationID=${encodeURIComponent(conversationID)}` });
+  }
+
+  reminderCommand(body: Partial<ReminderCommandRequest> & { requestID: string }): Promise<ReminderCommandResult> {
+    return this.request({ path: "/api/v1/companion/reminders/command", method: "POST", body });
+  }
+
+  contextConversations(query = "", page = 1): Promise<CompanionContextConversation[]> {
+    return this.request({ path: `/api/v1/companion/assistant/conversations?q=${encodeURIComponent(query)}&page=${page}` });
+  }
+
+  async setContextPreferences(body: CompanionContextPreferences): Promise<void> {
+    await this.request({ path: "/api/v1/companion/assistant/context", method: "PATCH", body });
+  }
+
+  saveFollowup(body: CompanionFollowupRequest): Promise<CompanionFollowup> {
+    return this.request({ path: "/api/v1/companion/assistant/followups", method: "POST", body });
+  }
+
+  async setNotifications(enabled: boolean, accepted = false, templateID = ""): Promise<void> {
+    await this.request({ path: "/api/v1/companion/assistant/notifications", method: "POST", body: { enabled, accepted, templateID } });
   }
 }
 

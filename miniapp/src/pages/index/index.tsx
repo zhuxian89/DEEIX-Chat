@@ -54,6 +54,7 @@ import {
   messageFromAPI,
 } from "@/product/message-timeline";
 import "./index.scss";
+import { MessageTime } from "@/components/message-time";
 
 type Screen = "home" | "chat" | "image" | "account" | "checkin" | "history" | "memories" | "shared" | "companion";
 
@@ -1046,9 +1047,10 @@ export default function HomePage() {
     const assistantID = `local-assistant-${messageCounter.current}`;
     setMessages((items) => [
       ...items,
-      { id: userID, imageSource: attachment?.localPath, role: "user", text: content },
+      { id: userID, createdAt: new Date().toISOString(), imageSource: attachment?.localPath, role: "user", text: content },
       {
         activityStatus: "正在思考…",
+        createdAt: new Date().toISOString(),
         id: assistantID,
         pending: true,
         role: "assistant",
@@ -1553,6 +1555,7 @@ export default function HomePage() {
       ...messages.slice(0, sourceIndex),
       {
         activityStatus: "正在重新思考…",
+        createdAt: new Date().toISOString(),
         id: pendingID,
         parentPublicID: parentUser.id,
         pending: true,
@@ -1644,6 +1647,7 @@ export default function HomePage() {
       {
         id: pendingID,
         imageStatus: editing ? "AI 正在编辑图片" : "AI 正在生成图片",
+        createdAt: new Date().toISOString(),
         parentPublicID: parentUser.id,
         pending: true,
         role: "assistant",
@@ -1958,6 +1962,7 @@ export default function HomePage() {
               <View className={`message message-${message.role}`} key={message.id}>
                 <Text className="messageAuthor">{message.role === "user" ? "提问" : "AI"}</Text>
                 <View className="messageContent">
+                  <MessageTime createdAt={message.createdAt} />
                   {message.imageSource ? <Image className="messageImage" src={message.imageSource} mode="widthFix" onClick={() => void previewImage(message.imageSource)} /> : null}
                   {message.text ? <Markdown>{message.text}</Markdown> : null}
                 </View>
@@ -2202,6 +2207,7 @@ export default function HomePage() {
                 <View id={`message-${message.id}`} className={`message message-${message.role}`} key={message.id}>
                   <Text className="messageAuthor">{message.role === "user" ? "你" : "AI"}</Text>
                   <View className="messageContent">
+                    <MessageTime createdAt={message.createdAt} />
                     {message.imageSource ? (
                       <Image className="messageImage" src={message.imageSource} mode="widthFix" onLoad={handleConversationImageLoad} />
                     ) : null}
@@ -2263,6 +2269,7 @@ export default function HomePage() {
               <View id={`message-${message.id}`} className="message message-user imagePromptMessage" key={message.id}>
                 <Text className="messageAuthor">你</Text>
                 <View className="messageContent">
+                  <MessageTime createdAt={message.createdAt} />
                   {message.imageSource ? (
                     <Image
                       className="messageImage"
@@ -2280,6 +2287,7 @@ export default function HomePage() {
                 <Text className="messageAuthor">AI</Text>
                 {message.pending || (!message.imageSource && Boolean(message.imageFileID)) ? (
                   <View className="imageLoadingCard">
+                    <MessageTime createdAt={message.createdAt} />
                     <View className={`imageLoadingFrame ${imageLoadingPhaseClass(message.imageStatus)}`}>
                       <View className="imageLoadingGlow imageLoadingGlowPrimary" />
                       <View className="imageLoadingGlow imageLoadingGlowSecondary" />
@@ -2292,6 +2300,7 @@ export default function HomePage() {
                   </View>
                 ) : message.imageSource ? (
                   <View className="imageCard">
+                    <MessageTime createdAt={message.createdAt} />
                     <Image
                       className="generatedImage"
                       src={message.imageSource}
@@ -2314,6 +2323,7 @@ export default function HomePage() {
                   </View>
                 ) : (
                   <View className="imageResultStatus">
+                    <MessageTime createdAt={message.createdAt} />
                     <Text className="imageResultStatusText">{message.imageStatus || message.text || "未收到可显示的图片"}</Text>
                     {message.parentPublicID && !message.id.startsWith("local-") ? (
                       <View className="imageResultActions">

@@ -35,8 +35,10 @@ func TestCompanionIdleInitiativeRespectsConversationAndPacing(t *testing.T) {
 		}},
 		{"unread", func(p *Profile, _ *domain.InitiativeState, _ []domainchat.Message) { p.ReadThroughID = 11 }},
 		{"forgotten", func(p *Profile, _ *domain.InitiativeState, _ []domainchat.Message) { p.ForgetThroughID = 12 }},
-		{"same visit", func(_ *Profile, s *domain.InitiativeState, _ []domainchat.Message) { s.IdleVisitID = "visit-123" }},
-		{"same turn new device", func(_ *Profile, s *domain.InitiativeState, _ []domainchat.Message) { s.IdleAfterMessageID = 12 }},
+		{"recent attempt", func(_ *Profile, s *domain.InitiativeState, _ []domainchat.Message) {
+			s.IdleAttemptAt = now.Add(-30 * time.Second)
+		}},
+		{"accepted turn new device", func(_ *Profile, s *domain.InitiativeState, _ []domainchat.Message) { s.AcceptedIdleAfter = 12 }},
 		{"too soon", func(_ *Profile, _ *domain.InitiativeState, m []domainchat.Message) {
 			m[1].CreatedAt = now.Add(-44 * time.Second)
 		}},
@@ -70,6 +72,20 @@ func TestCompanionIdleInitiativeRespectsConversationAndPacing(t *testing.T) {
 				t.Fatal("inappropriate interruption allowed")
 			}
 		})
+	}
+}
+
+func TestCompanionFailedIdleAttemptCanRecoverOnSameVisitAndTurn(t *testing.T) {
+	now := time.Now()
+	p := &Profile{ReadThroughID: 12}
+	items := initiativeTurns(now)
+	pace := &domain.InitiativeState{IdleVisitID: "visit-123", IdleAfterMessageID: 12, IdleAttemptAt: now.Add(-2 * time.Minute)}
+	if !initiativeAllowed(p, pace, "idle", "visit-123", 12, items, now, false) {
+		t.Fatal("failed attempt permanently consumed the turn")
+	}
+	accepted := acceptedPacing(*pace, Initiative{Kind: "idle", AfterMessageID: 12, AcceptedAt: now.Add(-20 * time.Minute)})
+	if initiativeAllowed(p, &accepted, "idle", "another-visit", 12, items, now, false) {
+		t.Fatal("success allowed a duplicate after cooldown")
 	}
 }
 

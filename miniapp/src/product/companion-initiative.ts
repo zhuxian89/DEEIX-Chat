@@ -21,11 +21,13 @@ export function canOfferCompanionContinuation(presence: CompanionIdlePresence, n
     now - Math.max(presence.lastInteractionAt, presence.replyVisibleAt) >= delay;
 }
 
-// One opportunity per page visit. Invalidating a visit never aborts the user's
-// ordinary chat; it only prevents a delayed proactive candidate from appearing.
+// Keep concurrent ticks single-flight, but let transient failures recover.
+// A delivered turn is never published twice during this visit.
 export class CompanionInitiativeVisit {
   readonly id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
-  private attempted = false;
+  private working = false;
+  private retryAt = 0;
+  private delivered = new Set<string>();
   private revision = 0;
 
   invalidate(): void { this.revision += 1; }
@@ -37,17 +39,49 @@ export class CompanionInitiativeVisit {
     isEligible: () => boolean,
     onAccepted: (message: CompanionInitiative) => void,
   ): Promise<void> {
-    if (this.attempted || !isEligible()) return;
-    this.attempted = true;
+    const key = `${kind}:${afterMessageID}`;
+    if (this.working || this.delivered.has(key) || Date.now() < this.retryAt || !isEligible()) return;
+    this.working = true;
+    this.retryAt = Date.now() + 30_000;
     const revision = this.revision;
     const isCurrent = () => this.revision === revision && isEligible();
     try {
       const candidate = await client.prepareInitiative(kind, this.id, afterMessageID);
-      if (!candidate || !isCurrent() || !(Date.parse(candidate.expiresAt) > Date.now())) return;
+      if (!candidate) { this.retryAt = Date.now() + 5 * 60_000; return; }
+      if (!isCurrent() || !(Date.parse(candidate.expiresAt) > Date.now())) return;
       const accepted = await client.acceptInitiative(candidate.id, this.id);
-      if (accepted?.id === candidate.id && Date.parse(accepted.acceptedAt) > 0 && isCurrent()) onAccepted(accepted);
-    } catch { /* Silence is a valid outcome; proactive work never blocks chatting. */ }
+      if (accepted?.id === candidate.id && Date.parse(accepted.acceptedAt) > 0) {
+        this.delivered.add(key);
+        if (isCurrent()) onAccepted(accepted);
+      }
+    } catch { /* Retry after a bounded delay; ordinary chat stays available. */ }
+    finally { this.working = false; }
   }
+}
+
+export class CompanionReadTracker {
+  confirmed = 0;
+  private working = false;
+  private retryAt = 0;
+
+  async acknowledge(client: Pick<CompanionClient, "markRead">, messageID: number): Promise<number> {
+    if (messageID <= this.confirmed || this.working || Date.now() < this.retryAt) return this.confirmed;
+    this.working = true;
+    try {
+      await client.markRead(messageID);
+      this.confirmed = Math.max(this.confirmed, messageID);
+    } catch {
+      this.retryAt = Date.now() + 10_000;
+    } finally { this.working = false; }
+    return this.confirmed;
+  }
+}
+
+export function companionEntryPreview(state: CompanionState): string {
+  if (state.quiet) return "不用想好问题，随口聊聊也可以。";
+  const latest = [...(state.initiatives ?? [])].reverse().find((item) => item.kind === "followup");
+  if (latest && (!state.greeting || Date.parse(latest.acceptedAt) >= Date.parse(state.greetingAt))) return latest.text;
+  return state.greeting || "不用想好问题，随口聊聊也可以。";
 }
 
 export function withCompanionInitiative(state: CompanionState, item: CompanionInitiative): CompanionState {

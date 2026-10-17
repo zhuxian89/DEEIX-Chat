@@ -23,6 +23,7 @@ type initiativeStateRecord struct {
 	IdleVisitID        string `gorm:"size:64"`
 	IdleAfterMessageID uint
 	LastIdleAt         time.Time
+	AcceptedIdleAfter  uint
 }
 
 func (initiativeStateRecord) TableName() string { return "companion_initiative_states" }
@@ -54,6 +55,12 @@ func (s *Store) InitiativeState(ctx context.Context, userID uint) (*domain.Initi
 		return nil, err
 	}
 	state := domain.InitiativeState(row)
+	// Include history written before the accepted-turn marker was introduced.
+	if state.AcceptedIdleAfter == 0 {
+		if err := s.db.WithContext(ctx).Model(&initiativeRecord{}).Where("user_id = ? AND kind = 'idle' AND accepted_at > ?", userID, time.Time{}).Select("COALESCE(MAX(after_message_id), 0)").Scan(&state.AcceptedIdleAfter).Error; err != nil {
+			return nil, err
+		}
+	}
 	return &state, nil
 }
 

@@ -9897,6 +9897,182 @@
                 }
             }
         },
+        "/companion/assistant": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "查看助手全局来源、跟进和通知状态",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CompanionAssistantResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/assistant/context": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "设置同账号会话和待办的读取范围",
+                "parameters": [
+                    {
+                        "description": "全局读取与排除会话",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CompanionContextPreferences"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/assistant/conversations": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "分页选择允许助手读取的会话",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "标题关键词",
+                        "name": "q",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "页码，从1开始，每页50条",
+                        "name": "page",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CompanionConversationsResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/assistant/followups": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "新增、改期、完成或取消跟进事项",
+                "parameters": [
+                    {
+                        "description": "新增时ID为空；更新需要当前revision",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CompanionFollowupRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/CompanionFollowupResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/assistant/notifications": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "记录微信订阅选择或关闭离线通知",
+                "parameters": [
+                    {
+                        "description": "用户在微信弹窗中的真实选择",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/CompanionNotificationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
         "/companion/conversations/{id}/messages/stream": {
             "post": {
                 "security": [
@@ -10233,6 +10409,76 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/SuccessDoc"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/reminders": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "查询提醒、到期记录及提醒对话",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "当前小禾会话",
+                        "name": "conversationID",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ReminderStateResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/companion/reminders/command": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "companion"
+                ],
+                "summary": "通过对话或卡片创建、查询和管理提醒",
+                "parameters": [
+                    {
+                        "description": "requestID保证重试幂等；卡片操作须携带revision",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/ReminderCommandRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/ReminderCommandResponse"
                         }
                     }
                 }
@@ -17785,6 +18031,57 @@
                 }
             }
         },
+        "CompanionAssistantResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/CompanionAssistantState"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "CompanionAssistantState": {
+            "type": "object",
+            "required": [
+                "decisions",
+                "followups",
+                "notifications",
+                "preferences",
+                "sources"
+            ],
+            "properties": {
+                "decisions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CompanionDecision"
+                    }
+                },
+                "followups": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CompanionFollowup"
+                    }
+                },
+                "notifications": {
+                    "$ref": "#/definitions/CompanionNotifications"
+                },
+                "preferences": {
+                    "$ref": "#/definitions/CompanionContextPreferences"
+                },
+                "sources": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CompanionContextSource"
+                    }
+                }
+            }
+        },
         "CompanionChatRequest": {
             "type": "object",
             "required": [
@@ -17864,6 +18161,259 @@
                 "sourceMessagePublicID": {
                     "type": "string",
                     "maxLength": 32
+                }
+            }
+        },
+        "CompanionContextConversation": {
+            "type": "object",
+            "required": [
+                "excluded",
+                "id",
+                "title"
+            ],
+            "properties": {
+                "excluded": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "CompanionContextPreferences": {
+            "type": "object",
+            "required": [
+                "enabled",
+                "excluded"
+            ],
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                },
+                "excluded": {
+                    "type": "array",
+                    "maxItems": 500,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "CompanionContextSource": {
+            "type": "object",
+            "required": [
+                "at",
+                "conversationID",
+                "id",
+                "kind",
+                "text",
+                "title"
+            ],
+            "properties": {
+                "at": {
+                    "type": "string"
+                },
+                "conversationID": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "CompanionConversationsResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/CompanionContextConversation"
+                    }
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "CompanionDecision": {
+            "type": "object",
+            "required": [
+                "at",
+                "kind",
+                "reason"
+            ],
+            "properties": {
+                "at": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "CompanionFollowup": {
+            "type": "object",
+            "required": [
+                "deliveredAt",
+                "dueAt",
+                "evidence",
+                "id",
+                "notificationStatus",
+                "revision",
+                "sourceConversationID",
+                "sourceID",
+                "sourceKind",
+                "status",
+                "title",
+                "userManaged"
+            ],
+            "properties": {
+                "deliveredAt": {
+                    "type": "string"
+                },
+                "dueAt": {
+                    "type": "string"
+                },
+                "evidence": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "notificationStatus": {
+                    "type": "string"
+                },
+                "revision": {
+                    "type": "integer"
+                },
+                "sourceConversationID": {
+                    "type": "string"
+                },
+                "sourceID": {
+                    "type": "string"
+                },
+                "sourceKind": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "userManaged": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "CompanionFollowupRequest": {
+            "type": "object",
+            "required": [
+                "dueAt",
+                "id",
+                "revision",
+                "status",
+                "title"
+            ],
+            "properties": {
+                "dueAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "revision": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "pending",
+                        "completed",
+                        "canceled"
+                    ]
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 120
+                }
+            }
+        },
+        "CompanionFollowupResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/CompanionFollowup"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "CompanionNotificationRequest": {
+            "type": "object",
+            "required": [
+                "accepted",
+                "enabled",
+                "templateID"
+            ],
+            "properties": {
+                "accepted": {
+                    "type": "boolean"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "templateID": {
+                    "type": "string",
+                    "maxLength": 128
+                }
+            }
+        },
+        "CompanionNotifications": {
+            "type": "object",
+            "required": [
+                "credits",
+                "enabled",
+                "ready",
+                "templateID"
+            ],
+            "properties": {
+                "credits": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "ready": {
+                    "type": "boolean"
+                },
+                "templateID": {
+                    "type": "string"
                 }
             }
         },
@@ -26070,6 +26620,305 @@
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "ReminderCommandRequest": {
+            "type": "object",
+            "required": [
+                "action",
+                "conversationID",
+                "delayMinutes",
+                "id",
+                "input",
+                "occurrenceID",
+                "requestID",
+                "revision",
+                "schedule",
+                "title"
+            ],
+            "properties": {
+                "action": {
+                    "type": "string",
+                    "enum": [
+                        "create",
+                        "list",
+                        "update",
+                        "pause",
+                        "resume",
+                        "delete",
+                        "complete",
+                        "skip",
+                        "snooze"
+                    ]
+                },
+                "conversationID": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "delayMinutes": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "input": {
+                    "type": "string",
+                    "maxLength": 8000
+                },
+                "occurrenceID": {
+                    "type": "string",
+                    "maxLength": 64
+                },
+                "requestID": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "minLength": 8
+                },
+                "revision": {
+                    "type": "integer"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/ReminderSchedule"
+                },
+                "title": {
+                    "type": "string",
+                    "maxLength": 120
+                }
+            }
+        },
+        "ReminderCommandResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/ReminderCommandResult"
+                },
+                "errorMsg": {
+                    "type": "string"
+                }
+            }
+        },
+        "ReminderCommandResult": {
+            "type": "object",
+            "required": [
+                "handled",
+                "snapshot",
+                "turn"
+            ],
+            "properties": {
+                "handled": {
+                    "type": "boolean"
+                },
+                "snapshot": {
+                    "$ref": "#/definitions/ReminderState"
+                },
+                "turn": {
+                    "$ref": "#/definitions/ReminderDialogue"
+                }
+            }
+        },
+        "ReminderDialogue": {
+            "type": "object",
+            "required": [
+                "createdAt",
+                "id",
+                "input",
+                "reminderIDs",
+                "reply"
+            ],
+            "properties": {
+                "createdAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "input": {
+                    "type": "string"
+                },
+                "reminderIDs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "reply": {
+                    "type": "string"
+                }
+            }
+        },
+        "ReminderEvent": {
+            "type": "object",
+            "required": [
+                "dueAt",
+                "id",
+                "notificationStatus",
+                "notifiedAt",
+                "reminderID",
+                "revision",
+                "status",
+                "title"
+            ],
+            "properties": {
+                "dueAt": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "notificationStatus": {
+                    "type": "string"
+                },
+                "notifiedAt": {
+                    "type": "string"
+                },
+                "reminderID": {
+                    "type": "string"
+                },
+                "revision": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "ReminderPlan": {
+            "type": "object",
+            "required": [
+                "description",
+                "id",
+                "nextAt",
+                "revision",
+                "schedule",
+                "status",
+                "title"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "nextAt": {
+                    "type": "string"
+                },
+                "revision": {
+                    "type": "integer"
+                },
+                "schedule": {
+                    "$ref": "#/definitions/ReminderSchedule"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "ReminderSchedule": {
+            "type": "object",
+            "required": [
+                "day",
+                "intervalMinutes",
+                "kind",
+                "limit",
+                "month",
+                "startAt",
+                "times",
+                "until",
+                "weekdays"
+            ],
+            "properties": {
+                "day": {
+                    "type": "integer"
+                },
+                "intervalMinutes": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "month": {
+                    "type": "integer"
+                },
+                "startAt": {
+                    "type": "string"
+                },
+                "times": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "until": {
+                    "type": "string"
+                },
+                "weekdays": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                }
+            }
+        },
+        "ReminderState": {
+            "type": "object",
+            "required": [
+                "occurrences",
+                "plans",
+                "serverTime",
+                "turns"
+            ],
+            "properties": {
+                "occurrences": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ReminderEvent"
+                    }
+                },
+                "plans": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ReminderPlan"
+                    }
+                },
+                "serverTime": {
+                    "type": "string"
+                },
+                "turns": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ReminderDialogue"
+                    }
+                }
+            }
+        },
+        "ReminderStateResponse": {
+            "type": "object",
+            "required": [
+                "data",
+                "errorMsg"
+            ],
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/ReminderState"
+                },
+                "errorMsg": {
+                    "type": "string"
                 }
             }
         },

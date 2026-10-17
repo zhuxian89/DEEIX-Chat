@@ -46,6 +46,21 @@ func (s *Service) composeInitiative(ctx context.Context, p *Profile, item *Initi
 		return "", "", err
 	}
 	sources := []initiativeSource{}
+	if item.Kind == "home" {
+		if store, ok := s.Store.(AssistantStore); ok {
+			global, err := store.ContextSources(ctx, p.UserID, "")
+			if err == nil {
+				for _, src := range global {
+					if src.ConversationID != p.ConversationPublicID {
+						sources = append(sources, initiativeSource{ID: src.ID, Text: clip(src.Title+"："+src.Text, 600), At: beijingTimestamp(src.At)})
+						if len(sources) >= 6 {
+							break
+						}
+					}
+				}
+			}
+		}
+	}
 	for _, memory := range memories {
 		if len(sources) >= 12 {
 			break

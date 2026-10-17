@@ -1,18 +1,22 @@
-import type { ConversationResponse, MessageResponse } from "@deeix/api-contract";
+import type { ConversationResponse, MessageResponse, ReminderState, ReminderPlan } from "@deeix/api-contract";
 import { Button, Image, ScrollView, Switch, Text, Textarea, View } from "@tarojs/components";
 import Taro from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { SpeechComposer } from "@/components/speech-input/speech-input";
 import { canOfferCompanionGreeting, companionBeijingDate, companionImageIDs, type CompanionMemory, type CompanionProactivity, type CompanionState } from "@/product/companion-client";
-import { canOfferCompanionContinuation, CompanionInitiativeVisit, withCompanionInitiative } from "@/product/companion-initiative";
+import { canOfferCompanionContinuation, companionEntryPreview, CompanionInitiativeVisit, CompanionReadTracker, withCompanionInitiative } from "@/product/companion-initiative";
 import { composerKeyboardHandlers, composerKeyboardStyle } from "@/product/keyboard-layout";
 import { companionDisplayText } from "@/product/companion-message";
 import { nextChatBottomScrollTop, shouldReleaseChatAutoFollow } from "@/product/chat-auto-scroll";
 import { latestVisibleMessages, messageFromAPI, type ConversationMessage } from "@/product/message-timeline";
+import { MessageTime } from "@/components/message-time";
 import { MiniAppRequestAbortedError, type ChatGenerationProgress, type MiniAppSession } from "@/product/session";
 import companionAvatar from "./assets/xiaohe-portrait.png";
 import "./companion.scss";
+import { AssistantSettings } from "./assistant-settings";
+import { ReminderCards, type ReminderAction } from "./reminder-cards";
+import { reminderMessages, reminderRequestID, reminderError } from "@/product/companion-reminders";
 
 const COMPANION_NAME = "小禾";
 const COMPANION_BOTTOM_THRESHOLD_PX = 80;
@@ -23,16 +27,16 @@ function CompanionAvatar({ size }: { size: "entry" | "header" | "message" }) {
   return <Image className={`companionAvatar companionAvatar--${size}`} src={companionAvatar} mode="aspectFill" />;
 }
 
-// This card stays inside the current page. It has no subscription-message API,
-// background scheduler or notification channel.
+// Refresh persisted greetings and server-generated follow-ups while foregrounded.
 export function CompanionEntry({ session, onState, onOpen, lastInteraction }: SharedProps & {
   onOpen(): void;
   lastInteraction: { current: number };
 }) {
   const [state, setState] = useState<CompanionState | null>(null);
+  const [reminderPreview, setReminderPreview] = useState("");
   const foreground = useRef(true);
   const working = useRef(false);
-  const offered = useRef(false);
+  const refreshAt = useRef(0);
   const stateCallback = useRef(onState);
   stateCallback.current = onState;
 
@@ -46,13 +50,13 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
     const show = () => {
       foreground.current = true;
       lastInteraction.current = Date.now();
-      offered.current = false;
+      refreshAt.current = 0;
       visit = new CompanionInitiativeVisit();
     };
     Taro.onAppHide(hide);
     Taro.onAppShow(show);
     const timer = setInterval(() => {
-      if (offered.current || working.current) return;
+      if (Date.now() < refreshAt.current || working.current) return;
       if (!canOfferCompanionGreeting({
         foreground: foreground.current,
         typing: false,
@@ -60,13 +64,20 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
         lastInteractionAt: lastInteraction.current,
       }, Date.now())) return;
       working.current = true;
-      offered.current = true;
+      refreshAt.current = Date.now() + 30_000;
       const interactionAt = lastInteraction.current;
       void session.companion.open(false)
         .then(async (next) => {
           if (disposed || !foreground.current) return;
           setState(next);
           stateCallback.current(next);
+          const reminderState = await session.companion.reminders(next.conversationPublicID).catch(() => null);
+          if (disposed || !foreground.current) return;
+          if (reminderState) {
+            const due = reminderState.occurrences.filter((item) => item.status === "due")
+              .sort((a, b) => Date.parse(b.dueAt) - Date.parse(a.dueAt))[0];
+            setReminderPreview(due ? `提醒：${due.title}已到时间` : "");
+          }
           const eligible = () => !disposed && foreground.current && lastInteraction.current === interactionAt && !next.quiet;
           if (!eligible()) return;
           if (!next.initiativeVersion) {
@@ -102,7 +113,7 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
         </View>
         <View className="companionEntryBody">
           <Text className="companionEntryTitle">{COMPANION_NAME} <Text className="companionTag">AI 聊天伙伴</Text></Text>
-          <Text className="companionEntryText">{state.greetingOffered && !state.quiet ? state.greeting : "不用想好问题，随口聊聊也可以。"}</Text>
+          <Text className="companionEntryText">{reminderPreview || companionEntryPreview(state)}</Text>
           <Text className="companionEntryAction">和{COMPANION_NAME}聊聊 ›</Text>
         </View>
       </View>
@@ -114,8 +125,9 @@ type DisplayMessage = ConversationMessage & {
   images?: string[];
   fileIDs?: string[];
   serverID?: number;
-  createdAt?: string;
   topic?: CompanionState["topic"];
+  reminderIDs?: string[];
+  occurrenceID?: string;
 };
 
 function toDisplay(message: MessageResponse): DisplayMessage | null {
@@ -148,6 +160,12 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   const [state, setState] = useState(initial);
   const [conversation, setConversation] = useState<ConversationResponse | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [reminders, setReminders] = useState<ReminderState | null>(null);
+  const [reminderOpen, setReminderOpen] = useState(false);
+  const [reminderNow, setReminderNow] = useState(Date.now());
+  const reminderOffset = useRef(0);
+  const reminderVersion = useRef(0);
+  const reminderRetry = useRef<{ input: string; requestID: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [speechActive, setSpeechActive] = useState(false);
   const [attachment, setAttachment] = useState<{ path: string; fileID: string } | null>(null);
@@ -160,7 +178,6 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   const [editor, setEditor] = useState<{ memory: CompanionMemory; value: string } | null>(null);
   const [keyboard, setKeyboard] = useState(0);
   const [scrollTop, setScrollTop] = useState(0);
-  const [foreground, setForeground] = useState(true);
   const [following, setFollowing] = useState(true);
   const mounted = useRef(true);
   const autoFollow = useRef(true);
@@ -171,12 +188,15 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   const busyRef = useRef(false);
   const composerComposingRef = useRef(false);
   const readThrough = useRef(0);
+  const readTracker = useRef(new CompanionReadTracker());
   const initiativeVisit = useRef(new CompanionInitiativeVisit());
   const initiativeForeground = useRef(true);
+  const stateRefreshAt = useRef(0);
+  const stateRefreshing = useRef(false);
   const lastInteractionAt = useRef(Date.now());
   const replyVisible = useRef({ id: 0, at: 0 });
-  const initiativeContext = useRef({ state, messages, draft, attachment, busy, uploading, loading, memoryOpen, speechActive });
-  initiativeContext.current = { state, messages, draft, attachment, busy, uploading, loading, memoryOpen, speechActive };
+  const initiativeContext = useRef({ state, messages, draft, attachment, busy, uploading, loading, memoryOpen: memoryOpen || reminderOpen, speechActive });
+  initiativeContext.current = { state, messages, draft, attachment, busy, uploading, loading, memoryOpen: memoryOpen || reminderOpen, speechActive };
 
   const recordCompanionInteraction = useCallback(() => {
     lastInteractionAt.current = Date.now();
@@ -240,8 +260,39 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
       setMessages(items);
       void loadImages(items);
     }
+    await refreshReminders(id);
     return items;
   };
+
+  const acceptReminders = (next: ReminderState) => {
+    if (!mounted.current) return;
+    reminderOffset.current = Date.parse(next.serverTime) - Date.now();
+    setReminderNow(Date.now() + reminderOffset.current);
+    setReminders(next);
+  };
+  const refreshReminders = async (id: string) => {
+    const version = ++reminderVersion.current;
+    const next = await session.companion.reminders(id);
+    if (version === reminderVersion.current) acceptReminders(next);
+  };
+
+  useEffect(() => {
+    if (!conversation) return;
+    let disposed = false;
+    let refreshing = false;
+    let refreshAt = 0;
+    const tick = () => {
+      if (disposed || !initiativeForeground.current) return;
+      setReminderNow(Date.now() + reminderOffset.current);
+      if (busyRef.current || refreshing || Date.now() < refreshAt) return;
+      refreshing = true; refreshAt = Date.now() + 10_000;
+      void refreshReminders(conversation.publicID).catch(() => {}).finally(() => { refreshing = false; });
+    };
+    const show = () => { refreshAt = 0; tick(); };
+    const timer = setInterval(tick, 1000);
+    Taro.onAppShow(show);
+    return () => { disposed = true; clearInterval(timer); Taro.offAppShow(show); reminderVersion.current++; };
+  }, [session, conversation?.publicID]);
 
   const initialize = async () => {
     setLoading(true);
@@ -280,8 +331,8 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
 
   useEffect(() => {
     mounted.current = true;
-    const show = () => { initiativeForeground.current = true; recordCompanionInteraction(); setForeground(true); };
-    const hide = () => { initiativeForeground.current = false; recordCompanionInteraction(); setForeground(false); setKeyboard(0); };
+    const show = () => { initiativeForeground.current = true; stateRefreshAt.current = 0; recordCompanionInteraction(); };
+    const hide = () => { initiativeForeground.current = false; recordCompanionInteraction(); setKeyboard(0); };
     Taro.onAppShow(show);
     Taro.onAppHide(hide);
     void initialize();
@@ -297,7 +348,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   useEffect(() => {
     if (!autoFollow.current || Date.now() - scrollingAt.current < 800) return;
     setScrollTop(nextChatBottomScrollTop);
-  }, [messages, keyboard, state?.initiatives]);
+  }, [messages, keyboard, state?.initiatives, reminders?.turns.length, reminders?.occurrences.length]);
 
   useEffect(() => {
     const latest = messages.at(-1);
@@ -309,6 +360,25 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   useEffect(() => {
     const timer = setInterval(() => {
       const after = initiativeContext.current.messages.at(-1)?.serverID ?? 0;
+      const snapshot = initiativeContext.current;
+      const latest = snapshot.messages.at(-1);
+      if (mounted.current && initiativeForeground.current && !snapshot.busy && !snapshot.loading && !snapshot.memoryOpen &&
+        !snapshot.draft && !snapshot.attachment && !snapshot.speechActive && !touching.current &&
+        Date.now() - lastInteractionAt.current >= 2000 && Date.now() >= stateRefreshAt.current && !stateRefreshing.current) {
+        stateRefreshing.current = true;
+        stateRefreshAt.current = Date.now() + 15_000;
+        const previous = snapshot.state;
+        void session.companion.state().then((next) => {
+          if (mounted.current && initiativeForeground.current && initiativeContext.current.state === previous &&
+            !initiativeContext.current.busy && !initiativeContext.current.memoryOpen) updateState(next);
+        }).catch(() => { /* Next foreground tick retries. */ }).finally(() => { stateRefreshing.current = false; });
+      }
+      if (mounted.current && initiativeForeground.current && !snapshot.memoryOpen && !snapshot.busy &&
+        !snapshot.loading && autoFollow.current && latest?.serverID && !latest.pending) {
+        void readTracker.current.acknowledge(session.companion, latest.serverID).then((confirmed) => {
+          if (mounted.current) readThrough.current = Math.max(readThrough.current, confirmed);
+        });
+      }
       const eligible = () => {
         const current = initiativeContext.current;
         if (!mounted.current || !current.state?.initiativeVersion || current.messages.at(-1)?.serverID !== after) return false;
@@ -333,14 +403,6 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
     return () => { clearInterval(timer); initiativeVisit.current.invalidate(); };
   }, [session]);
 
-  useEffect(() => {
-    const latest = messages.at(-1);
-    if (!foreground || memoryOpen || busy || loading || !autoFollow.current) return;
-    if (!latest?.serverID || latest.pending || latest.serverID <= readThrough.current) return;
-    readThrough.current = latest.serverID;
-    void session.companion.markRead(latest.serverID).catch(() => { readThrough.current = 0; });
-  }, [messages, foreground, memoryOpen, busy, loading, following, session]);
-
   const send = async (submittedText?: string) => {
     const content = (submittedText ?? draft).trim();
     if (!conversation || !state || busyRef.current || uploading || (speechActive && submittedText === undefined) || (!content && !attachment)) return false;
@@ -360,6 +422,18 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
       { id: pendingID, role: "assistant", text: "", pending: true, activityStatus: `${COMPANION_NAME}正在想怎么接着聊…`, createdAt: new Date().toISOString() },
     ]);
     try {
+      if (!image) {
+        const request = reminderRetry.current?.input === content ? reminderRetry.current : { input: content, requestID: reminderRequestID() };
+        reminderRetry.current = request;
+        reminderVersion.current++;
+        const handled = await session.companion.reminderCommand({ ...request, conversationID: conversation.publicID });
+        reminderRetry.current = null;
+        if (handled.handled) {
+          acceptReminders(handled.snapshot);
+          if (mounted.current) setMessages((current) => current.filter((item) => item.id !== id && item.id !== pendingID));
+          return true;
+        }
+      }
       const result = await session.sendChat(
         conversation,
         state.model,
@@ -388,6 +462,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
       if (assistant) void loadImages([assistant]);
     } catch (cause) {
       if (mounted.current) {
+        if (reminderRetry.current) setDraft(content);
         setMessages((current) => current.map((item) => item.id === pendingID
           ? { ...item, pending: false, activityStatus: "这条回复没有完成" } : item));
         if (!(cause instanceof MiniAppRequestAbortedError)) setError(errorMessage(cause));
@@ -443,7 +518,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   const forget = async (memory?: CompanionMemory) => {
     const choice = await Taro.showModal({
       title: memory ? "忘记这条记忆？" : "忘记全部记忆？",
-      content: "会同时清除续聊摘要，并从接下来的聊天重新了解你。历史聊天仍保留供你查看。",
+      content: "会同时清除续聊摘要和从旧资料整理的跟进。旧会话、旧待办不再用于回忆，从接下来的内容重新了解你。历史聊天仍保留供你查看。",
       confirmText: "忘记",
       confirmColor: "#b54b45",
     });
@@ -489,6 +564,23 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
     });
   };
 
+  const reminderAction = async (action: ReminderAction) => {
+    if (!conversation || busyRef.current) return;
+    busyRef.current = true; setBusy(true); setError("");
+    reminderVersion.current++;
+    try {
+      const result = await session.companion.reminderCommand({ ...action, requestID: reminderRequestID(), conversationID: conversation.publicID });
+      acceptReminders(result.snapshot);
+    } catch (cause) {
+      if (mounted.current) setError(reminderError(cause));
+      await refreshReminders(conversation.publicID).catch(() => {});
+    } finally { busyRef.current = false; if (mounted.current) setBusy(false); }
+  };
+  const editReminder = (plan: ReminderPlan) => {
+    setMemoryOpen(false); setReminderOpen(false);
+    setDraft(`把${plan.title}提醒改到`);
+  };
+
   const timeline: DisplayMessage[] = messages.map((message) => ({ ...message, text: companionDisplayText(message) }));
   for (const initiative of state?.initiatives ?? []) {
     if (messages.length >= 100 && initiative.afterMessageID < (messages[0].serverID ?? 0)) continue;
@@ -502,31 +594,43 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
     const greetingAt = Date.parse(state.greetingAt);
     if (!messages.length || greetingAt >= Date.parse(messages[0].createdAt ?? "")) {
       const next = timeline.findIndex((item) => Date.parse(item.createdAt ?? "") > greetingAt);
-      timeline.splice(next < 0 ? timeline.length : next, 0, { id: `greeting-${state.greetingID}`, role: "assistant", text: state.greeting, topic: state.topic });
+      timeline.splice(next < 0 ? timeline.length : next, 0, { id: `greeting-${state.greetingID}`, role: "assistant", text: state.greeting, topic: state.topic, createdAt: state.greetingAt });
+    }
+  }
+  if (reminders) {
+    for (const item of reminderMessages(reminders)) {
+      const next = timeline.findIndex((message) => Date.parse(message.createdAt ?? "") > Date.parse(item.createdAt ?? ""));
+      timeline.splice(next < 0 ? timeline.length : next, 0, item);
     }
   }
 
   return (
     <View className="companionPage" onTouchStart={recordCompanionInteraction}>
       <View className="companionHeader">
-        <Text className="companionBack" onClick={memoryOpen ? () => setMemoryOpen(false) : onBack}>‹ 返回</Text>
+        <Text className="companionBack" onClick={reminderOpen ? () => setReminderOpen(false) : memoryOpen ? () => setMemoryOpen(false) : onBack}>‹ 返回</Text>
         <View className="companionHeading">
           <CompanionAvatar size="header" />
           <View className="companionHeadingText">
-            <Text className="companionName">{memoryOpen ? `${COMPANION_NAME}的记忆` : COMPANION_NAME}</Text>
+            <Text className="companionName">{reminderOpen ? "我的提醒" : memoryOpen ? "记忆与跟进" : COMPANION_NAME}</Text>
             <Text className="companionSubtitle">{memoryOpen ? "由你查看、纠正和删除" : "AI 聊天伙伴 · 随时聊聊"}</Text>
           </View>
         </View>
-        {!memoryOpen && <Text className="companionMemoryLink" onClick={() => void openMemories()}>我的记忆</Text>}
+        {!memoryOpen && !reminderOpen && <Text className="companionMemoryLink" onClick={() => void openMemories()}>记忆与跟进</Text>}
       </View>
       {error && <View className="companionError"><Text>{error}</Text>{!busy && <Text onClick={() => void initialize()}>重新连接</Text>}</View>}
-      {memoryOpen ? (
+      {reminderOpen ? <ScrollView scrollY enhanced bounces={false} scrollAnchoring={false} className="companionHistory">
+        <View className="reminderManage">
+          <Text className="reminderHint">可以在对话中创建、查询、改期或删除。每天重复的提醒，完成本次后仍会继续。</Text>
+          <Text className="reminderHint">关闭小程序后的微信通知，需要在“记忆与跟进”中授权。</Text>
+          {reminders && <ReminderCards state={reminders} now={reminderNow} busy={busy} onAction={(action) => void reminderAction(action)} onEdit={editReminder} />}
+        </View>
+      </ScrollView> : memoryOpen ? (
         <ScrollView scrollY enhanced bounces={false} scrollAnchoring={false} className="companionHistory">
           <View className="companionMemoryIntro">{COMPANION_NAME}会逐步记下你明确说过的兴趣、偏好和近期计划。记错了可以改；过期的信息会淡出。</View>
           {state?.initiativeVersion ? (
             <View className="companionProactivity">
               <Text>小禾主动找你聊天</Text>
-              <Text className="companionEvidence">只在你打开小程序时；不回应就收住，不会催你。</Text>
+              <Text className="companionEvidence">闲聊只在打开时出现；“我先开口”会暂停主动闲聊和自动跟进。你明确设置的定时提醒仍会生效，微信通知需要另行授权。</Text>
               <View className="companionProactivityOptions">
                 {([{ mode: "normal", label: "自然一点" }, { mode: "less", label: "少主动一点" }, { mode: "off", label: "我先开口" }] as const).map(({ mode, label }) => (
                   <Button key={mode} className={(state.quiet ? "off" : state.proactivity) === mode ? "companionProactivitySelected" : ""}
@@ -535,6 +639,8 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
               </View>
             </View>
           ) : <View className="companionSetting"><Text>打开时主动打个招呼</Text><Switch checked={!state?.quiet} disabled={memoryBusy} color="#548b75" onChange={(event) => void toggleQuiet(!event.detail.value)} /></View>}
+          <AssistantSettings client={session.companion} refreshKey={state} quiet={Boolean(state?.quiet)} onChanged={() => void session.companion.state().then(updateState).catch((cause) => setError(errorMessage(cause)))} />
+          <Text className="reminderManageLink" onClick={() => setReminderOpen(true)}>我的提醒 · 查看倒计时与管理 ›</Text>
           {editor && <View className="companionMemory">
             <Text className="companionMemoryValue">纠正这条记忆</Text>
             <Textarea className="companionMemoryEditor" value={editor.value} maxlength={120} onInput={(event) => setEditor({ ...editor, value: event.detail.value })} />
@@ -550,6 +656,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
           <Button className="companionForgetAll" disabled={memoryBusy || busy} onClick={() => void forget()}>全部忘记，重新认识</Button>
         </ScrollView>
       ) : <>
+        <Text className="reminderManageLink" onClick={() => setReminderOpen(true)}>我的提醒{reminders ? ` · ${reminders.plans.filter((p) => p.status === "active").length} 个进行中` : ""} ›</Text>
         <View className="companionHistoryShell">
           <ScrollView id="companionMessages" scrollY enhanced bounces={false} scrollAnchoring={false} className="companionHistory companionChatHistory" scrollTop={scrollTop} scrollWithAnimation={false}
             lowerThreshold={COMPANION_BOTTOM_THRESHOLD_PX}
@@ -575,7 +682,9 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
             {timeline.map((message) => <View className={`companionRow ${message.role === "user" ? "companionUserRow" : ""}`} key={message.id}>
               {message.role !== "user" && <CompanionAvatar size="message" />}
               <View className={`companionBubble ${message.role === "user" ? "companionUser" : "companionAssistant"}`}>
+                <MessageTime createdAt={message.createdAt} />
                 {message.text && <Markdown>{message.text}</Markdown>}
+                {reminders && Boolean(message.reminderIDs?.length) && <ReminderCards state={reminders} ids={message.reminderIDs} occurrenceID={message.occurrenceID} now={reminderNow} busy={busy} onAction={(action) => void reminderAction(action)} onEdit={editReminder} />}
                 {message.topic && (
                   <View className="companionTopicSource">
                     <Text className="companionSourceLink" onClick={() => void Taro.setClipboardData({ data: message.topic!.url })}>

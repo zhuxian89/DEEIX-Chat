@@ -14,7 +14,7 @@ import (
 )
 
 func TestCompanionRegistrationIsAdditiveAndAuthenticated(t *testing.T) {
-	t.Setenv("DEEIX_COMPANION_ENABLED", "true")
+	t.Setenv("DEEIX_COMPANION_ENABLED", "")
 	db, err := gorm.Open(sqlite.Open(filepath.Join(t.TempDir(), "registration.db")), &gorm.Config{})
 	if err != nil {
 		t.Fatal(err)
@@ -27,8 +27,14 @@ func TestCompanionRegistrationIsAdditiveAndAuthenticated(t *testing.T) {
 	if err := registerCompanion(engine, db, config.NewRuntime(config.Config{JWTSecret: "test-companion-secret"}), nil, nil, nil, shutdown, nil); err != nil {
 		t.Fatal(err)
 	}
-	if !db.Migrator().HasTable("companion_profiles") || !db.Migrator().HasTable("companion_memories") || !db.Migrator().HasTable("companion_topic_caches") {
-		t.Fatal("missing companion tables")
+	for _, table := range []string{
+		"companion_profiles", "companion_memories", "companion_topic_caches",
+		"companion_context_preferences", "companion_followups", "companion_decisions", "companion_notifications",
+		"companion_reminder_owners", "companion_reminders", "companion_reminder_events", "companion_reminder_turns",
+	} {
+		if !db.Migrator().HasTable(table) {
+			t.Errorf("startup did not create table %s", table)
+		}
 	}
 	if db.Migrator().HasTable("identity_users") || db.Migrator().HasTable("chat_messages") {
 		t.Fatal("companion migrated upstream tables")

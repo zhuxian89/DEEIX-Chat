@@ -75,10 +75,15 @@ func trimMemories(tx *gorm.DB, userID uint) error {
 	return tx.Where("user_id = ? AND id IN ?", userID, obsolete).Delete(&memoryRecord{}).Error
 }
 
-type Store struct{ db *gorm.DB }
+type Store struct {
+	db    *gorm.DB
+	appID func() string
+}
+
+func (s *Store) SetAppIDProvider(provider func() string) { s.appID = provider }
 
 func NewStore(db *gorm.DB) (*Store, error) {
-	if err := db.AutoMigrate(&profileRecord{}, &memoryRecord{}, &topicCacheRecord{}, &initiativeStateRecord{}, &initiativeRecord{}); err != nil {
+	if err := db.AutoMigrate(&profileRecord{}, &memoryRecord{}, &topicCacheRecord{}, &initiativeStateRecord{}, &initiativeRecord{}, &contextPreferencesRecord{}, &followupRecord{}, &decisionRecord{}, &notificationRecord{}, &reminderOwner{}, &reminderRecord{}, &reminderEvent{}, &reminderTurnRecord{}); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil
@@ -187,6 +192,20 @@ func (s *Store) Edit(ctx context.Context, userID, through uint, memoryID, value 
 
 // Both memory edits and deletions invalidate context within the same transaction.
 func resetMemoryContext(tx *gorm.DB, userID, through uint) error {
+	// Take the same owner-row lock as publishing before changing any source policy.
+	if err := tx.Model(&profileRecord{}).Where("user_id = ?", userID).Update("revision", gorm.Expr("revision + 1")).Error; err != nil {
+		return err
+	}
+	row := contextPreferencesRecord{UserID: userID, Enabled: true, ExcludedJSON: "[]"}
+	if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
+		return err
+	}
+	if err := tx.Model(&contextPreferencesRecord{}).Where("user_id = ?", userID).Updates(map[string]interface{}{"forget_before": time.Now(), "refresh_after": time.Time{}, "success_digest": ""}).Error; err != nil {
+		return err
+	}
+	if err := tx.Where("user_id = ? AND source_kind <> 'manual'", userID).Delete(&followupRecord{}).Error; err != nil {
+		return err
+	}
 	if err := tx.Where("user_id = ?", userID).Delete(&initiativeRecord{}).Error; err != nil {
 		return err
 	}
@@ -194,7 +213,6 @@ func resetMemoryContext(tx *gorm.DB, userID, through uint) error {
 		"summary":           "",
 		"forget_through_id": through,
 		"through_id":        through,
-		"revision":          gorm.Expr("revision + 1"),
 		"refresh_token":     "",
 		"last_greeting":     "",
 		"greeting_id":       "",

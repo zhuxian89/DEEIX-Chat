@@ -15,9 +15,11 @@ import (
 )
 
 type Service struct {
-	Store         Store
-	Chat          *chat.Service
-	TopicProvider TopicProvider
+	Store                  Store
+	Chat                   *chat.Service
+	TopicProvider          TopicProvider
+	Notifier               NotificationSender
+	NotificationTemplateID string
 }
 
 type State struct {
@@ -175,6 +177,14 @@ func (s *Service) Conversation(ctx context.Context, userID uint, publicID, query
 		return nil, nil, err
 	}
 	prompt += initiativeContext(initiatives, now)
+	prompt += s.globalContextPrompt(ctx, userID, query)
+	if store, ok := s.Store.(ReminderStore); ok {
+		state, err := store.ReminderSnapshot(ctx, userID, publicID, now)
+		if err != nil {
+			return nil, nil, err
+		}
+		prompt += reminderContextText(state)
+	}
 	return s.Chat.ForCompanion(p.ConversationID, userID, p.ForgetThroughID, prompt), p, nil
 }
 

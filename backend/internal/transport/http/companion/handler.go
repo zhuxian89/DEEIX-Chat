@@ -37,6 +37,13 @@ func NewHandler(service *app.Service, cfg *config.Runtime, shutdown *lifecycle.S
 func (h *Handler) Register(group *gin.RouterGroup) {
 	g := group.Group("/companion")
 	g.GET("", h.State)
+	g.GET("/assistant", h.Assistant)
+	g.GET("/reminders", h.Reminders)
+	g.POST("/reminders/command", h.ReminderCommand)
+	g.PATCH("/assistant/context", h.ContextPreferences)
+	g.GET("/assistant/conversations", h.ContextConversations)
+	g.POST("/assistant/followups", h.SaveFollowup)
+	g.POST("/assistant/notifications", h.Notifications)
 	g.POST("/open", h.Open)
 	g.POST("/read", h.Read)
 	g.PATCH("/preferences", h.Preferences)

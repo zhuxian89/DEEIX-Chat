@@ -1,0 +1,11 @@
+# Add after the existing deployment's Compose file with -f.
+# Requires an application image containing the companion reminder feature.
+services:
+  app:
+    environment:
+      # WeChat one-time subscription: schedule reminder (public template 571).
+      DEEIX_COMPANION_NOTIFICATION_TEMPLATE_ID: "${DEEIX_COMPANION_NOTIFICATION_TEMPLATE_ID:-GkYenXrXMZjt6OY9NCmm_ylfOUGwdq8TYcW45lzuXEE}"
+      DEEIX_COMPANION_NOTIFICATION_TITLE_FIELD: "${DEEIX_COMPANION_NOTIFICATION_TITLE_FIELD:-thing5}"
+      DEEIX_COMPANION_NOTIFICATION_TIME_FIELD: "${DEEIX_COMPANION_NOTIFICATION_TIME_FIELD:-time30}"
+      # formal: released miniapp; trial: trial build; developer: development build.
+      DEEIX_COMPANION_NOTIFICATION_STATE: "${DEEIX_COMPANION_NOTIFICATION_STATE:-formal}"

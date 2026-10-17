@@ -1566,6 +1566,41 @@ definitions:
     - usedAt
     - usedByUserID
     type: object
+  CompanionAssistantResponse:
+    properties:
+      data:
+        $ref: '#/definitions/CompanionAssistantState'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  CompanionAssistantState:
+    properties:
+      decisions:
+        items:
+          $ref: '#/definitions/CompanionDecision'
+        type: array
+      followups:
+        items:
+          $ref: '#/definitions/CompanionFollowup'
+        type: array
+      notifications:
+        $ref: '#/definitions/CompanionNotifications'
+      preferences:
+        $ref: '#/definitions/CompanionContextPreferences'
+      sources:
+        items:
+          $ref: '#/definitions/CompanionContextSource'
+        type: array
+    required:
+    - decisions
+    - followups
+    - notifications
+    - preferences
+    - sources
+    type: object
   CompanionChatRequest:
     properties:
       branchReason:
@@ -1625,6 +1660,184 @@ definitions:
     - content
     - contentType
     - knowledgeBaseIDs
+    type: object
+  CompanionContextConversation:
+    properties:
+      excluded:
+        type: boolean
+      id:
+        type: string
+      title:
+        type: string
+    required:
+    - excluded
+    - id
+    - title
+    type: object
+  CompanionContextPreferences:
+    properties:
+      enabled:
+        type: boolean
+      excluded:
+        items:
+          type: string
+        maxItems: 500
+        type: array
+    required:
+    - enabled
+    - excluded
+    type: object
+  CompanionContextSource:
+    properties:
+      at:
+        type: string
+      conversationID:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      text:
+        type: string
+      title:
+        type: string
+    required:
+    - at
+    - conversationID
+    - id
+    - kind
+    - text
+    - title
+    type: object
+  CompanionConversationsResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/CompanionContextConversation'
+        type: array
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  CompanionDecision:
+    properties:
+      at:
+        type: string
+      kind:
+        type: string
+      reason:
+        type: string
+    required:
+    - at
+    - kind
+    - reason
+    type: object
+  CompanionFollowup:
+    properties:
+      deliveredAt:
+        type: string
+      dueAt:
+        type: string
+      evidence:
+        type: string
+      id:
+        type: string
+      notificationStatus:
+        type: string
+      revision:
+        type: integer
+      sourceConversationID:
+        type: string
+      sourceID:
+        type: string
+      sourceKind:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      userManaged:
+        type: boolean
+    required:
+    - deliveredAt
+    - dueAt
+    - evidence
+    - id
+    - notificationStatus
+    - revision
+    - sourceConversationID
+    - sourceID
+    - sourceKind
+    - status
+    - title
+    - userManaged
+    type: object
+  CompanionFollowupRequest:
+    properties:
+      dueAt:
+        type: string
+      id:
+        maxLength: 64
+        type: string
+      revision:
+        type: integer
+      status:
+        enum:
+        - pending
+        - completed
+        - canceled
+        type: string
+      title:
+        maxLength: 120
+        type: string
+    required:
+    - dueAt
+    - id
+    - revision
+    - status
+    - title
+    type: object
+  CompanionFollowupResponse:
+    properties:
+      data:
+        $ref: '#/definitions/CompanionFollowup'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  CompanionNotificationRequest:
+    properties:
+      accepted:
+        type: boolean
+      enabled:
+        type: boolean
+      templateID:
+        maxLength: 128
+        type: string
+    required:
+    - accepted
+    - enabled
+    - templateID
+    type: object
+  CompanionNotifications:
+    properties:
+      credits:
+        type: integer
+      enabled:
+        type: boolean
+      ready:
+        type: boolean
+      templateID:
+        type: string
+    required:
+    - credits
+    - enabled
+    - ready
+    - templateID
     type: object
   ContentModerationCategoryCatalogResponse:
     properties:
@@ -7386,6 +7599,221 @@ definitions:
     required:
     - results
     - total
+    type: object
+  ReminderCommandRequest:
+    properties:
+      action:
+        enum:
+        - create
+        - list
+        - update
+        - pause
+        - resume
+        - delete
+        - complete
+        - skip
+        - snooze
+        type: string
+      conversationID:
+        maxLength: 64
+        type: string
+      delayMinutes:
+        type: integer
+      id:
+        maxLength: 64
+        type: string
+      input:
+        maxLength: 8000
+        type: string
+      occurrenceID:
+        maxLength: 64
+        type: string
+      requestID:
+        maxLength: 100
+        minLength: 8
+        type: string
+      revision:
+        type: integer
+      schedule:
+        $ref: '#/definitions/ReminderSchedule'
+      title:
+        maxLength: 120
+        type: string
+    required:
+    - action
+    - conversationID
+    - delayMinutes
+    - id
+    - input
+    - occurrenceID
+    - requestID
+    - revision
+    - schedule
+    - title
+    type: object
+  ReminderCommandResponse:
+    properties:
+      data:
+        $ref: '#/definitions/ReminderCommandResult'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
+    type: object
+  ReminderCommandResult:
+    properties:
+      handled:
+        type: boolean
+      snapshot:
+        $ref: '#/definitions/ReminderState'
+      turn:
+        $ref: '#/definitions/ReminderDialogue'
+    required:
+    - handled
+    - snapshot
+    - turn
+    type: object
+  ReminderDialogue:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: string
+      input:
+        type: string
+      reminderIDs:
+        items:
+          type: string
+        type: array
+      reply:
+        type: string
+    required:
+    - createdAt
+    - id
+    - input
+    - reminderIDs
+    - reply
+    type: object
+  ReminderEvent:
+    properties:
+      dueAt:
+        type: string
+      id:
+        type: string
+      notificationStatus:
+        type: string
+      notifiedAt:
+        type: string
+      reminderID:
+        type: string
+      revision:
+        type: integer
+      status:
+        type: string
+      title:
+        type: string
+    required:
+    - dueAt
+    - id
+    - notificationStatus
+    - notifiedAt
+    - reminderID
+    - revision
+    - status
+    - title
+    type: object
+  ReminderPlan:
+    properties:
+      description:
+        type: string
+      id:
+        type: string
+      nextAt:
+        type: string
+      revision:
+        type: integer
+      schedule:
+        $ref: '#/definitions/ReminderSchedule'
+      status:
+        type: string
+      title:
+        type: string
+    required:
+    - description
+    - id
+    - nextAt
+    - revision
+    - schedule
+    - status
+    - title
+    type: object
+  ReminderSchedule:
+    properties:
+      day:
+        type: integer
+      intervalMinutes:
+        type: integer
+      kind:
+        type: string
+      limit:
+        type: integer
+      month:
+        type: integer
+      startAt:
+        type: string
+      times:
+        items:
+          type: integer
+        type: array
+      until:
+        type: string
+      weekdays:
+        items:
+          type: integer
+        type: array
+    required:
+    - day
+    - intervalMinutes
+    - kind
+    - limit
+    - month
+    - startAt
+    - times
+    - until
+    - weekdays
+    type: object
+  ReminderState:
+    properties:
+      occurrences:
+        items:
+          $ref: '#/definitions/ReminderEvent'
+        type: array
+      plans:
+        items:
+          $ref: '#/definitions/ReminderPlan'
+        type: array
+      serverTime:
+        type: string
+      turns:
+        items:
+          $ref: '#/definitions/ReminderDialogue'
+        type: array
+    required:
+    - occurrences
+    - plans
+    - serverTime
+    - turns
+    type: object
+  ReminderStateResponse:
+    properties:
+      data:
+        $ref: '#/definitions/ReminderState'
+      errorMsg:
+        type: string
+    required:
+    - data
+    - errorMsg
     type: object
   RenameConversationRequest:
     properties:
@@ -16967,6 +17395,112 @@ paths:
       summary: 获取固定助手及专属记忆
       tags:
       - companion
+  /companion/assistant:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CompanionAssistantResponse'
+      security:
+      - BearerAuth: []
+      summary: 查看助手全局来源、跟进和通知状态
+      tags:
+      - companion
+  /companion/assistant/context:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: 全局读取与排除会话
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CompanionContextPreferences'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 设置同账号会话和待办的读取范围
+      tags:
+      - companion
+  /companion/assistant/conversations:
+    get:
+      parameters:
+      - description: 标题关键词
+        in: query
+        name: q
+        type: string
+      - description: 页码，从1开始，每页50条
+        in: query
+        name: page
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CompanionConversationsResponse'
+      security:
+      - BearerAuth: []
+      summary: 分页选择允许助手读取的会话
+      tags:
+      - companion
+  /companion/assistant/followups:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 新增时ID为空；更新需要当前revision
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CompanionFollowupRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/CompanionFollowupResponse'
+      security:
+      - BearerAuth: []
+      summary: 新增、改期、完成或取消跟进事项
+      tags:
+      - companion
+  /companion/assistant/notifications:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 用户在微信弹窗中的真实选择
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/CompanionNotificationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/SuccessDoc'
+      security:
+      - BearerAuth: []
+      summary: 记录微信订阅选择或关闭离线通知
+      tags:
+      - companion
   /companion/conversations/{id}/messages/stream:
     post:
       consumes:
@@ -17173,6 +17707,48 @@ paths:
       security:
       - BearerAuth: []
       summary: 记录前台已阅读的助手消息，抑制未读时的主动开场
+      tags:
+      - companion
+  /companion/reminders:
+    get:
+      parameters:
+      - description: 当前小禾会话
+        in: query
+        name: conversationID
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ReminderStateResponse'
+      security:
+      - BearerAuth: []
+      summary: 查询提醒、到期记录及提醒对话
+      tags:
+      - companion
+  /companion/reminders/command:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: requestID保证重试幂等；卡片操作须携带revision
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/ReminderCommandRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/ReminderCommandResponse'
+      security:
+      - BearerAuth: []
+      summary: 通过对话或卡片创建、查询和管理提醒
       tags:
       - companion
   /companion/topics/feedback:

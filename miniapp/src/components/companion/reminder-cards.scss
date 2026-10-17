@@ -1,0 +1,12 @@
+.reminderCards { width: 100%; }
+.reminderCard { margin-top: 16px; padding: 22px; border: 1px solid #d9e6dd; border-radius: 18px; background: #f5faf6; color: #244a38; }
+.reminderTitle, .reminderRule, .reminderCountdown, .reminderHint { display: block; }
+.reminderTitle { font-size: 29px; font-weight: 600; }
+.reminderRule { margin-top: 10px; font-size: 24px; color: #567362; }
+.reminderCountdown { margin: 16px 0 8px; font-size: 31px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.reminderHint { font-size: 23px; line-height: 1.6; color: #718178; }
+.reminderActions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.reminderActions button { margin: 0; padding: 0 17px; font-size: 23px; line-height: 2.2; background: #e5efe8; color: #365a45; border: 0; }
+.reminderActions button::after { border: 0; }
+.reminderManage { margin: 20px 24px; }
+.reminderManageLink { display: block; padding: 12px 24px; font-size: 25px; color: #548b75; }

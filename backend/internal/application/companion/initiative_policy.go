@@ -54,12 +54,15 @@ func initiativeAllowed(p *Profile, pace *domain.InitiativeState, kind, visit str
 		return false
 	}
 	if kind == "idle" {
+		if pace.AcceptedIdleAfter >= after && after > 0 {
+			return false
+		}
 		if after == 0 || after != latest || user.ID <= p.ForgetThroughID || user.Status != "success" ||
 			assistant.CreatedAt.IsZero() || now.Sub(assistant.CreatedAt) < 45*time.Second || now.Sub(assistant.CreatedAt) > 30*time.Minute ||
 			closingConversation(user.Content) || awaitingAnswer(assistant.Content) || strings.TrimSpace(assistant.Content) == "" {
 			return false
 		}
-		if !accepting && (pace.IdleVisitID == visit || pace.IdleAfterMessageID >= latest || now.Sub(pace.IdleAttemptAt) < 5*time.Minute) {
+		if !accepting && now.Sub(pace.IdleAttemptAt) < time.Minute {
 			return false
 		}
 		cooldown := 10 * time.Minute
@@ -106,6 +109,7 @@ func initiativeAllowed(p *Profile, pace *domain.InitiativeState, kind, visit str
 func acceptedPacing(pace domain.InitiativeState, item domain.Initiative) domain.InitiativeState {
 	if item.Kind == "idle" {
 		pace.LastIdleAt = item.AcceptedAt
+		pace.AcceptedIdleAfter = item.AfterMessageID
 		return pace
 	}
 	day := item.AcceptedAt.In(beijing).Format("2006-01-02")

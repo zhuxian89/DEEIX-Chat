@@ -14,7 +14,7 @@ func (s *Store) PurgeDeletedUsers(ctx context.Context) error {
 	}
 	var ids []uint
 	if err := s.db.WithContext(ctx).Model(&profileRecord{}).
-		Where("NOT EXISTS (SELECT 1 FROM identity_users WHERE identity_users.id = companion_profiles.user_id)").
+		Where("NOT EXISTS (SELECT 1 FROM identity_users WHERE identity_users.id = companion_profiles.user_id AND identity_users.deleted_at IS NULL AND identity_users.status <> 'deactivated')").
 		Order("user_id ASC").Limit(100).Pluck("user_id", &ids).Error; err != nil {
 		return err
 	}
@@ -22,6 +22,11 @@ func (s *Store) PurgeDeletedUsers(ctx context.Context) error {
 		return nil
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		for _, model := range []interface{}{&contextPreferencesRecord{}, &followupRecord{}, &decisionRecord{}, &notificationRecord{}, &reminderOwner{}, &reminderRecord{}, &reminderEvent{}, &reminderTurnRecord{}} {
+			if err := tx.Where("user_id IN ?", ids).Delete(model).Error; err != nil {
+				return err
+			}
+		}
 		if err := tx.Where("user_id IN ?", ids).Delete(&initiativeRecord{}).Error; err != nil {
 			return err
 		}

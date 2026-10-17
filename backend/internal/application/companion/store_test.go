@@ -257,7 +257,7 @@ func TestCompanionPromptExpiresAndRecallsRelevantFacts(t *testing.T) {
 
 func TestCompanionDeletedAccountCleanupOnlyTouchesOwnTables(t *testing.T) {
 	s := testStore(t)
-	if err := s.db.Exec("CREATE TABLE identity_users (id INTEGER PRIMARY KEY)").Error; err != nil {
+	if err := s.db.Exec("CREATE TABLE identity_users (id INTEGER PRIMARY KEY, deleted_at datetime, status text DEFAULT 'active')").Error; err != nil {
 		t.Fatal(err)
 	}
 	s.db.Exec("INSERT INTO identity_users (id) VALUES (2)")

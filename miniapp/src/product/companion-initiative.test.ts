@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { canOfferCompanionContinuation, CompanionInitiativeVisit, withCompanionInitiative, type CompanionIdlePresence } from "./companion-initiative";
+import { canOfferCompanionContinuation, companionEntryPreview, CompanionInitiativeVisit, CompanionReadTracker, withCompanionInitiative, type CompanionIdlePresence } from "./companion-initiative";
 import { CompanionClient, type CompanionInitiative, type CompanionState } from "./companion-client";
 import type { ApiRequest } from "@/platform/transport";
 
@@ -32,7 +32,7 @@ function deferred<T>() {
   return { promise, resolve };
 }
 
-test("one page visit can only publish one initiative even with concurrent timer ticks", async () => {
+test("one conversation turn only publishes once even with concurrent timer ticks", async () => {
   const visit = new CompanionInitiativeVisit();
   let prepared = 0, accepted = 0, displayed = 0;
   const client = {
@@ -41,6 +41,44 @@ test("one page visit can only publish one initiative even with concurrent timer 
   };
   await Promise.all(Array.from({ length: 5 }, () => visit.consider(client, "idle", 12, () => true, () => { displayed += 1; })));
   assert.deepEqual([prepared, accepted, displayed], [1, 1, 1]);
+});
+
+test("a failed initiative retries after recovery and a later conversation turn remains eligible", async (t) => {
+  let now = 1_800_000_000_000;
+  t.mock.method(Date, "now", () => now);
+  const visit = new CompanionInitiativeVisit();
+  let calls = 0, shown = 0;
+  const client = {
+    prepareInitiative: async () => { if (++calls === 1) throw new Error("offline"); return message(); },
+    acceptInitiative: async () => message(),
+  };
+  const consider = (id = 12) => visit.consider(client, "idle", id, () => true, () => { shown++; });
+  await consider(); await consider(); assert.equal(calls, 1);
+  now += 30_000; await consider(); assert.equal(shown, 1);
+  now += 600_000; await consider(); assert.equal(calls, 2);
+  await consider(14); assert.equal(shown, 2);
+});
+
+test("failed read acknowledgement stays unconfirmed until a later successful retry", async (t) => {
+  let now = 1_800_000_000_000;
+  t.mock.method(Date, "now", () => now);
+  const tracker = new CompanionReadTracker();
+  let calls = 0;
+  const client = { markRead: async () => { if (++calls === 1) throw new Error("offline"); } };
+  assert.equal(await tracker.acknowledge(client, 12), 0);
+  assert.equal(await tracker.acknowledge(client, 12), 0);
+  assert.equal(calls, 1);
+  now += 10_000;
+  assert.equal(await tracker.acknowledge(client, 12), 12);
+  await tracker.acknowledge(client, 12); assert.equal(calls, 2);
+  assert.equal(await tracker.acknowledge(client, 14), 14);
+});
+
+test("home keeps the persisted greeting after reopening and previews newer followups", () => {
+  const state = { greeting: "今天的计划还顺利吗？", greetingOffered: false, greetingAt: new Date(1000).toISOString(), quiet: false, initiatives: [] } as unknown as CompanionState;
+  assert.equal(companionEntryPreview(state), state.greeting);
+  const next = withCompanionInitiative(state, { ...message(), kind: "followup", text: "事项到了约定时间" });
+  assert.equal(companionEntryPreview(next), "事项到了约定时间");
 });
 
 test("typing, scrolling or leaving while generating discards the candidate without accepting", async () => {

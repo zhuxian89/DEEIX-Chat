@@ -17,6 +17,7 @@ type InitiativeState struct {
 	IdleVisitID        string
 	IdleAfterMessageID uint
 	LastIdleAt         time.Time
+	AcceptedIdleAfter  uint
 }
 
 type Initiative struct {

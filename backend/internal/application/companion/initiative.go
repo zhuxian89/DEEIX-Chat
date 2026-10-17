@@ -27,6 +27,7 @@ func (s *Service) PrepareInitiative(ctx context.Context, userID uint, kind, visi
 	}
 	token, err := s.Store.Acquire(ctx, userID)
 	if errors.Is(err, ErrBusy) {
+		s.recordDecision(ctx, userID, kind, "busy")
 		return nil, nil
 	}
 	if err != nil {
@@ -41,6 +42,11 @@ func (s *Service) PrepareInitiative(ctx context.Context, userID uint, kind, visi
 	defer cancel()
 	text, topic, err := s.composeInitiative(ctx, p, item)
 	if err != nil || text == "" {
+		reason := "no_suitable_message"
+		if err != nil {
+			reason = "generation_failed"
+		}
+		s.recordDecision(context.WithoutCancel(ctx), userID, kind, reason)
 		return nil, err
 	}
 	item.Text, item.TopicJSON = text, topic
@@ -66,6 +72,19 @@ func (s *Service) reserveInitiative(ctx context.Context, userID uint, token, kin
 	p.LeaseUntil = 0
 	now := time.Now()
 	if !initiativeAllowed(p, pace, kind, visit, after, items, now, false) {
+		reason := "cooldown_or_context"
+		if proactivityMode(p, pace) == "off" {
+			reason = "off"
+		} else if _, latest := messageBoundary(items); latest > p.ReadThroughID {
+			reason = "unread"
+		} else if kind == "idle" && pace.AcceptedIdleAfter >= after && after > 0 {
+			reason = "already_delivered"
+		} else if closingConversation(latestTurn(items, "user").Content) {
+			reason = "conversation_closed"
+		} else if awaitingAnswer(latestTurn(items, "assistant").Content) {
+			reason = "awaiting_reply"
+		}
+		s.recordDecision(ctx, userID, kind, reason)
 		return nil, nil, nil
 	}
 	latestUser, latest := messageBoundary(items)
@@ -124,5 +143,6 @@ func (s *Service) AcceptInitiative(ctx context.Context, userID uint, id, visit s
 	if err := s.Store.AcceptInitiative(ctx, *item, token, acceptedPacing(*pace, *item)); err != nil {
 		return nil, err
 	}
+	s.recordDecision(ctx, userID, item.Kind, "delivered")
 	return item, nil
 }

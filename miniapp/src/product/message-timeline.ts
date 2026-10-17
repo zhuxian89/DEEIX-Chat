@@ -23,6 +23,7 @@ export type ConversationMessage = {
   activityStatus?: string;
   branchReason?: string;
   contentType?: string;
+  createdAt?: string;
   id: string;
   imageFileID?: string;
   imageSource?: string;
@@ -78,6 +79,7 @@ export function messageFromAPI(message: MessageResponse | PublicSharedMessageRes
     branchReason: message.branchReason.trim() || undefined,
     id: message.publicID || ("id" in message ? String(message.id) : ""),
     contentType,
+    createdAt: message.createdAt,
     imageFileID: imageFileID || undefined,
     imageStatus: imageFileID
       ? "正在加载图片"
@@ -145,10 +147,12 @@ export function createPendingImageTurn(
   inputImageSource?: string,
   pendingStatus = "AI 正在生成图片",
 ): ConversationMessage[] {
+  const createdAt = new Date().toISOString();
   return [
-    { id: userID, imageSource: inputImageSource, role: "user", text: prompt },
+    { id: userID, createdAt, imageSource: inputImageSource, role: "user", text: prompt },
     {
       id: assistantID,
+      createdAt,
       imageStatus: pendingStatus,
       pending: true,
       role: "assistant",

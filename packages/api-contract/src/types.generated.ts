@@ -657,6 +657,19 @@ export interface CodeResponse {
   usedByUserID: number;
 }
 
+export interface CompanionAssistantResponse {
+  data: CompanionAssistantState;
+  errorMsg: string;
+}
+
+export interface CompanionAssistantState {
+  decisions: CompanionDecision[];
+  followups: CompanionFollowup[];
+  notifications: CompanionNotifications;
+  preferences: CompanionContextPreferences;
+  sources: CompanionContextSource[];
+}
+
 export interface CompanionChatRequest {
   branchReason?: "default" | "retry" | "edit";
   /** @maxLength 64 */
@@ -679,6 +692,82 @@ export interface CompanionChatRequest {
   skillIDs?: number[];
   /** @maxLength 32 */
   sourceMessagePublicID?: string;
+}
+
+export interface CompanionContextConversation {
+  excluded: boolean;
+  id: string;
+  title: string;
+}
+
+export interface CompanionContextPreferences {
+  enabled: boolean;
+  /** @maxItems 500 */
+  excluded: string[];
+}
+
+export interface CompanionContextSource {
+  at: string;
+  conversationID: string;
+  id: string;
+  kind: string;
+  text: string;
+  title: string;
+}
+
+export interface CompanionConversationsResponse {
+  data: CompanionContextConversation[];
+  errorMsg: string;
+}
+
+export interface CompanionDecision {
+  at: string;
+  kind: string;
+  reason: string;
+}
+
+export interface CompanionFollowup {
+  deliveredAt: string;
+  dueAt: string;
+  evidence: string;
+  id: string;
+  notificationStatus: string;
+  revision: number;
+  sourceConversationID: string;
+  sourceID: string;
+  sourceKind: string;
+  status: string;
+  title: string;
+  userManaged: boolean;
+}
+
+export interface CompanionFollowupRequest {
+  dueAt: string;
+  /** @maxLength 64 */
+  id: string;
+  revision: number;
+  status: "pending" | "completed" | "canceled";
+  /** @maxLength 120 */
+  title: string;
+}
+
+export interface CompanionFollowupResponse {
+  data: CompanionFollowup;
+  errorMsg: string;
+}
+
+export interface CompanionNotificationRequest {
+  accepted: boolean;
+  enabled: boolean;
+  /** @maxLength 128 */
+  templateID: string;
+}
+
+export interface CompanionNotifications {
+  credits: number;
+  enabled: boolean;
+  ready: boolean;
+  templateID: string;
 }
 
 export interface ContentModerationCategoryCatalogResponse {
@@ -3259,6 +3348,101 @@ export interface RegistrationcodeErrorDoc {
 export interface RegistrationcodeListResponse {
   results: CodeResponse[];
   total: number;
+}
+
+export interface ReminderCommandRequest {
+  action:
+    | "create"
+    | "list"
+    | "update"
+    | "pause"
+    | "resume"
+    | "delete"
+    | "complete"
+    | "skip"
+    | "snooze";
+  /** @maxLength 64 */
+  conversationID: string;
+  delayMinutes: number;
+  /** @maxLength 64 */
+  id: string;
+  /** @maxLength 8000 */
+  input: string;
+  /** @maxLength 64 */
+  occurrenceID: string;
+  /**
+   * @minLength 8
+   * @maxLength 100
+   */
+  requestID: string;
+  revision: number;
+  schedule: ReminderSchedule;
+  /** @maxLength 120 */
+  title: string;
+}
+
+export interface ReminderCommandResponse {
+  data: ReminderCommandResult;
+  errorMsg: string;
+}
+
+export interface ReminderCommandResult {
+  handled: boolean;
+  snapshot: ReminderState;
+  turn: ReminderDialogue;
+}
+
+export interface ReminderDialogue {
+  createdAt: string;
+  id: string;
+  input: string;
+  reminderIDs: string[];
+  reply: string;
+}
+
+export interface ReminderEvent {
+  dueAt: string;
+  id: string;
+  notificationStatus: string;
+  notifiedAt: string;
+  reminderID: string;
+  revision: number;
+  status: string;
+  title: string;
+}
+
+export interface ReminderPlan {
+  description: string;
+  id: string;
+  nextAt: string;
+  revision: number;
+  schedule: ReminderSchedule;
+  status: string;
+  title: string;
+}
+
+export interface ReminderSchedule {
+  day: number;
+  intervalMinutes: number;
+  kind: string;
+  limit: number;
+  month: number;
+  startAt: string;
+  times: number[];
+  until: string;
+  weekdays: number[];
+}
+
+export interface ReminderState {
+  occurrences: ReminderEvent[];
+  plans: ReminderPlan[];
+  serverTime: string;
+  turns: ReminderDialogue[];
+}
+
+export interface ReminderStateResponse {
+  data: ReminderState;
+  errorMsg: string;
 }
 
 export interface RenameConversationRequest {
@@ -8510,6 +8694,91 @@ export namespace Companion {
   /**
    * No description
    * @tags companion
+   * @name AssistantList
+   * @summary 查看助手全局来源、跟进和通知状态
+   * @request GET:/companion/assistant
+   * @secure
+   */
+  export namespace AssistantList {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = CompanionAssistantResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name AssistantContextPartialUpdate
+   * @summary 设置同账号会话和待办的读取范围
+   * @request PATCH:/companion/assistant/context
+   * @secure
+   */
+  export namespace AssistantContextPartialUpdate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CompanionContextPreferences;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name AssistantConversationsList
+   * @summary 分页选择允许助手读取的会话
+   * @request GET:/companion/assistant/conversations
+   * @secure
+   */
+  export namespace AssistantConversationsList {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** 页码，从1开始，每页50条 */
+      page?: number;
+      /** 标题关键词 */
+      q?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = CompanionConversationsResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name AssistantFollowupsCreate
+   * @summary 新增、改期、完成或取消跟进事项
+   * @request POST:/companion/assistant/followups
+   * @secure
+   */
+  export namespace AssistantFollowupsCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CompanionFollowupRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = CompanionFollowupResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name AssistantNotificationsCreate
+   * @summary 记录微信订阅选择或关闭离线通知
+   * @request POST:/companion/assistant/notifications
+   * @secure
+   */
+  export namespace AssistantNotificationsCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = CompanionNotificationRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
    * @name ConversationsMessagesStreamCreate
    * @summary 与固定助手聊天，沿用聊天事件、任务恢复和计费契约
    * @request POST:/companion/conversations/{id}/messages/stream
@@ -8663,6 +8932,41 @@ export namespace Companion {
     export type RequestBody = ReadRequest;
     export type RequestHeaders = {};
     export type ResponseBody = SuccessDoc;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name RemindersList
+   * @summary 查询提醒、到期记录及提醒对话
+   * @request GET:/companion/reminders
+   * @secure
+   */
+  export namespace RemindersList {
+    export type RequestParams = {};
+    export type RequestQuery = {
+      /** 当前小禾会话 */
+      conversationID?: string;
+    };
+    export type RequestBody = never;
+    export type RequestHeaders = {};
+    export type ResponseBody = ReminderStateResponse;
+  }
+
+  /**
+   * No description
+   * @tags companion
+   * @name RemindersCommandCreate
+   * @summary 通过对话或卡片创建、查询和管理提醒
+   * @request POST:/companion/reminders/command
+   * @secure
+   */
+  export namespace RemindersCommandCreate {
+    export type RequestParams = {};
+    export type RequestQuery = {};
+    export type RequestBody = ReminderCommandRequest;
+    export type RequestHeaders = {};
+    export type ResponseBody = ReminderCommandResponse;
   }
 
   /**
