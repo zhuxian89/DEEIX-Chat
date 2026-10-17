@@ -10,7 +10,6 @@ import (
 
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/extraction"
 	domainbilling "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/billing"
-	domaincompanion "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
 	domaindailycheckin "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/dailycheckin"
 	domainsettings "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
@@ -748,7 +747,7 @@ func validatePatchItem(item PatchItem) error {
 		_, err := domaindailycheckin.ParseConfig(value)
 		return err
 	case "companion:notification":
-		_, err := domaincompanion.ParseNotificationConfig(value)
+		_, err := ParseNotificationConfig(value)
 		return err
 	}
 	return nil

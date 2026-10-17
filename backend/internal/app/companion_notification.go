@@ -5,21 +5,21 @@ import (
 	"sync"
 
 	companionapp "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/companion"
-	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/wechatminiapp"
 )
 
 func companionNotificationProvider(runtime *config.Runtime) func() companionapp.NotificationRuntime {
 	var mu sync.Mutex
-	var lastConfig domain.NotificationConfig
+	var lastConfig settings.NotificationConfig
 	var lastAppID, lastSecret string
 	var current companionapp.NotificationRuntime
 	return func() companionapp.NotificationRuntime {
 		mu.Lock()
 		defer mu.Unlock()
 		cfg := runtime.Snapshot()
-		c, err := domain.ParseNotificationConfig(cfg.CompanionNotificationJSON)
+		c, err := settings.ParseNotificationConfig(cfg.CompanionNotificationJSON)
 		appID, secret := strings.TrimSpace(cfg.WeChatMiniAppAppID), strings.TrimSpace(cfg.WeChatMiniAppAppSecret)
 		if err != nil || !c.Enabled || appID == "" || secret == "" {
 			current = companionapp.NotificationRuntime{}

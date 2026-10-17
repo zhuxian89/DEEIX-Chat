@@ -5,12 +5,12 @@ import (
 	"sync"
 	"testing"
 
-	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
+	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 )
 
 func TestCompanionNotificationHotConfiguration(t *testing.T) {
-	cfg := config.Config{CompanionNotificationJSON: domain.DefaultNotificationConfigJSON()}
+	cfg := config.Config{CompanionNotificationJSON: settings.DefaultNotificationConfigJSON()}
 	runtime := config.NewRuntime(cfg)
 	provider := companionNotificationProvider(runtime)
 	if provider().Sender != nil {
@@ -43,7 +43,7 @@ func TestCompanionNotificationHotConfiguration(t *testing.T) {
 			t.Fatal("unavailable notification config reported ready")
 		}
 	}
-	cfg.CompanionNotificationJSON = domain.DefaultNotificationConfigJSON()
+	cfg.CompanionNotificationJSON = settings.DefaultNotificationConfigJSON()
 	runtime.Store(cfg)
 	if provider().Sender == nil {
 		t.Fatal("re-enabling required a restart")
@@ -51,10 +51,10 @@ func TestCompanionNotificationHotConfiguration(t *testing.T) {
 }
 
 func TestCompanionNotificationConcurrentConfigUpdates(t *testing.T) {
-	a := config.Config{CompanionNotificationJSON: domain.DefaultNotificationConfigJSON(), WeChatMiniAppAppID: "app-a", WeChatMiniAppAppSecret: "secret-a"}
+	a := config.Config{CompanionNotificationJSON: settings.DefaultNotificationConfigJSON(), WeChatMiniAppAppID: "app-a", WeChatMiniAppAppSecret: "secret-a"}
 	b := a
 	b.WeChatMiniAppAppID, b.WeChatMiniAppAppSecret = "app-b", "secret-b"
-	c, _ := domain.ParseNotificationConfig(a.CompanionNotificationJSON)
+	c, _ := settings.ParseNotificationConfig(a.CompanionNotificationJSON)
 	b.CompanionNotificationJSON = strings.ReplaceAll(a.CompanionNotificationJSON, c.TemplateID, "template-b")
 	runtime := config.NewRuntime(a)
 	provider := companionNotificationProvider(runtime)

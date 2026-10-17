@@ -4,7 +4,6 @@ import (
 	"strings"
 	"testing"
 
-	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
 )
 
@@ -15,7 +14,7 @@ func TestCompanionNotificationSeedUpdateAndDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	item, ok := repo.items["companion:notification"]
-	if !ok || item.ValueType != "json" || item.Value != domain.DefaultNotificationConfigJSON() {
+	if !ok || item.ValueType != "json" || item.Value != DefaultNotificationConfigJSON() {
 		t.Fatal("reminder defaults were not seeded")
 	}
 	custom := strings.ReplaceAll(item.Value, "formal", "developer")
@@ -51,7 +50,7 @@ func TestCompanionNotificationRejectsInvalidChangesWithoutOverwriting(t *testing
 	if err := service.Seed(t.Context(), config.Config{}); err != nil {
 		t.Fatal(err)
 	}
-	valid := domain.DefaultNotificationConfigJSON()
+	valid := DefaultNotificationConfigJSON()
 	for _, bad := range []string{
 		`null`, `{}`, valid + `{}`, strings.ReplaceAll(valid, "thing5", "{{thing5.DATA}}"),
 		strings.ReplaceAll(valid, "time30", "thing30"), strings.ReplaceAll(valid, "formal", "production"),

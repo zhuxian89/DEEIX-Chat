@@ -1,4 +1,4 @@
-package companion
+package settings
 
 import (
 	"encoding/json"
@@ -13,6 +13,16 @@ const NotificationConfigKey = "notification"
 
 // One setting keeps the template and its field mapping atomic on updates.
 type NotificationConfig struct {
+	Enabled    bool
+	TemplateID string
+	TitleField string
+	TimeField  string
+	State      string
+}
+
+// The settings document is private to the configuration boundary. Public
+// application values stay independent of their stored JSON representation.
+type notificationConfigDocument struct {
 	Enabled    bool   `json:"enabled"`
 	TemplateID string `json:"templateId"`
 	TitleField string `json:"titleField"`
@@ -35,11 +45,16 @@ func ParseNotificationConfig(raw string) (NotificationConfig, error) {
 	}
 	decoder := json.NewDecoder(strings.NewReader(raw))
 	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&c); err != nil {
+	var document notificationConfigDocument
+	if err := decoder.Decode(&document); err != nil {
 		return c, errors.New("notification configuration must be a JSON object")
 	}
 	if err := decoder.Decode(new(interface{})); err != io.EOF {
 		return c, errors.New("notification configuration must contain one JSON object")
+	}
+	c = NotificationConfig{
+		Enabled: document.Enabled, TemplateID: document.TemplateID,
+		TitleField: document.TitleField, TimeField: document.TimeField, State: document.State,
 	}
 	c.TemplateID = strings.TrimSpace(c.TemplateID)
 	c.TitleField = strings.TrimSpace(c.TitleField)

@@ -4,7 +4,6 @@ import (
 	"strconv"
 	"strings"
 
-	domaincompanion "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
 	domaindailycheckin "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/dailycheckin"
 	domainsettings "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
@@ -20,7 +19,7 @@ const (
 // defaultSettings 返回所有动态配置的默认种子数据。
 func defaultSettings() []domainsettings.SystemSetting {
 	return []domainsettings.SystemSetting{
-		{Namespace: domaincompanion.NotificationConfigNamespace, Key: domaincompanion.NotificationConfigKey, Value: domaincompanion.DefaultNotificationConfigJSON(), ValueType: "json", Description: "小禾消息提醒：微信订阅开关、日程提醒模板、标题与时间字段及跳转版本；保存后生效"},
+		{Namespace: NotificationConfigNamespace, Key: NotificationConfigKey, Value: DefaultNotificationConfigJSON(), ValueType: "json", Description: "小禾消息提醒：微信订阅开关、日程提醒模板、标题与时间字段及跳转版本；保存后生效"},
 		{Namespace: "speech", Key: "enabled", Value: "false", ValueType: "bool", Description: "启用小禾、AI 对话和 AI 生图的语音输入；请先填写腾讯云凭据"},
 		{Namespace: "speech", Key: "tencent_secret_id", Value: "", ValueType: "string", Description: "腾讯云语音识别 SecretId（加密保存）"},
 		{Namespace: "speech", Key: "tencent_secret_key", Value: "", ValueType: "string", Description: "腾讯云语音识别 SecretKey（加密保存，留空保留原值）"},
