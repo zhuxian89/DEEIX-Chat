@@ -90,6 +90,8 @@ func (r *RuntimeSettings) cacheSet(ctx context.Context, item domainsettings.Syst
 
 func (r *RuntimeSettings) applyItem(cfg *config.Config, item domainsettings.SystemSetting) {
 	switch item.Namespace + ":" + item.Key {
+	case "companion:notification":
+		cfg.CompanionNotificationJSON = item.Value
 	case "wechat:callback_token":
 		cfg.WeChatCallbackToken = strings.TrimSpace(item.Value)
 	case "wechat_miniapp:enabled":

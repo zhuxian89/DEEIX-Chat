@@ -44,12 +44,13 @@ func (s *Service) AssistantState(ctx context.Context, user uint) (*AssistantStat
 	if result.Notifications, err = store.NotificationSettings(ctx, user); err != nil {
 		return nil, err
 	}
-	result.NotificationReady = s.Notifier != nil && s.NotificationTemplateID != ""
-	if result.Notifications.TemplateID != s.NotificationTemplateID {
+	notification := s.notificationRuntime()
+	result.NotificationReady = notification.Sender != nil && notification.TemplateID != ""
+	if result.Notifications.TemplateID != notification.TemplateID {
 		result.Notifications.Enabled = false
 		result.Notifications.Credits = 0
 	}
-	result.Notifications.TemplateID = s.NotificationTemplateID
+	result.Notifications.TemplateID = notification.TemplateID
 	return result, nil
 }
 
@@ -304,16 +305,17 @@ func (s *Service) TickAssistant(ctx context.Context, after uint) (uint, error) {
 		if refreshErr != nil {
 			s.recordDecision(ctx, user, "followup", "refresh_pending")
 		}
-		item, err := store.PublishDueFollowup(ctx, user, time.Now(), s.NotificationTemplateID)
+		notification := s.notificationRuntime()
+		item, err := store.PublishDueFollowup(ctx, user, time.Now(), notification.TemplateID)
 		if err != nil {
 			s.recordDecision(ctx, user, "followup", "delivery_failed")
 			continue
 		}
 		if item != nil {
 			status := "uncertain"
-			if s.Notifier != nil {
+			if notification.Sender != nil {
 				sendCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
-				err = s.Notifier.Send(sendCtx, *item)
+				err = notification.Sender.Send(sendCtx, *item)
 				cancel()
 				if err == nil {
 					status = "sent"

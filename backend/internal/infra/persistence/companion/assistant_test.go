@@ -320,6 +320,9 @@ func TestNotificationConsentIsConsumedAtomicallyAndQuietPausesDelivery(t *testin
 	if err := db.Exec("INSERT INTO wechat_miniapp_bindings(user_id,app_id,open_id) VALUES(1,'app','owner')").Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := store.SetNotificationSettings(t.Context(), 1, domain.NotificationSettings{Enabled: true, TemplateID: "template", AppID: "previous-app"}, true); err == nil {
+		t.Fatal("consent from an outdated runtime was accepted for another app")
+	}
 	for i := 0; i < 3; i++ {
 		if err := store.SetNotificationSettings(t.Context(), 1, domain.NotificationSettings{Enabled: true, TemplateID: "template"}, true); err != nil {
 			t.Fatal(err)

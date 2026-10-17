@@ -92,3 +92,17 @@ func TestSubscriptionFailuresAreSanitizedAndNeverAutomaticallyResent(t *testing.
 		t.Fatal("missing credentials accepted")
 	}
 }
+
+func TestSubscriptionRejectsChangedAppBeforeAnyNetworkRequest(t *testing.T) {
+	calls := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { calls++ }))
+	defer server.Close()
+	client, err := NewSubscriptionClient(server.Client(), server.URL, func() (string, string) { return "old-app", "secret" }, "thing5", "time30", "formal")
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = client.Send(t.Context(), domain.NotificationDelivery{AppID: "new-app", OpenID: "owner", TemplateID: "template", Title: "reminder", DueAt: time.Now()})
+	if err == nil || calls != 0 {
+		t.Fatal("changed account reached notification transport")
+	}
+}

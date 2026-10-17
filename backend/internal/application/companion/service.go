@@ -20,6 +20,7 @@ type Service struct {
 	TopicProvider          TopicProvider
 	Notifier               NotificationSender
 	NotificationTemplateID string
+	NotificationProvider   func() NotificationRuntime
 }
 
 type State struct {

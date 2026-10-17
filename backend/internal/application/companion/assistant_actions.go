@@ -79,8 +79,9 @@ func (s *Service) SetNotifications(ctx context.Context, user uint, enabled, acce
 	if _, err := s.Store.Profile(ctx, user); err != nil {
 		return err
 	}
-	if enabled && (s.Notifier == nil || s.NotificationTemplateID == "" || template != s.NotificationTemplateID || !accepted) {
+	notification := s.notificationRuntime()
+	if enabled && (notification.Sender == nil || notification.TemplateID == "" || template != notification.TemplateID || !accepted) {
 		return ErrInvalid
 	}
-	return store.SetNotificationSettings(ctx, user, domain.NotificationSettings{Enabled: enabled, TemplateID: s.NotificationTemplateID}, enabled && accepted)
+	return store.SetNotificationSettings(ctx, user, domain.NotificationSettings{Enabled: enabled, TemplateID: notification.TemplateID, AppID: notification.AppID}, enabled && accepted)
 }

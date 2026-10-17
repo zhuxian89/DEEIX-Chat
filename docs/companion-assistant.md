@@ -31,32 +31,25 @@
 
 ## 微信订阅配置
 
-复用服务端现有小程序 AppID、AppSecret 和有效账号绑定，密钥不下发到客户端。新增环境配置仅位于小禾注册模块：
+在管理后台「参数配置」搜索“消息提醒”，编辑 `companion:notification`。表单提供通知开关、模板 ID、标题字段、时间字段和跳转版本，整组保存后生效，无需重启后端。配置存入已有系统参数表，不新增配置表，也不读取提醒环境变量。复用参数配置中现有的小程序 AppID、AppSecret 和有效账号绑定，密钥不下发到客户端。
 
 | 配置 | 含义 |
 | --- | --- |
-| `DEEIX_COMPANION_NOTIFICATION_TEMPLATE_ID` | 在微信公众平台申请的真实一次性订阅模板 ID |
-| `DEEIX_COMPANION_NOTIFICATION_TITLE_FIELD` | 模板的事项字段，本次为 `thing5` |
-| `DEEIX_COMPANION_NOTIFICATION_TIME_FIELD` | 模板的时间字段，本次为 `time30` |
-| `DEEIX_COMPANION_NOTIFICATION_STATE` | `formal`（默认）、`trial` 或 `developer` |
+| `enabled` | 微信通知开关，默认开启；关闭仍保留应用内提醒 |
+| `templateId` | 在微信公众平台申请的真实一次性订阅模板 ID |
+| `titleField` | 模板的事项字段，本次为 `thing5` |
+| `timeField` | 模板的时间字段，本次为 `time30` |
+| `state` | 正式版 `formal`（默认）、体验版 `trial` 或开发版 `developer` |
 
-当前适配需要一个仅由事项和时间两个字段组成的兼容模板。事项最长 20 字，时间格式 `YYYY-MM-DD HH:mm`；通知打开小程序首页。未配模板、字段不兼容或启动时缺少凭据时，接口报告 `ready=false`，按钮不可授权。
+当前适配需要一个仅由事项和时间两个字段组成的兼容模板。事项最长 20 字，时间格式 `YYYY-MM-DD HH:mm`；通知打开小程序首页。配置关闭、配置被删除、配置无效或缺少凭据时，接口报告 `ready=false`，按钮不可授权。保存时校验字段格式和版本选项；补齐凭据后下一次读取自动就绪，不需要重启。
 
 ### 本次选用的模板与部署配置
 
-2026-10-17 根据微信公众平台截图确认：类目为“备忘录”，模板名称为“日程提醒”，公共模板编号为 571。模板 ID 为 `GkYenXrXMZjt6OY9NCmm_ylfOUGwdq8TYcW45lzuXEE`，日程标题对应 `{{thing5.DATA}}`，提醒时间对应 `{{time30.DATA}}`；环境变量填写字段名 `thing5`、`time30`，不包含花括号或 `.DATA`。喝药、运动、陪孩子写作业等用户创建的事项共用此模板。
+2026-10-17 根据微信公众平台截图确认：类目为“备忘录”，模板名称为“日程提醒”，公共模板编号为 571。模板 ID 为 `GkYenXrXMZjt6OY9NCmm_ylfOUGwdq8TYcW45lzuXEE`，日程标题对应 `{{thing5.DATA}}`，提醒时间对应 `{{time30.DATA}}`；字段名填写 `thing5`、`time30`，不包含花括号或 `.DATA`。喝药、运动、陪孩子写作业等用户创建的事项共用此模板。
 
-仓库根目录的 [docker-compose.companion.yml](../docker-compose.companion.yml) 已填写上述值。它是独立覆盖文件，需叠加到当前部署实际使用的 Compose 文件上；没有修改原有 Compose 文件。部署时须先准备包含本次提醒功能的后端镜像及配套小程序，不能假设现有远程 `latest` 镜像已经包含未发布的本地代码。
+部署包含本次改动的后端和 Web 管理端后，启动时自动补齐 `companion:notification`，预填上述模板、字段和正式版选项。已有管理员修改的值不会被覆盖。无需额外 Compose 文件或服务器环境变量；此前添加的提醒覆盖文件已移除。
 
-例如，使用默认 Compose 的部署在确认镜像后加载：
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.companion.yml up -d app
-```
-
-使用 `docker-compose.full.yml` 或 `docker-compose.sqlite.yml` 的部署应替换第一个文件名，保持原有数据库、存储和网络配置。模板参数通过容器环境变量传入后端；只把它们写进根目录 `.env` 或 `config.yaml` 不会自动启用发送。直接运行后端时，需将以上四项设置为该后端进程的环境变量。
-
-覆盖文件默认使用正式版 `formal`。开发版验收需将 `DEEIX_COMPANION_NOTIFICATION_STATE` 设为 `developer`，体验版设为 `trial`；Compose 可从启动环境或 `.env` 读取该覆盖值。该值指定通知点击后打开的小程序版本，不控制调度时间。模板、字段及版本环境变更后须重建后端容器，直接运行的后端则须重启。
+开发版验收在同一表单选择“开发版”，体验版选择“体验版”，公开发布后选择“正式版”。该选项指定通知点击后打开的小程序版本，不控制调度时间。新请求和新领取的通知使用最新配置；已经领取的发送使用领取时的完整配置，避免模板 ID 与字段混用。更换模板后，旧模板的授权不能用于新模板。配置删除会停用通知；若需长期停用，应使用开关，因为后端再次启动会补齐缺失的默认参数。
 
 配置生效后，在小禾“记忆与跟进”确认通知状态就绪，再点击“允许下一次提醒”，授权后创建一条短时提醒验收。截图及本地适配测试只能确认字段映射，不能替代微信账号归属、用户授权和真机送达验证。
 

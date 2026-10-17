@@ -63,11 +63,12 @@ type NotificationSettings struct {
 	Enabled    bool
 	Credits    int
 	TemplateID string
+	AppID      string // Internal consent binding; never supplied by the client.
 }
 
 type NotificationDelivery struct {
-	ID                        string
-	UserID                    uint
-	OpenID, TemplateID, Title string
-	DueAt                     time.Time
+	ID                               string
+	UserID                           uint
+	AppID, OpenID, TemplateID, Title string
+	DueAt                            time.Time
 }

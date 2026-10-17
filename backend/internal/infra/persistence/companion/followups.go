@@ -266,6 +266,9 @@ func (s *Store) SetNotificationSettings(ctx context.Context, user uint, n domain
 		if binding, err = s.binding(ctx, user); err != nil {
 			return err
 		}
+		if n.AppID != "" && n.AppID != binding.AppID {
+			return ErrBusy
+		}
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&notificationRecord{UserID: user}).Error; err != nil {
@@ -484,7 +487,7 @@ func (s *Store) PublishDueFollowup(ctx context.Context, user uint, now time.Time
 				}
 				if r.RowsAffected == 1 {
 					state = "dispatching"
-					delivery = &domain.NotificationDelivery{ID: id, UserID: user, OpenID: b.OpenID, TemplateID: template, Title: f.Title, DueAt: f.DueAt}
+					delivery = &domain.NotificationDelivery{ID: id, UserID: user, AppID: b.AppID, OpenID: b.OpenID, TemplateID: template, Title: f.Title, DueAt: f.DueAt}
 				}
 			}
 		}

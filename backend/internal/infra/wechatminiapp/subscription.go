@@ -94,6 +94,10 @@ func (c *SubscriptionClient) accessToken(ctx context.Context) (string, error) {
 }
 
 func (c *SubscriptionClient) Send(ctx context.Context, d domain.NotificationDelivery) error {
+	appID, _ := c.credentials()
+	if d.AppID != "" && d.AppID != appID {
+		return errors.New("subscription application changed before delivery")
+	}
 	if d.OpenID == "" || d.TemplateID == "" || d.Title == "" || d.DueAt.IsZero() {
 		return errors.New("subscription delivery is invalid")
 	}

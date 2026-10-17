@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	domain "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
+	"github.com/google/uuid"
 	"sync"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 func reminderCommand(t *testing.T, s *Store, c domain.ReminderCommand, now time.Time) domain.ReminderResult {
 	t.Helper()
 	if c.RequestID == "" {
-		c.RequestID = fmt.Sprintf("request-%d", time.Now().UnixNano())
+		c.RequestID = "request-" + uuid.NewString()
 	}
 	c.ConversationID = "companion"
 	result, err := s.ExecuteReminder(t.Context(), 1, c, now)

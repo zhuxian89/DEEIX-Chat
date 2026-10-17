@@ -595,7 +595,7 @@ func (s *Store) ClaimReminderNotification(ctx context.Context, now time.Time, te
 					}
 					if result.RowsAffected == 1 {
 						status = "dispatching"
-						delivery = &domain.NotificationDelivery{ID: fmt.Sprintf("%s:%d", row.ID, row.Revision), UserID: row.UserID, OpenID: b.OpenID, TemplateID: template, Title: p.Title, DueAt: row.DueAt}
+						delivery = &domain.NotificationDelivery{ID: fmt.Sprintf("%s:%d", row.ID, row.Revision), UserID: row.UserID, AppID: b.AppID, OpenID: b.OpenID, TemplateID: template, Title: p.Title, DueAt: row.DueAt}
 					}
 				}
 			}

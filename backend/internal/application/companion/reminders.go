@@ -68,7 +68,7 @@ func (s *Service) TickReminders(ctx context.Context) error {
 	if !ok {
 		return nil
 	}
-	return store.TickReminders(ctx, time.Now(), s.NotificationTemplateID)
+	return store.TickReminders(ctx, time.Now(), s.notificationRuntime().TemplateID)
 }
 
 // Delivery runs separately so a slow external request cannot delay due events.
@@ -79,7 +79,7 @@ func (s *Service) DispatchReminders(ctx context.Context) error {
 // Bound both simultaneous requests and request starts. Idle users create no jobs.
 func (s *Service) dispatchReminders(ctx context.Context, workers int, spacing time.Duration) error {
 	store, ok := s.Store.(ReminderStore)
-	if !ok || s.Notifier == nil {
+	if !ok {
 		return nil
 	}
 	ticker := time.NewTicker(spacing)
@@ -106,7 +106,14 @@ func (s *Service) dispatchReminders(ctx context.Context, workers int, spacing ti
 					claims.Unlock()
 					return
 				}
-				d, more, err := store.ClaimReminderNotification(ctx, time.Now(), s.NotificationTemplateID)
+				notification := s.notificationRuntime()
+				if notification.Sender == nil || notification.TemplateID == "" {
+					claimsStopped = true
+					close(stopClaims)
+					claims.Unlock()
+					return
+				}
+				d, more, err := store.ClaimReminderNotification(ctx, time.Now(), notification.TemplateID)
 				if err != nil || (d == nil && !more) {
 					claimsStopped = true
 					close(stopClaims)
@@ -124,7 +131,7 @@ func (s *Service) dispatchReminders(ctx context.Context, workers int, spacing ti
 				}
 				status := "uncertain"
 				sendCtx, cancel := context.WithTimeout(ctx, 12*time.Second)
-				err = s.Notifier.Send(sendCtx, *d)
+				err = notification.Sender.Send(sendCtx, *d)
 				cancel()
 				if err == nil {
 					status = "sent"

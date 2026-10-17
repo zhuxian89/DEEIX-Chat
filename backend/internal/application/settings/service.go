@@ -10,6 +10,7 @@ import (
 
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/application/extraction"
 	domainbilling "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/billing"
+	domaincompanion "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/companion"
 	domaindailycheckin "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/dailycheckin"
 	domainsettings "github.com/DEEIX-AI/DEEIX-Chat/backend/internal/domain/settings"
 	"github.com/DEEIX-AI/DEEIX-Chat/backend/internal/infra/config"
@@ -368,6 +369,7 @@ func csvSet(raw string) map[string]struct{} {
 
 // validNamespaces 合法的 namespace 集合。
 var validNamespaces = map[string]bool{
+	"companion":      true,
 	"miniapp_todo":   true,
 	"speech":         true,
 	"auth":           true,
@@ -744,6 +746,9 @@ func validatePatchItem(item PatchItem) error {
 		return validateStringMax(value, 255, key)
 	case "daily_checkin:config":
 		_, err := domaindailycheckin.ParseConfig(value)
+		return err
+	case "companion:notification":
+		_, err := domaincompanion.ParseNotificationConfig(value)
 		return err
 	}
 	return nil

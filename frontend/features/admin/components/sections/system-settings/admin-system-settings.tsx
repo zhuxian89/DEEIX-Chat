@@ -55,6 +55,8 @@ import type { SettingItem, SettingsGrouped } from "@/shared/api/settings.types";
 import { resolveAccessToken } from "@/shared/auth/resolve-access-token";
 import { parseKindsJSON } from "@/shared/model/llm-schema";
 
+import { CompanionNotificationField } from "./companion-notification-field";
+
 const PAGE_SIZE = 20;
 
 type SettingRow = SettingItem & { namespace: string };
@@ -565,6 +567,9 @@ function SettingValueField({
   }
 
   if (draft.valueType === "json") {
+    if (draft.namespace === "companion" && draft.key === "notification") {
+      return <CompanionNotificationField value={draft.value} onChange={onChange} />;
+    }
     if (draft.namespace === "daily_checkin" && draft.key === "config") {
       return <DailyCheckinConfigField value={draft.value} onChange={onChange} />;
     }

@@ -403,6 +403,9 @@ type Config struct {
 	WeChatMiniAppDefaultChatModel  string
 	WeChatMiniAppDefaultImageModel string
 
+	// Dynamic setting companion:notification; no environment-variable fallback.
+	CompanionNotificationJSON string
+
 	// Speech credentials are only used to seed missing system settings at startup.
 	SpeechTencentSecretID  string
 	SpeechTencentSecretKey string
