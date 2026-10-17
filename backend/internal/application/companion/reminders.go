@@ -163,6 +163,7 @@ var clockRE = regexp.MustCompile(`(凌晨|早上|早晨|上午|中午|下午|傍
 var dateRE = regexp.MustCompile(`(?:(\d{4})[-年/])?(\d{1,2})[-月/](\d{1,2})[日号]?`)
 var monthDayRE = regexp.MustCompile(`每月\s*([0-9一二两三四五六七八九十]+)\s*[日号]`)
 var indexRE = regexp.MustCompile(`第\s*([0-9一二两三四五六七八九十]+)\s*[个条项]`)
+var reminderTitleRE = regexp.MustCompile(`"([^"]*)"|“([^”]*)”|「([^」]*)」`)
 
 func chineseNumber(s string) (float64, bool) {
 	if s == "半" {
@@ -255,20 +256,45 @@ func matchReminderTitle(s string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(s, " ", ""), "陪伴", "陪")
 }
 
+func quotedReminderTitle(text string) (title, command, reason string) {
+	const quotes = "\"“”「」"
+	if !strings.ContainsAny(text, quotes) {
+		return "", text, ""
+	}
+	matches := reminderTitleRE.FindAllStringSubmatch(text, -1)
+	command = reminderTitleRE.ReplaceAllString(text, " ")
+	if len(matches) != 1 || strings.ContainsAny(command, quotes) {
+		return "", command, "请用一对完整的引号标出一个提醒名称，例如：把“为了测试”提醒改到3分钟后。"
+	}
+	for _, part := range matches[0][1:] {
+		if strings.TrimSpace(part) != "" {
+			return strings.TrimSpace(part), command, ""
+		}
+	}
+	return "", command, "引号内需要填写提醒名称。"
+}
+
+// Preserve complete names before stripping conversational words such as 的、了、把.
+// A quoted name is literal and must never fall back to another reminder.
+func namedReminderMatches(text, quotedTitle string, plans []domain.Reminder) []domain.Reminder {
+	var matches []domain.Reminder
+	for _, p := range plans {
+		if p.Status == "deleted" || p.Title == "" {
+			continue
+		}
+		if quotedTitle != "" {
+			if p.Title == quotedTitle {
+				matches = append(matches, p)
+			}
+		} else if strings.Contains(matchReminderTitle(text), matchReminderTitle(p.Title)) {
+			matches = append(matches, p)
+		}
+	}
+	return matches
+}
+
 func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.Time) domain.ReminderCommand {
 	text := strings.TrimSpace(input)
-	// A common dictated typo is a duration followed by 小时候, not childhood.
-	text = regexp.MustCompile(`([0-9一二两三四五六七八九十半])个?小时候`).ReplaceAllString(text, "${1}小时后")
-	halfHour := regexp.MustCompile(`([0-9一二两三四五六七八九十]+)个?(?:半小时|小时半)`)
-	text = halfHour.ReplaceAllStringFunc(text, func(v string) string {
-		m := halfHour.FindStringSubmatch(v)
-		n, _ := chineseNumber(m[1])
-		return strconv.FormatFloat(n+.5, 'f', -1, 64) + "小时"
-	})
-	text = regexp.MustCompile(`早晚\s*([0-9一二两三四五六七八九十]+)点`).ReplaceAllString(text, "早上${1}点和晚上${1}点")
-	if text == "" || reminderContains(text, "比如", "例如", "举个例子", "假如", "假设", "如果我说", "怎么实现", "如何实现", "代码") {
-		return domain.ReminderCommand{}
-	}
 	var last *domain.ReminderTurn
 	for i := len(state.Turns) - 1; i >= 0; i-- {
 		if state.Turns[i].Input != "" && now.Sub(state.Turns[i].CreatedAt) < 30*time.Minute {
@@ -281,6 +307,19 @@ func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.
 		if clockRE.MatchString(text) || durationRE.MatchString(text) {
 			text = last.Input + " " + text
 		}
+	}
+	quotedTitle, text, quoteReason := quotedReminderTitle(text)
+	// A common dictated typo is a duration followed by 小时候, not childhood.
+	text = regexp.MustCompile(`([0-9一二两三四五六七八九十半])个?小时候`).ReplaceAllString(text, "${1}小时后")
+	halfHour := regexp.MustCompile(`([0-9一二两三四五六七八九十]+)个?(?:半小时|小时半)`)
+	text = halfHour.ReplaceAllStringFunc(text, func(v string) string {
+		m := halfHour.FindStringSubmatch(v)
+		n, _ := chineseNumber(m[1])
+		return strconv.FormatFloat(n+.5, 'f', -1, 64) + "小时"
+	})
+	text = regexp.MustCompile(`早晚\s*([0-9一二两三四五六七八九十]+)点`).ReplaceAllString(text, "早上${1}点和晚上${1}点")
+	if text == "" || reminderContains(text, "比如", "例如", "举个例子", "假如", "假设", "如果我说", "怎么实现", "如何实现", "代码") {
+		return domain.ReminderCommand{}
 	}
 	action := ""
 	switch {
@@ -304,16 +343,17 @@ func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.
 	if action != "" {
 		// Do not intercept unrelated delete/edit requests or ordinary completion reports.
 		potential := reminderContains(text, "提醒", "闹钟", "倒计时", "多久")
-		for _, p := range state.Plans {
-			if strings.Contains(matchReminderTitle(text), matchReminderTitle(p.Title)) {
-				potential = true
-			}
+		if len(namedReminderMatches(text, quotedTitle, state.Plans)) > 0 {
+			potential = true
 		}
 		if last != nil && len(last.ReminderIDs) == 1 && reminderContains(text, "这个", "这条", "那个", "改成", "推迟", "已完成", "暂停", "恢复") {
 			potential = true
 		}
 		if !potential {
 			return domain.ReminderCommand{}
+		}
+		if quoteReason != "" {
+			return domain.ReminderCommand{Action: "clarify", Reply: quoteReason}
 		}
 		c := domain.ReminderCommand{Action: action}
 		if action == "list" {
@@ -324,13 +364,20 @@ func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.
 			}
 			matches := []string{}
 			query := matchReminderTitle(cleanReminderTarget(text))
-			for _, p := range state.Plans {
-				if p.Status != "deleted" && (strings.Contains(matchReminderTitle(text), matchReminderTitle(p.Title)) || query != "" && strings.Contains(matchReminderTitle(p.Title), query)) {
-					matches = append(matches, p.ID)
+			for _, p := range namedReminderMatches(text, quotedTitle, state.Plans) {
+				matches = append(matches, p.ID)
+			}
+			if len(matches) == 0 && quotedTitle == "" {
+				for _, p := range state.Plans {
+					if p.Status != "deleted" && query != "" && strings.Contains(matchReminderTitle(p.Title), query) {
+						matches = append(matches, p.ID)
+					}
 				}
 			}
 			if len(matches) > 0 {
 				c.IDs = matches
+			} else if quotedTitle != "" {
+				return domain.ReminderCommand{Action: "clarify", Reply: fmt.Sprintf("没有找到名为“%s”的提醒。可以说“查看所有提醒”。", quotedTitle)}
 			} else if query != "" && !reminderContains(query, "现在", "目前", "都", "有", "是") {
 				return domain.ReminderCommand{Action: "clarify", Reply: "没有找到这个提醒。可以说“查看所有提醒”。"}
 			}
@@ -348,14 +395,19 @@ func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.
 		if action == "snooze" {
 			query = durationRE.ReplaceAllString(query, "")
 		}
+		matches := namedReminderMatches(query, quotedTitle, state.Plans)
+		if len(matches) == 0 && quotedTitle != "" {
+			return domain.ReminderCommand{Action: "clarify", Reply: fmt.Sprintf("没有找到名为“%s”的提醒。可以说“查看所有提醒”。", quotedTitle)}
+		}
 		query = cleanReminderTarget(query)
-		matches := []domain.Reminder{}
-		for _, p := range state.Plans {
-			if p.Status == "deleted" {
-				continue
-			}
-			if query != "" && (strings.Contains(matchReminderTitle(p.Title), matchReminderTitle(query)) || strings.Contains(matchReminderTitle(query), matchReminderTitle(p.Title))) {
-				matches = append(matches, p)
+		if len(matches) == 0 {
+			for _, p := range state.Plans {
+				if p.Status == "deleted" {
+					continue
+				}
+				if query != "" && (strings.Contains(matchReminderTitle(p.Title), matchReminderTitle(query)) || strings.Contains(matchReminderTitle(query), matchReminderTitle(p.Title))) {
+					matches = append(matches, p)
+				}
 			}
 		}
 		if len(matches) == 0 && last != nil {
@@ -430,6 +482,9 @@ func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.
 		}
 		return domain.ReminderCommand{}
 	}
+	if quoteReason != "" {
+		return domain.ReminderCommand{Action: "clarify", Reply: quoteReason}
+	}
 	schedule, rest, reason := parseReminderSchedule(text, now)
 	if reason != "" {
 		return domain.ReminderCommand{Action: "clarify", Reply: reason}
@@ -449,6 +504,9 @@ func ParseReminderCommand(input string, state domain.ReminderSnapshot, now time.
 		if rest == old {
 			break
 		}
+	}
+	if quotedTitle != "" {
+		rest = quotedTitle
 	}
 	if rest == "" || len([]rune(rest)) > 120 {
 		return domain.ReminderCommand{Action: "clarify", Reply: "还需要提醒的事情，例如“一个小时后提醒我吃药”。"}

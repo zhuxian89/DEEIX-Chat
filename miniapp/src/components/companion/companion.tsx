@@ -578,7 +578,7 @@ export function CompanionPanel({ session, onState, onBack, initial }: SharedProp
   };
   const editReminder = (plan: ReminderPlan) => {
     setMemoryOpen(false); setReminderOpen(false);
-    setDraft(`把${plan.title}提醒改到`);
+    setDraft(`把“${plan.title}”提醒改到`);
   };
 
   const timeline: DisplayMessage[] = messages.map((message) => ({ ...message, text: companionDisplayText(message) }));

@@ -262,7 +262,8 @@ func TestTodoSyncHandlesDatesCompletionDeletionAndAccountBinding(t *testing.T) {
 	if err := db.Exec("INSERT INTO wechat_miniapp_bindings(user_id,app_id,open_id) VALUES(1,'app','owner'),(2,'app','other')").Error; err != nil {
 		t.Fatal(err)
 	}
-	task := todo.Task{ID: "task", Title: "提交材料", DueDate: now.Add(time.Hour).In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02"), DueTime: now.Add(time.Hour).In(time.FixedZone("UTC+8", 8*3600)).Format("15:04"), Timezone: "Asia/Shanghai", UpdatedAt: now, Version: 1}
+	dueAt := now.Add(time.Hour).In(time.FixedZone("UTC+8", 8*3600)).Truncate(time.Minute)
+	task := todo.Task{ID: "task", Title: "提交材料", DueDate: dueAt.Format("2006-01-02"), DueTime: dueAt.Format("15:04"), Timezone: "Asia/Shanghai", UpdatedAt: now, Version: 1}
 	save := func(owner string) {
 		t.Helper()
 		data, _ := json.Marshal(task)
@@ -282,15 +283,20 @@ func TestTodoSyncHandlesDatesCompletionDeletionAndAccountBinding(t *testing.T) {
 	}
 	original := items[0].ID
 	task.Title = "提交材料"
-	task.DueDate = now.Add(24 * time.Hour).In(time.FixedZone("UTC+8", 8*3600)).Format("2006-01-02")
+	// Advance the scheduled date, including when the initial hour crosses midnight.
+	dueAt = dueAt.AddDate(0, 0, 1)
+	task.DueDate = dueAt.Format("2006-01-02")
 	task.Version++
 	save("owner")
 	if err := store.SyncTodoFollowups(t.Context(), 1, now); err != nil {
 		t.Fatal(err)
 	}
-	items, _ = store.Followups(t.Context(), 1)
-	if len(items) != 1 || items[0].ID != original || items[0].Revision != 2 {
-		t.Fatal("TODO change duplicated event")
+	items, err := store.Followups(t.Context(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].ID != original || items[0].Revision != 2 || !items[0].DueAt.Equal(dueAt) {
+		t.Fatalf("TODO change did not update the existing event: %+v", items)
 	}
 	task.CompletedAt = &now
 	save("owner")

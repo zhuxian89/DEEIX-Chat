@@ -54,3 +54,134 @@ func TestReminderConversationLifecycleAndClarification(t *testing.T) {
 		t.Fatalf("clarification: %+v", c)
 	}
 }
+
+func TestReminderCommandsPreserveNamedTargets(t *testing.T) {
+	now := time.Date(2026, 10, 17, 16, 22, 0, 0, domain.ReminderZone)
+	for _, names := range []struct{ title, other string }{
+		{"为了测试", "为测试"},
+		{"宝宝的药", "宝宝药"},
+		{"维修把手", "维修手"},
+	} {
+		t.Run(names.title, func(t *testing.T) {
+			created := ParseReminderCommand("2分钟后提醒我"+names.title, domain.ReminderSnapshot{}, now)
+			if created.Action != "create" || created.Title != names.title {
+				t.Fatalf("create: %+v", created)
+			}
+			state := domain.ReminderSnapshot{
+				Plans: []domain.Reminder{
+					{ID: "target", Title: created.Title, Status: "active", Revision: 3, Schedule: created.Schedule},
+					{ID: "other", Title: names.other, Status: "active", Revision: 7, Schedule: created.Schedule},
+				},
+				Turns: []domain.ReminderTurn{{Input: "2分钟后提醒我" + names.other, ReminderIDs: []string{"other"}, CreatedAt: now}},
+			}
+			for _, tt := range []struct{ input, action string }{
+				{"把" + names.title + "提醒改到3分钟后", "update"},
+				{"暂停" + names.title + "提醒", "pause"},
+				{"恢复" + names.title + "提醒", "resume"},
+				{"删除" + names.title + "提醒", "delete"},
+				{"把" + names.title + "提醒推迟十分钟", "snooze"},
+				{names.title + "提醒已完成", "complete"},
+				{"查询" + names.title + "提醒", "list"},
+			} {
+				t.Run(tt.input, func(t *testing.T) {
+					command := ParseReminderCommand(tt.input, state, now)
+					if command.Action != tt.action || len(command.IDs) != 1 || command.IDs[0] != "target" {
+						t.Fatalf("wrong target: %+v", command)
+					}
+					if tt.action != "list" && (command.ID != "target" || command.Revision != 3 || command.Title != names.title) {
+						t.Fatalf("lost reminder identity: %+v", command)
+					}
+					if tt.action == "update" && (command.Schedule.Kind != "once" || !command.Schedule.StartAt.Equal(now.Add(3*time.Minute))) {
+						t.Fatalf("wrong updated time: %+v", command)
+					}
+					if tt.action == "snooze" && command.DelayMinutes != 10 {
+						t.Fatalf("wrong delay: %+v", command)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestReminderNamedTargetsStillRequireDisambiguation(t *testing.T) {
+	now := time.Date(2026, 10, 17, 16, 22, 0, 0, domain.ReminderZone)
+	state := domain.ReminderSnapshot{Plans: []domain.Reminder{
+		{ID: "first", Title: "为了测试", Status: "active"},
+		{ID: "second", Title: "为了测试", Status: "paused"},
+		{ID: "deleted", Title: "为了测试", Status: "deleted"},
+	}}
+	for _, input := range []string{"把为了测试提醒改到3分钟后", "删除为了测试提醒", "删除“为了测试”提醒"} {
+		command := ParseReminderCommand(input, state, now)
+		if command.Action != "clarify" || len(command.IDs) != 2 || command.IDs[0] != "first" || command.IDs[1] != "second" {
+			t.Fatalf("%s: %+v", input, command)
+		}
+	}
+}
+
+func TestQuotedReminderTitles(t *testing.T) {
+	now := time.Date(2026, 10, 17, 16, 22, 0, 0, domain.ReminderZone)
+	for _, quotes := range [][2]string{{"“", "”"}, {`"`, `"`}, {"「", "」"}} {
+		for _, title := range []string{"为了测试", "取消会员", "跳绳10分钟", "一个半小时复盘"} {
+			quoted := quotes[0] + title + quotes[1]
+			t.Run(quoted, func(t *testing.T) {
+				created := ParseReminderCommand("2分钟后提醒我"+quoted, domain.ReminderSnapshot{}, now)
+				if created.Action != "create" || created.Title != title || !created.Schedule.StartAt.Equal(now.Add(2*time.Minute)) {
+					t.Fatalf("quoted creation: %+v", created)
+				}
+				state := domain.ReminderSnapshot{Plans: []domain.Reminder{
+					{ID: "target", Title: title, Status: "active", Revision: 3, Schedule: created.Schedule},
+					{ID: "partial", Title: "测试", Status: "active"},
+				}}
+				for _, tt := range []struct{ input, action string }{
+					{"把" + quoted + "提醒改到3分钟后", "update"},
+					{"暂停" + quoted + "提醒", "pause"},
+					{"恢复" + quoted + "提醒", "resume"},
+					{"删除" + quoted + "提醒", "delete"},
+					{"把" + quoted + "提醒推迟十分钟", "snooze"},
+					{quoted + "提醒已完成", "complete"},
+					{"查询" + quoted + "提醒", "list"},
+				} {
+					command := ParseReminderCommand(tt.input, state, now)
+					if command.Action != tt.action || len(command.IDs) != 1 || command.IDs[0] != "target" {
+						t.Fatalf("%s: %+v", tt.input, command)
+					}
+					if tt.action == "update" && !command.Schedule.StartAt.Equal(now.Add(3*time.Minute)) {
+						t.Fatalf("title affected new time: %+v", command)
+					}
+					if tt.action == "snooze" && command.DelayMinutes != 10 {
+						t.Fatalf("title affected delay: %+v", command)
+					}
+				}
+			})
+		}
+	}
+}
+
+func TestQuotedReminderTargetDoesNotFallBack(t *testing.T) {
+	now := time.Date(2026, 10, 17, 16, 22, 0, 0, domain.ReminderZone)
+	state := domain.ReminderSnapshot{
+		Plans: []domain.Reminder{
+			{ID: "medicine", Title: "吃药", Status: "active"},
+			{ID: "deleted", Title: "为了测试", Status: "deleted"},
+		},
+		Turns: []domain.ReminderTurn{{Input: "2分钟后提醒我吃药", ReminderIDs: []string{"medicine"}, CreatedAt: now}},
+	}
+	for _, input := range []string{
+		"把“并不存在”提醒改成3分钟后", "删除“药”提醒", "删除“喝药”提醒",
+		"删除“为了测试”提醒", "查看“并不存在”提醒", "删除“”提醒",
+		"删除“吃药提醒", `删除"吃药”提醒`, "删除“吃药”和“喝水”提醒",
+	} {
+		command := ParseReminderCommand(input, state, now)
+		if command.Action != "clarify" || command.ID != "" || len(command.IDs) != 0 {
+			t.Fatalf("%s selected a reminder: %+v", input, command)
+		}
+	}
+	state.Turns = []domain.ReminderTurn{{Input: "提醒我“跳绳10分钟”", Reply: "还需要具体时间", CreatedAt: now}}
+	command := ParseReminderCommand("半小时后", state, now)
+	if command.Action != "create" || command.Title != "跳绳10分钟" || !command.Schedule.StartAt.Equal(now.Add(30*time.Minute)) {
+		t.Fatalf("quoted clarification: %+v", command)
+	}
+	if command := ParseReminderCommand("帮我给“老板”写封邮件", state, now); command.Action != "" {
+		t.Fatalf("intercepted ordinary chat: %+v", command)
+	}
+}
