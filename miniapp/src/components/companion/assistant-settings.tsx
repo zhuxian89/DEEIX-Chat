@@ -1,9 +1,9 @@
 import type { CompanionAssistantState, CompanionContextConversation, CompanionFollowup } from "@deeix/api-contract";
 import { Button, Input, Picker, Switch, Text, View } from "@tarojs/components";
-import Taro from "@tarojs/taro";
 import { useEffect, useRef, useState } from "react";
 import type { CompanionClient } from "@/product/companion-client";
-import { companionDecisionText, followupDateParts, followupDueAt, followupTime, subscribeToFollowup } from "@/product/companion-assistant";
+import { companionDecisionText, followupDateParts, followupDueAt, followupTime } from "@/product/companion-assistant";
+import { useCompanionSubscriptions } from "./use-subscriptions";
 import "./assistant-settings.scss";
 
 type Editor = { item?: CompanionFollowup; title: string; date: string; time: string };
@@ -11,6 +11,7 @@ type Editor = { item?: CompanionFollowup; title: string; date: string; time: str
 export function AssistantSettings({ client, refreshKey, quiet, onChanged }: {
   client: CompanionClient; refreshKey: unknown; quiet: boolean; onChanged(): void;
 }) {
+  const subscription = useCompanionSubscriptions(client);
   const [state, setState] = useState<CompanionAssistantState | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -67,6 +68,7 @@ export function AssistantSettings({ client, refreshKey, quiet, onChanged }: {
     if (!editor) return;
     const dueAt = followupDueAt(editor.date, editor.time);
     if (!dueAt) throw new Error("请选择有效的日期和时间。");
+    void subscription.controller.request();
     await client.saveFollowup({ id: editor.item?.id ?? "", revision: editor.item?.revision ?? 0, title: editor.title.trim(), dueAt, status: "pending" });
     if (mounted.current) setEditor(null);
     await reload();
@@ -75,20 +77,9 @@ export function AssistantSettings({ client, refreshKey, quiet, onChanged }: {
     await client.saveFollowup({ id: item.id, revision: item.revision, title: item.title, dueAt: item.dueAt, status });
     await reload();
   };
-  const subscribe = async () => {
-    if (!state) return;
-    const accepted = await subscribeToFollowup(state.notifications, async (id) => {
-      // Taro 4.2 requires an Alipay-only field in this shared type; WeChat uses tmplIds.
-      const result = await Taro.requestSubscribeMessage({ tmplIds: [id] } as Taro.requestSubscribeMessage.Option);
-      const choice: unknown = Reflect.get(result, id);
-      return typeof choice === "string" ? choice : "reject";
-    }, client);
-    if (!accepted) throw new Error("未获得订阅授权，仍会保留应用内提醒。");
-    await reload();
-  };
-
   if (!state) return <View className="assistantSettings"><Text>{error || "正在加载跟进信息…"}</Text><Button disabled={busy} onClick={() => void run(reload)}>重新加载</Button></View>;
   const pending = state.followups.filter((item) => item.status === "pending");
+  const notifications = subscription.settings ?? state.notifications;
   const visible = showHistory ? state.followups : pending;
   return <View className="assistantSettings">
     {error && <View className="assistantError"><Text>{error}</Text><Button disabled={busy} onClick={() => void run(reload)}>刷新数据</Button></View>}
@@ -121,9 +112,13 @@ export function AssistantSettings({ client, refreshKey, quiet, onChanged }: {
     </View>
     <View className="assistantSection">
       <Text className="assistantTitle">微信通知</Text>
-      <Text className="assistantHint">{!state.notifications.ready ? "通知暂未配置。到期消息会保留在小禾会话里，打开后可查看。" : state.notifications.enabled && state.notifications.credits > 0 ? "已获得一次通知授权，下次事项到期时使用。" : "允许后，下一次事项到期可通过微信提醒；每次订阅仅用于一次通知。"}</Text>
-      <Button disabled={busy || !state.notifications.ready} onClick={() => void run(subscribe)}>允许下一次提醒</Button>
-      {state.notifications.enabled && <Button disabled={busy} onClick={() => void run(async () => { await client.setNotifications(false); await reload(); })}>关闭微信通知</Button>}
+      <Text className="assistantHint">{subscription.error || (!notifications.ready ? "通知暂未配置。到期消息会保留在小禾会话里。" : notifications.enabled ? `可用微信提醒：${notifications.credits} 次。` : "允许后，可在提醒到期时收到微信通知。")}</Text>
+      <Text className="assistantHint">允许时勾选“总是保持以上选择”，后续使用小禾会免弹窗补充通知次数。</Text>
+      <Button disabled={busy || subscription.busy} onClick={() => {
+        if (subscription.settings?.ready) void subscription.controller.request(true);
+        else void subscription.controller.refresh();
+      }}>{!subscription.settings?.ready ? "重新加载通知状态" : notifications.enabled ? "补充通知次数" : "允许微信提醒"}</Button>
+      {notifications.enabled && <Button disabled={busy} onClick={() => void run(async () => { await subscription.controller.disable(); await reload(); })}>关闭微信通知</Button>}
     </View>
     <View className="assistantSection">
       <View className="assistantSetting"><Text className="assistantTitle">全局理解</Text><Switch checked={state.preferences.enabled} disabled={busy} color="#548b75" onChange={(e) => void run(() => setContext(e.detail.value, state.preferences.excluded))} /></View>

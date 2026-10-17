@@ -66,6 +66,11 @@ type NotificationSettings struct {
 	AppID      string // Internal consent binding; never supplied by the client.
 }
 
+type NotificationConsent struct {
+	RequestID string
+	Automatic bool
+}
+
 type NotificationDelivery struct {
 	ID                               string
 	UserID                           uint

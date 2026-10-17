@@ -71,7 +71,7 @@ func (s *Service) SaveFollowup(ctx context.Context, user uint, id, title, status
 	f.Title, f.Status, f.DueAt, f.UserManaged = title, status, due, true
 	return store.SaveFollowup(ctx, f)
 }
-func (s *Service) SetNotifications(ctx context.Context, user uint, enabled, accepted bool, template string) error {
+func (s *Service) SetNotifications(ctx context.Context, user uint, enabled, accepted bool, template string, consents ...domain.NotificationConsent) error {
 	store, ok := s.Store.(AssistantStore)
 	if !ok {
 		return ErrNotFound
@@ -83,5 +83,21 @@ func (s *Service) SetNotifications(ctx context.Context, user uint, enabled, acce
 	if enabled && (notification.Sender == nil || notification.TemplateID == "" || template != notification.TemplateID || !accepted) {
 		return ErrInvalid
 	}
-	return store.SetNotificationSettings(ctx, user, domain.NotificationSettings{Enabled: enabled, TemplateID: notification.TemplateID, AppID: notification.AppID}, enabled && accepted)
+	settings := domain.NotificationSettings{Enabled: enabled, TemplateID: notification.TemplateID, AppID: notification.AppID}
+	if len(consents) > 1 {
+		return ErrInvalid
+	}
+	if len(consents) == 1 {
+		consent := consents[0]
+		if consent.RequestID != "" {
+			if !enabled || len(consent.RequestID) < 8 || len(consent.RequestID) > 100 || strings.TrimSpace(consent.RequestID) != consent.RequestID {
+				return ErrInvalid
+			}
+			return store.GrantNotification(ctx, user, settings, consent)
+		}
+		if consent.Automatic {
+			return ErrInvalid
+		}
+	}
+	return store.SetNotificationSettings(ctx, user, settings, enabled && accepted)
 }

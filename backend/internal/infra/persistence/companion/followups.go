@@ -260,34 +260,7 @@ func (s *Store) NotificationSettings(ctx context.Context, user uint) (domain.Not
 	return domain.NotificationSettings{Enabled: row.Enabled, Credits: row.Credits, TemplateID: row.TemplateID}, err
 }
 func (s *Store) SetNotificationSettings(ctx context.Context, user uint, n domain.NotificationSettings, grant bool) error {
-	var binding *models.WeChatMiniAppBinding
-	if n.Enabled {
-		var err error
-		if binding, err = s.binding(ctx, user); err != nil {
-			return err
-		}
-		if n.AppID != "" && n.AppID != binding.AppID {
-			return ErrBusy
-		}
-	}
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&notificationRecord{UserID: user}).Error; err != nil {
-			return err
-		}
-		updates := map[string]interface{}{"enabled": n.Enabled, "template_id": n.TemplateID}
-		if !n.Enabled {
-			updates["credits"] = 0
-			updates["bound_app_id"], updates["bound_open_id"] = "", ""
-		}
-		if grant && n.Enabled {
-			// One accepted subscription request grants at most one send. Do not accumulate
-			// unverifiable client counts; the platform remains the final consent authority.
-			updates["credits"] = 1
-			updates["last_consent_at"] = time.Now()
-			updates["bound_app_id"], updates["bound_open_id"] = binding.AppID, binding.OpenID
-		}
-		return tx.Model(&notificationRecord{}).Where("user_id = ?", user).Updates(updates).Error
-	})
+	return s.writeNotificationSettings(ctx, user, n, grant, domain.NotificationConsent{})
 }
 func (s *Store) AssistantUsers(ctx context.Context, after uint, limit int) ([]uint, error) {
 	if limit < 1 || limit > 100 {

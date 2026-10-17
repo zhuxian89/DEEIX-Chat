@@ -83,7 +83,7 @@ type Store struct {
 func (s *Store) SetAppIDProvider(provider func() string) { s.appID = provider }
 
 func NewStore(db *gorm.DB) (*Store, error) {
-	if err := db.AutoMigrate(&profileRecord{}, &memoryRecord{}, &topicCacheRecord{}, &initiativeStateRecord{}, &initiativeRecord{}, &contextPreferencesRecord{}, &followupRecord{}, &decisionRecord{}, &notificationRecord{}, &reminderOwner{}, &reminderRecord{}, &reminderEvent{}, &reminderTurnRecord{}); err != nil {
+	if err := db.AutoMigrate(&profileRecord{}, &memoryRecord{}, &topicCacheRecord{}, &initiativeStateRecord{}, &initiativeRecord{}, &contextPreferencesRecord{}, &followupRecord{}, &decisionRecord{}, &notificationRecord{}, &notificationConsentRecord{}, &reminderOwner{}, &reminderRecord{}, &reminderEvent{}, &reminderTurnRecord{}); err != nil {
 		return nil, err
 	}
 	return &Store{db: db}, nil

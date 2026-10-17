@@ -758,7 +758,10 @@ export interface CompanionFollowupResponse {
 
 export interface CompanionNotificationRequest {
   accepted: boolean;
+  automatic?: boolean;
   enabled: boolean;
+  /** @maxLength 100 */
+  requestID?: string;
   /** @maxLength 128 */
   templateID: string;
 }

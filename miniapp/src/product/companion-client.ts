@@ -110,8 +110,8 @@ export class CompanionClient {
     return this.request({ path: "/api/v1/companion/assistant/followups", method: "POST", body });
   }
 
-  async setNotifications(enabled: boolean, accepted = false, templateID = ""): Promise<void> {
-    await this.request({ path: "/api/v1/companion/assistant/notifications", method: "POST", body: { enabled, accepted, templateID } });
+  async setNotifications(enabled: boolean, accepted = false, templateID = "", requestID = "", automatic = false): Promise<void> {
+    await this.request({ path: "/api/v1/companion/assistant/notifications", method: "POST", body: { enabled, accepted, templateID, requestID, automatic } });
   }
 }
 

@@ -83,6 +83,8 @@ type CompanionNotificationRequest struct {
 	Enabled    bool   `json:"enabled"`
 	Accepted   bool   `json:"accepted"`
 	TemplateID string `json:"templateID" binding:"max=128"`
+	RequestID  string `json:"requestID,omitempty" binding:"max=100"`
+	Automatic  bool   `json:"automatic,omitempty"`
 }
 
 func followupDTO(f domain.Followup) CompanionFollowup {
@@ -208,7 +210,7 @@ func (h *Handler) Notifications(c *gin.Context) {
 		response.InvalidRequestBody(c, err)
 		return
 	}
-	if err := h.service.SetNotifications(c.Request.Context(), middleware.MustUserID(c), req.Enabled, req.Accepted, req.TemplateID); err != nil {
+	if err := h.service.SetNotifications(c.Request.Context(), middleware.MustUserID(c), req.Enabled, req.Accepted, req.TemplateID, domain.NotificationConsent{RequestID: req.RequestID, Automatic: req.Automatic}); err != nil {
 		fail(c, err)
 		return
 	}

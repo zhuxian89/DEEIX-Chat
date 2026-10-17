@@ -18392,8 +18392,15 @@ const docTemplate = `{
                 "accepted": {
                     "type": "boolean"
                 },
+                "automatic": {
+                    "type": "boolean"
+                },
                 "enabled": {
                     "type": "boolean"
+                },
+                "requestID": {
+                    "type": "string",
+                    "maxLength": 100
                 },
                 "templateID": {
                     "type": "string",

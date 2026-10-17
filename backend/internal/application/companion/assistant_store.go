@@ -20,6 +20,7 @@ type AssistantStore interface {
 	Decisions(context.Context, uint) ([]domain.Decision, error)
 	NotificationSettings(context.Context, uint) (domain.NotificationSettings, error)
 	SetNotificationSettings(context.Context, uint, domain.NotificationSettings, bool) error
+	GrantNotification(context.Context, uint, domain.NotificationSettings, domain.NotificationConsent) error
 	AssistantUsers(context.Context, uint, int) ([]uint, error)
 	ClaimFollowupRefresh(context.Context, uint, time.Time, string) (bool, error)
 	CompleteFollowupRefresh(context.Context, uint, string) error

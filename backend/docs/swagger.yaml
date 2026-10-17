@@ -1813,8 +1813,13 @@ definitions:
     properties:
       accepted:
         type: boolean
+      automatic:
+        type: boolean
       enabled:
         type: boolean
+      requestID:
+        maxLength: 100
+        type: string
       templateID:
         maxLength: 128
         type: string

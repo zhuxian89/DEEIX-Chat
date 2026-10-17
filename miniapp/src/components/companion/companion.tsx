@@ -17,6 +17,7 @@ import "./companion.scss";
 import { AssistantSettings } from "./assistant-settings";
 import { ReminderCards, type ReminderAction } from "./reminder-cards";
 import { ReminderSubscription } from "./reminder-subscription";
+import { useCompanionSubscriptions } from "./use-subscriptions";
 import { reminderMessages, reminderRequestID, reminderError } from "@/product/companion-reminders";
 
 const COMPANION_NAME = "小禾";
@@ -34,6 +35,7 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
   lastInteraction: { current: number };
 }) {
   const [state, setState] = useState<CompanionState | null>(null);
+  const { controller: subscriptions } = useCompanionSubscriptions(session.companion);
   const foreground = useRef(true);
   const working = useRef(false);
   const refreshAt = useRef(0);
@@ -97,7 +99,7 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction }: Sh
   }, [session, lastInteraction]);
 
   return (
-    <View className="companionEntryFrame" onClick={onOpen}>
+    <View className="companionEntryFrame" onClick={() => { void subscriptions.request(); onOpen(); }}>
       <View className="companionEntry">
         <View className="companionEntryPortrait">
           <CompanionAvatar size="entry" />
@@ -150,6 +152,7 @@ function errorMessage(error: unknown): string {
 export function CompanionPanel({ session, onState, onBack, initial, reminderInboxRequest = 0 }: SharedProps & {
   onBack(): void; initial: CompanionState | null; reminderInboxRequest?: number;
 }) {
+  const { controller: subscriptions } = useCompanionSubscriptions(session.companion);
   const [state, setState] = useState(initial);
   const [conversation, setConversation] = useState<ConversationResponse | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -566,6 +569,7 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
 
   const reminderAction = async (action: ReminderAction) => {
     if (!conversation || busyRef.current) return;
+    if (action.action !== "delete" && action.action !== "pause") void subscriptions.request();
     busyRef.current = true; setBusy(true); setError("");
     reminderVersion.current++;
     try {
@@ -726,7 +730,11 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
                 }}
                 value={draft} placeholder="随口说点什么…" maxlength={8000} autoHeight adjustPosition={false} showConfirmBar={false} disabled={busy || loading || speechActive} onLineChange={measureHistory} onInput={(event) => { recordCompanionInteraction(); setDraft(event.detail.value); }} />
             </SpeechComposer>
-            <Button className="companionSend" disabled={loading || uploading || speechActive || (!busy && !draft.trim() && !attachment)} onClick={() => busy ? void session.cancelActiveGeneration().catch((cause) => setError(errorMessage(cause))) : void send()}>{busy ? "停止" : "发送"}</Button>
+            <Button className="companionSend" disabled={loading || uploading || speechActive || (!busy && !draft.trim() && !attachment)} onClick={() => {
+              if (busy) { void session.cancelActiveGeneration().catch((cause) => setError(errorMessage(cause))); return; }
+              void subscriptions.request();
+              void send();
+            }}>{busy ? "停止" : "发送"}</Button>
           </View>
           {!keyboard && <Text className="companionFootnote">聊天及联网按平台用量计费 · 主动招呼不扣余额</Text>}
         </View>
