@@ -282,7 +282,13 @@ func (h *Handler) Stream(c *gin.Context) {
 		return
 	}
 	var req conversation.SendMessageRequest
-	if json.Unmarshal(body, &req) != nil || len([]rune(req.Content)) > 10_000 || len(req.FileIDs) > 4 {
+	maxFiles := h.cfg.Snapshot().MaxMessageFiles
+	if maxFiles <= 0 {
+		maxFiles = 10
+	}
+	// Keep the companion request within the standard chat HTTP contract.
+	maxFiles = min(maxFiles, 20)
+	if json.Unmarshal(body, &req) != nil || len([]rune(req.Content)) > 10_000 || len(req.FileIDs) > maxFiles {
 		fail(c, app.ErrInvalid)
 		return
 	}

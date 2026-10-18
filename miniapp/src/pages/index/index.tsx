@@ -49,13 +49,19 @@ import {
 } from "@/product/conversation-metadata";
 import {
   applyImageProgress,
+  applyMessageImageDownload,
   type ConversationMessage,
   createPendingImageTurn,
   latestVisibleMessages,
   messageFromAPI,
+  messageImageFileIDs,
+  messageImages,
 } from "@/product/message-timeline";
 import "./index.scss";
 import { MessageTime } from "@/components/message-time";
+import { PhotoTray } from "@/components/chat-photos/photo-tray";
+import { useChatPhotos } from "@/components/chat-photos/use-chat-photos";
+import { downloadMessagePhotos } from "@/product/message-photo-downloads";
 
 type Screen = "home" | "chat" | "image" | "account" | "checkin" | "history" | "memories" | "shared" | "companion";
 
@@ -223,6 +229,7 @@ export default function HomePage() {
   const [reminderInboxRequest, setReminderInboxRequest] = useState(0);
   const messageCounter = useRef(0);
   const historyLoadCounter = useRef(0);
+  const retryingImages = useRef(new Set<string>());
   const dailyCheckinRevealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isDailyCheckinClaimingRef = useRef(false);
   const dailyCheckinReturnScreenRef = useRef<"home" | "account">("home");
@@ -253,6 +260,11 @@ export default function HomePage() {
   const [uploading, setUploading] = useState(false);
   const [pendingImage, setPendingImage] = useState<PendingImage | null>(null);
   const [workspaceError, setWorkspaceError] = useState("");
+  const chatPhotos = useChatPhotos(sessionRef.current, {
+    scope: `${user?.publicID ?? ""}:${screen === "chat" ? currentConversation?.publicID ?? "" : ""}`,
+    limit: 9,
+    onError: setWorkspaceError,
+  });
   const [keyboardHeight, setKeyboardHeight] = useState(0);
   const [loadingMoreConversations, setLoadingMoreConversations] = useState(false);
   const [managingConversationID, setManagingConversationID] = useState("");
@@ -385,19 +397,11 @@ export default function HomePage() {
           setSharedConversation(shared);
           setSharedMessages(visibleMessages);
           setPreparedShare({ shareID: shared.shareID, title: shared.title || "AI 对话分享" });
-          for (const item of visibleMessages) {
-            if (!item.imageFileID) {
-              continue;
-            }
-            void session.downloadSharedImage(shared.shareID, item.imageFileID).then((imageSource) => {
-              if (!imageSource) {
-                return;
-              }
-              setSharedMessages((current) => current.map((message) => message.id === item.id
-                ? { ...message, imageSource }
-                : message));
-            });
-          }
+          const shareHistoryID = historyLoadCounter.current;
+          void downloadMessagePhotos(visibleMessages, (fileID) => session.downloadSharedImage(shared.shareID, fileID), (messageID, fileID, source) => {
+            setSharedMessages((current) => current.map((message) => message.id === messageID
+              ? applyMessageImageDownload(message, fileID, source) : message));
+          }, () => sessionRef.current === session && historyLoadCounter.current === shareHistoryID);
         } catch (error) {
           setWorkspaceError(error instanceof Error ? error.message : "分享内容加载失败");
         } finally {
@@ -866,46 +870,15 @@ export default function HomePage() {
     setCurrentConversation(conversation);
     setScreen(resolvedMode);
     const applyHistory = (history: Awaited<ReturnType<MiniAppSession["listMessages"]>>) => {
+      if (historyLoadCounter.current !== historyLoadID || sessionRef.current !== session) return [];
       const timeline = latestVisibleMessages(
         history.map(messageFromAPI).filter((item): item is ConversationMessage => item !== null),
       );
       setMessages(timeline);
-      for (const item of timeline) {
-        if (!item.imageFileID) {
-          continue;
-        }
-        void session.downloadMessageImage(item.imageFileID).then((imageSource) => {
-          if (historyLoadCounter.current !== historyLoadID) {
-            return;
-          }
-          if (!imageSource) {
-            setMessages((current) => current.map((message) => message.id === item.id
-              ? {
-                  ...message,
-                  imageFileID: undefined,
-                  imageStatus: "历史图片加载失败，请重新进入对话",
-                  pending: false,
-                }
-              : message));
-            return;
-          }
-          setMessages((current) => current.map((message) => message.id === item.id
-            ? applyImageProgress(message, { imageSource, pending: false, status: "图片生成完成" })
-            : message));
-        }).catch(() => {
-          if (historyLoadCounter.current !== historyLoadID) {
-            return;
-          }
-          setMessages((current) => current.map((message) => message.id === item.id
-            ? {
-                ...message,
-                imageFileID: undefined,
-                imageStatus: "历史图片加载失败，请重新进入对话",
-                pending: false,
-              }
-            : message));
-        });
-      }
+      void downloadMessagePhotos(timeline, (fileID) => session.downloadMessageImage(fileID), (messageID, fileID, source) => {
+        setMessages((current) => current.map((message) => message.id === messageID
+          ? applyMessageImageDownload(message, fileID, source) : message));
+      }, () => historyLoadCounter.current === historyLoadID && sessionRef.current === session);
       return timeline;
     };
     try {
@@ -1037,10 +1010,17 @@ export default function HomePage() {
     const conversation = currentConversation;
     const selectedModel = selectedChatModel;
     const content = (submittedText ?? prompt).trim();
-    const attachment = pendingImage;
-    if (!session || !conversation || !selectedModel || running || uploading || composerSendingRef.current || (!content && !attachment)) {
+    const selection = chatPhotos.snapshot();
+    const attachments = selection.photos;
+    if (!session || !conversation || !selectedModel || running || uploading || composerSendingRef.current ||
+      selection.choosing || attachments.length > selection.limit ||
+      attachments.some((photo) => photo.status !== "ready" || !photo.fileID) || (!content && !attachments.length)) {
       return false;
     }
+    const fileIDs = attachments.map((photo) => photo.fileID!);
+    const images = attachments.map((photo) => ({ fileID: photo.fileID, source: photo.path }));
+    const knownMessageIDs = new Set(messages.map((message) => message.id));
+    const requestHistoryID = historyLoadCounter.current;
     composerSendingRef.current = true;
     enableChatAutoFollow(true);
     setWorkspaceError("");
@@ -1050,7 +1030,7 @@ export default function HomePage() {
     const assistantID = `local-assistant-${messageCounter.current}`;
     setMessages((items) => [
       ...items,
-      { id: userID, createdAt: new Date().toISOString(), imageSource: attachment?.localPath, role: "user", text: content },
+      { id: userID, createdAt: new Date().toISOString(), images, role: "user", text: content },
       {
         activityStatus: "正在思考…",
         createdAt: new Date().toISOString(),
@@ -1061,12 +1041,12 @@ export default function HomePage() {
       },
     ]);
     setPrompt("");
-    setPendingImage(null);
     setRunning(true);
     setStopping(false);
     const shouldRefreshGeneratedTitle = Boolean(applyOptimisticConversationTitle(conversation, content));
     try {
       const result = await session.sendChat(conversation, selectedModel.platformModelName, content, (progress) => {
+        if (historyLoadCounter.current !== requestHistoryID) return;
         setMessages((items) => items.map((item) => item.id === assistantID
           ? {
               ...item,
@@ -1076,24 +1056,34 @@ export default function HomePage() {
               text: progress.text || item.text,
             }
           : item));
-      }, attachment ? [attachment.fileID] : [], networkSearchAvailable && networkSearchEnabled);
+      }, fileIDs, networkSearchAvailable && networkSearchEnabled);
+      if (historyLoadCounter.current !== requestHistoryID) return true;
+      chatPhotos.clear();
       const persistedUser = result.userMessage ? messageFromAPI(result.userMessage) : null;
       const persistedAssistant = result.assistantMessage ? messageFromAPI(result.assistantMessage) : null;
       setMessages((items) => items.map((item) => {
         if (item.id === userID && persistedUser) {
-          return { ...persistedUser, imageSource: attachment?.localPath ?? persistedUser.imageSource };
+          return { ...persistedUser, images: images.length ? images : persistedUser.images };
         }
         if (item.id === assistantID) {
           return {
-            ...(persistedAssistant ?? item),
+            ...applyImageProgress(persistedAssistant ?? item, { imageSource: result.imageSource, pending: false }),
             activityStatus: undefined,
-            pending: false,
             processTrace: result.processTrace ?? persistedAssistant?.processTrace ?? item.processTrace,
             text: result.text,
           };
         }
         return item;
       }));
+      if (persistedAssistant) {
+        void downloadMessagePhotos(
+          [applyImageProgress(persistedAssistant, { imageSource: result.imageSource, pending: false })],
+          (fileID) => session.downloadMessageImage(fileID),
+          (messageID, fileID, source) => setMessages((items) => items.map((item) => item.id === messageID
+            ? applyMessageImageDownload(item, fileID, source) : item)),
+          () => historyLoadCounter.current === requestHistoryID,
+        );
+      }
       updateConversation({ ...conversation, model: selectedModel.platformModelName });
       void refreshConversations();
       void refreshBalance();
@@ -1101,6 +1091,7 @@ export default function HomePage() {
         void refreshGeneratedConversationTitle(conversation.publicID);
       }
     } catch (error) {
+      if (historyLoadCounter.current !== requestHistoryID) return false;
       const stopped = error instanceof MiniAppRequestAbortedError;
       const errorMessage = error instanceof Error ? error.message : "发送失败，请重试";
       const billingMessage = errorMessage.includes("billing.insufficient_funds")
@@ -1116,16 +1107,36 @@ export default function HomePage() {
             text: chatGenerationFailureText(item.text, stopped, billingMessage),
           }
         : item));
-      if (attachment) {
-        setPendingImage((current) => current ?? attachment);
+      if (fileIDs.length) {
+        // A disconnected stream may already have persisted the whole photo turn.
+        const history = await session.listMessages(conversation.publicID).catch(() => null);
+        if (historyLoadCounter.current !== requestHistoryID) return false;
+        const timeline = history?.map(messageFromAPI).filter((item): item is ConversationMessage => item !== null);
+        const persistedUser = timeline?.find((item) => item.role === "user" && !knownMessageIDs.has(item.id) &&
+          item.text === (content || "请参考附件") && messageImageFileIDs(item).length === fileIDs.length &&
+          messageImageFileIDs(item).every((id, index) => id === fileIDs[index]));
+        if (persistedUser && timeline) {
+          chatPhotos.clear();
+          setMessages((current) => {
+            const previous = new Map(current.map((item) => [item.id, item]));
+            return latestVisibleMessages(timeline).map((item) => item.id === persistedUser.id
+              ? { ...item, images }
+              : { ...item, images: previous.get(item.id)?.images ?? item.images,
+                  imageSource: previous.get(item.id)?.imageSource ?? item.imageSource });
+          });
+        } else {
+          setPrompt(content);
+        }
       }
       if (!stopped) {
         setWorkspaceError(billingMessage ?? errorMessage);
       }
     } finally {
-      composerSendingRef.current = false;
-      setRunning(false);
-      setStopping(false);
+      if (historyLoadCounter.current === requestHistoryID) {
+        composerSendingRef.current = false;
+        setRunning(false);
+        setStopping(false);
+      }
     }
     return true;
   };
@@ -1151,34 +1162,9 @@ export default function HomePage() {
   };
 
   const chooseChatImage = async () => {
-    const session = sessionRef.current;
-    if (!session || running || uploading) {
-      return;
-    }
+    if (running || speechActive) return;
     setWorkspaceError("");
-    try {
-      const selection = await Taro.chooseMedia({
-        count: 1,
-        mediaType: ["image"],
-        sizeType: ["compressed"],
-        sourceType: ["album", "camera"],
-      });
-      const selected = selection.tempFiles[0];
-      if (!selected?.tempFilePath) {
-        return;
-      }
-      const fileName = `wechat-image-${Date.now()}.jpg`;
-      setUploading(true);
-      const uploaded = await session.uploadChatImage(selected.tempFilePath, fileName);
-      setPendingImage({ fileID: uploaded.fileID, fileName: uploaded.fileName || fileName, localPath: selected.tempFilePath });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "图片上传失败，请重试";
-      if (!/cancel/u.test(message)) {
-        setWorkspaceError(message);
-      }
-    } finally {
-      setUploading(false);
-    }
+    await chatPhotos.choose();
   };
 
   const chooseImageEditInput = async () => {
@@ -1316,7 +1302,9 @@ export default function HomePage() {
       const persistedAssistant = result.assistantMessage ? messageFromAPI(result.assistantMessage) : null;
       setMessages((items) => items.map((item) => {
         if (item.id === userID && persistedUser) {
-          return { ...persistedUser, imageSource: attachment?.localPath ?? persistedUser.imageSource };
+          return attachment
+            ? applyMessageImageDownload(persistedUser, attachment.fileID, attachment.localPath)
+            : persistedUser;
         }
         if (item.id === assistantID) {
           return {
@@ -1496,6 +1484,7 @@ export default function HomePage() {
   const goHome = () => {
     sessionRef.current?.abort();
     historyLoadCounter.current += 1;
+    composerSendingRef.current = false;
     setRunning(false);
     setStopping(false);
     setWorkspaceError("");
@@ -1528,6 +1517,25 @@ export default function HomePage() {
     await Taro.previewImage({ current: source, urls: [source] });
   };
 
+  const retryMessagePhoto = async (messageID: string, fileID: string, shareID?: string) => {
+    const session = sessionRef.current;
+    const requestHistoryID = historyLoadCounter.current;
+    const key = `${shareID ?? currentConversation?.publicID}:${messageID}:${fileID}`;
+    if (!session || retryingImages.current.has(key)) return;
+    retryingImages.current.add(key);
+    const update = shareID ? setSharedMessages : setMessages;
+    update((current) => current.map((message) => message.id === messageID
+      ? applyMessageImageDownload(message, fileID, null, "正在加载图片") : message));
+    try {
+      const source = await (shareID ? session.downloadSharedImage(shareID, fileID) : session.downloadMessageImage(fileID)).catch(() => null);
+      if (historyLoadCounter.current !== requestHistoryID) return;
+      update((current) => current.map((message) => message.id === messageID
+        ? applyMessageImageDownload(message, fileID, source) : message));
+    } finally {
+      retryingImages.current.delete(key);
+    }
+  };
+
   const copyAssistantAnswer = async (message: ConversationMessage) => {
     if (!message.text.trim()) {
       return;
@@ -1545,11 +1553,13 @@ export default function HomePage() {
     const model = selectedChatModel;
     const sourceIndex = messages.findIndex((item) => item.id === message.id);
     const parentUser = messages.find((item) => item.id === message.parentPublicID && item.role === "user");
-    if (!session || !conversation || !model || running || sourceIndex < 0 || !parentUser ||
+    if (!session || !conversation || !model || running || composerSendingRef.current || sourceIndex < 0 || !parentUser ||
       message.id.startsWith("local-")) {
       await Taro.showToast({ title: "这条回答暂时无法重新生成", icon: "none" });
       return;
     }
+    const requestHistoryID = historyLoadCounter.current;
+    composerSendingRef.current = true;
     const previousMessages = messages;
     messageCounter.current += 1;
     const pendingID = `local-retry-${messageCounter.current}`;
@@ -1576,6 +1586,7 @@ export default function HomePage() {
         model.platformModelName,
         parentUser.text,
         (progress) => {
+          if (historyLoadCounter.current !== requestHistoryID) return;
           setMessages((items) => items.map((item) => item.id === pendingID
             ? {
                 ...item,
@@ -1585,7 +1596,7 @@ export default function HomePage() {
               }
             : item));
         },
-        parentUser.imageFileID ? [parentUser.imageFileID] : [],
+        messageImageFileIDs(parentUser),
         networkSearchAvailable && networkSearchEnabled,
         {
           branchReason: "retry",
@@ -1593,26 +1604,39 @@ export default function HomePage() {
           sourceMessagePublicID: message.id,
         },
       );
+      if (historyLoadCounter.current !== requestHistoryID) return;
       const persisted = result.assistantMessage ? messageFromAPI(result.assistantMessage) : null;
       setMessages((items) => items.map((item) => item.id === pendingID
         ? {
-            ...(persisted ?? item),
+            ...applyImageProgress(persisted ?? item, { imageSource: result.imageSource, pending: false }),
             activityStatus: undefined,
-            pending: false,
             processTrace: result.processTrace ?? persisted?.processTrace ?? item.processTrace,
             text: result.text,
           }
         : item));
+      if (persisted) {
+        void downloadMessagePhotos(
+          [applyImageProgress(persisted, { imageSource: result.imageSource, pending: false })],
+          (fileID) => session.downloadMessageImage(fileID),
+          (messageID, fileID, source) => setMessages((items) => items.map((item) => item.id === messageID
+            ? applyMessageImageDownload(item, fileID, source) : item)),
+          () => historyLoadCounter.current === requestHistoryID,
+        );
+      }
       void refreshBalance();
       void refreshConversations();
     } catch (error) {
+      if (historyLoadCounter.current !== requestHistoryID) return;
       setMessages(previousMessages);
       if (!(error instanceof MiniAppRequestAbortedError)) {
         setWorkspaceError(error instanceof Error ? error.message : "重新生成失败，请重试");
       }
     } finally {
-      setRunning(false);
-      setStopping(false);
+      if (historyLoadCounter.current === requestHistoryID) {
+        composerSendingRef.current = false;
+        setRunning(false);
+        setStopping(false);
+      }
     }
   };
 
@@ -1975,7 +1999,7 @@ export default function HomePage() {
                 <Text className="messageAuthor">{message.role === "user" ? "提问" : "AI"}</Text>
                 <View className="messageContent">
                   <MessageTime createdAt={message.createdAt} />
-                  {message.imageSource ? <Image className="messageImage" src={message.imageSource} mode="widthFix" onClick={() => void previewImage(message.imageSource)} /> : null}
+                  <MessagePhotos message={message} onRetry={(fileID) => void retryMessagePhoto(message.id, fileID, sharedConversation.shareID)} />
                   {message.text ? <Markdown>{message.text}</Markdown> : null}
                 </View>
               </View>
@@ -2220,9 +2244,8 @@ export default function HomePage() {
                   <Text className="messageAuthor">{message.role === "user" ? "你" : "AI"}</Text>
                   <View className="messageContent">
                     <MessageTime createdAt={message.createdAt} />
-                    {message.imageSource ? (
-                      <Image className="messageImage" src={message.imageSource} mode="widthFix" onLoad={handleConversationImageLoad} />
-                    ) : null}
+                    <MessagePhotos message={message} onLoad={handleConversationImageLoad}
+                      onRetry={(fileID) => void retryMessagePhoto(message.id, fileID)} />
                     {message.role === "assistant" ? (
                       <ConversationTrace trace={message.processTrace} pending={Boolean(message.pending)} />
                     ) : null}
@@ -2282,15 +2305,8 @@ export default function HomePage() {
                 <Text className="messageAuthor">你</Text>
                 <View className="messageContent">
                   <MessageTime createdAt={message.createdAt} />
-                  {message.imageSource ? (
-                    <Image
-                      className="messageImage"
-                      src={message.imageSource}
-                      mode="widthFix"
-                      onLoad={handleConversationImageLoad}
-                      onClick={() => void previewImage(message.imageSource)}
-                    />
-                  ) : null}
+                  <MessagePhotos message={message} onLoad={handleConversationImageLoad}
+                    onRetry={(fileID) => void retryMessagePhoto(message.id, fileID)} />
                   {message.text ? <Markdown>{message.text}</Markdown> : null}
                 </View>
               </View>
@@ -2399,7 +2415,10 @@ export default function HomePage() {
               </View>
             </View>
           )}
-          {pendingImage ? (
+          {screen === "chat" ? (
+            <PhotoTray photos={chatPhotos.photos} limit={chatPhotos.limit} disabled={running || speechActive}
+              tone="chat" onAdd={chooseChatImage} onRemove={chatPhotos.remove} onRetry={chatPhotos.retry} />
+          ) : pendingImage ? (
             <View className="pendingImageRow">
               <Image className="pendingImage" src={pendingImage.localPath} mode="aspectFill" />
               <View className="pendingImageBody">
@@ -2412,13 +2431,13 @@ export default function HomePage() {
           <View className="composer">
             <Button
               className="attachButton"
-              disabled={running || uploading || speechActive}
+              disabled={running || uploading || speechActive || (screen === "chat" && chatPhotos.choosing)}
               onClick={screen === "chat" ? chooseChatImage : chooseImageEditInput}
             >
-              {uploading ? "…" : "＋"}
+              {uploading || (screen === "chat" && chatPhotos.uploading) ? "…" : "＋"}
             </Button>
             <SpeechComposer key={currentConversation.publicID}
-              client={sessionRef.current?.speech} draft={prompt} disabled={running || uploading}
+              client={sessionRef.current?.speech} draft={prompt} disabled={running || uploading || (screen === "chat" && chatPhotos.blocked)}
               onSend={(text) => screen === "chat" ? sendChat(text) : generateImage(text)}
               onActive={setSpeechActive} onError={setWorkspaceError}>
               <Textarea
@@ -2454,7 +2473,7 @@ export default function HomePage() {
               className={`sendButton ${running ? "stopSendButton" : ""}`}
               disabled={speechActive || stopping || (!running && (
                 uploading ||
-                (screen === "chat" && (!selectedChatModel || (!prompt.trim() && !pendingImage))) ||
+                (screen === "chat" && (chatPhotos.blocked || !selectedChatModel || (!prompt.trim() && !chatPhotos.photos.length))) ||
                 (screen === "image" && (!selectedImageModel || !prompt.trim()))
               ))}
               onClick={running
@@ -2585,6 +2604,38 @@ export default function HomePage() {
   );
   })();
   return <>{content}{screen !== "home" && <ReminderNotice events={reminderNotice.visible} onOpen={openReminderInbox} onDismiss={reminderNotice.dismiss} />}</>;
+}
+
+function MessagePhotos({ message, onLoad, onRetry }: { message: ConversationMessage; onLoad?: () => void; onRetry?: (fileID: string) => void }) {
+  const photos = messageImages(message);
+  if (!photos.length) return null;
+  const urls = photos.flatMap((photo) => photo.source ? [photo.source] : []);
+  const preview = (source: string) => {
+    void Taro.previewImage({ current: source, urls }).catch(() => {
+      void Taro.showToast({ title: "图片预览失败，请重试", icon: "none" });
+    });
+  };
+  if (photos.length === 1 && photos[0].source) {
+    const source = photos[0].source;
+    return <Image className="messageImage" src={source} mode="widthFix" onLoad={onLoad} onClick={() => preview(source)} />;
+  }
+  return (
+    <View className={`messagePhotos ${photos.length === 1 ? "messagePhotosSingle" : ""} ${photos.length === 2 || photos.length === 4 ? "messagePhotosTwoColumns" : ""}`}>
+      {photos.map((photo, index) => (
+        <View className="messagePhotoCell" key={photo.fileID ?? photo.source ?? index}>
+          {photo.source ? (
+            <Image className="messagePhotoThumbnail" src={photo.source} mode="aspectFill"
+              onLoad={onLoad} onClick={() => preview(photo.source!)} />
+          ) : (
+            <View className="messagePhotoPlaceholder" onClick={() => {
+              if (photo.fileID && photo.status === "图片加载失败") onRetry?.(photo.fileID);
+            }}><Text>{photo.status === "图片加载失败" ? "加载失败，点此重试" : photo.status || "正在加载图片"}</Text></View>
+          )}
+          {photos.length > 1 ? <Text className="messagePhotoNumber">{index + 1}</Text> : null}
+        </View>
+      ))}
+    </View>
+  );
 }
 
 function AccountMetric({ label, value }: { label: string; value: string }) {

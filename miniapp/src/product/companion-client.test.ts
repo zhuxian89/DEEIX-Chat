@@ -49,6 +49,16 @@ test("companion keeps authenticated image IDs from mixed replies", () => {
   assert.equal(companionStreamPath(" a/b "), "/api/v1/companion/conversations/a%2Fb/messages/stream");
 });
 
+test("companion preserves all photo attachments and their order across a history reload", () => {
+  const fileIDs = Array.from({ length: 12 }, (_, index) => `photo-${index + 1}`);
+  const attachments = fileIDs.map((file_id, index) => index % 2
+    ? { file_id: ` ${file_id} `, mime_type: "Image/JPEG" }
+    : { file_id, file_category: "IMAGE" });
+  assert.deepEqual(companionImageIDs(JSON.stringify([
+    ...attachments, { file_id: "photo-2", kind: "image" }, { file_id: "document", kind: "file" },
+  ])), fileIDs);
+});
+
 test("memory management uses tenant-authenticated requests and preserves values", async () => {
   const requests: ApiRequest[] = [];
   const client = new CompanionClient(async <T>(request: ApiRequest): Promise<T> => { requests.push(request); return {} as T; });

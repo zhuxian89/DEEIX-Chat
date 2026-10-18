@@ -124,6 +124,7 @@ test(`manual ${mode} scrolling only updates the bottom button, not the native me
     Markdown: ({ children }: { children: React.ReactNode }) => React.createElement("text", null, children),
     ConversationTrace: () => null,
     MessageTime: () => null,
+    MessagePhotos: () => null,
     messages: mode === "chat"
       ? [{ id: "answer", role: "assistant", text: "fixture-reply" }]
       : [{ id: "generated", role: "assistant", imageSource: "fixture.png" }],

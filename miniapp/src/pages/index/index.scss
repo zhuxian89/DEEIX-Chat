@@ -1052,6 +1052,20 @@ page {
 .pendingImageMode { color: #7b6bd0; display: block; font-size: 18px; margin-top: 5px; }
 .pendingImageRemove { color: #7659f7; font-size: 21px; padding: 16px 8px; }
 .messageImage { border-radius: 16px; display: block; margin-bottom: 12px; max-width: 420px; width: 100%; }
+.messagePhotos {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 12px;
+  max-width: 100%;
+  width: 420px;
+}
+.messagePhotosTwoColumns { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.messagePhotosSingle { grid-template-columns: 1fr; }
+.messagePhotoCell { border-radius: 12px; min-width: 0; overflow: hidden; padding-top: 100%; position: relative; }
+.messagePhotoThumbnail, .messagePhotoPlaceholder { height: 100%; left: 0; position: absolute; top: 0; width: 100%; }
+.messagePhotoPlaceholder { align-items: center; background: #edf0ec; color: #626b61; display: flex; font-size: 20px; justify-content: center; text-align: center; }
+.messagePhotoNumber { background: rgba(0, 0, 0, .45); border-radius: 7px; bottom: 6px; color: #fff; font-size: 18px; min-width: 22px; padding: 2px 5px; position: absolute; right: 6px; text-align: center; }
 .sendButton {
   align-items: center;
   background: #6e52ff !important;

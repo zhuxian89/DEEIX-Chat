@@ -145,12 +145,12 @@ export function companionImageIDs(attachments: string | undefined): string[] {
     if (!Array.isArray(items)) return [];
     const images = items.filter((item): item is Record<string, unknown> =>
       Boolean(item) && typeof item === "object" &&
-      (item.kind === "image" || item.file_category === "image" || String(item.mime_type ?? "").startsWith("image/")),
+      (String(item.kind ?? "").toLowerCase() === "image" || String(item.file_category ?? "").toLowerCase() === "image" || String(item.mime_type ?? "").toLowerCase().startsWith("image/")),
     );
     const fileIDs = images
       .map((item) => typeof item.file_id === "string" ? item.file_id.trim() : "")
       .filter(Boolean);
-    return [...new Set(fileIDs)].slice(0, 8);
+    return [...new Set(fileIDs)];
   } catch {
     return [];
   }

@@ -1,0 +1,16 @@
+.photoTray { --photo-accent: #7865b1; padding: 0 2px 18px; }
+.photoTray--companion { --photo-accent: #5e8067; }
+.photoTrayHeader { display: flex; justify-content: space-between; color: #7d857f; font-size: 21px; padding-bottom: 8px; }
+.photoTrayScroll { width: 100%; }
+.photoTrayItems { display: flex; align-items: center; gap: 16px; padding: 12px 12px 4px 0; width: max-content; }
+.photoTrayItem { position: relative; flex-shrink: 0; width: 128px; height: 128px; border: 2px solid transparent; border-radius: 18px; }
+.photoTrayItem--failed { border-color: #cb6656; }
+.photoTrayImage { display: block; width: 100%; height: 100%; border-radius: 16px; }
+.photoTrayNumber { position: absolute; left: 5px; bottom: 5px; padding: 1px 7px; border-radius: 6px; background: rgba(40, 49, 43, .48); color: #fff; font-size: 20px; }
+.photoTrayRemove { position: absolute; top: -12px; right: -12px; display: flex; align-items: center; justify-content: center; width: 40px; height: 40px; border: 3px solid #fff; border-radius: 50%; background: var(--photo-accent); color: #fff; font-size: 29px; line-height: 1; z-index: 2; }
+.photoTrayStatus { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; border-radius: 16px; background: rgba(30, 39, 31, .5); color: #fff; font-size: 21px; }
+.photoTrayAdd { box-sizing: border-box; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 106px; height: 128px; border: 2px dashed var(--photo-accent); border-radius: 18px; color: var(--photo-accent); font-size: 20px; }
+.photoTrayPlus { font-size: 40px; line-height: 1.2; padding-bottom: 7px; }
+.photoTrayError, .photoTrayHint { display: block; margin-top: 12px; font-size: 21px; line-height: 1.5; }
+.photoTrayError { color: #be4c3b; }
+.photoTrayHint { color: #7d857f; }

@@ -4,9 +4,12 @@ import { formatMessageTime } from "./message-time";
 import type { MessageResponse } from "@deeix/api-contract";
 import {
   applyImageProgress,
+  applyMessageImageDownload,
   createPendingImageTurn,
   latestVisibleMessages,
   messageFromAPI,
+  messageImageFileIDs,
+  messageImages,
 } from "./message-timeline";
 
 function serverMessage(overrides: Partial<MessageResponse>): MessageResponse {
@@ -65,6 +68,50 @@ test("historical image-only assistant messages remain visible", () => {
   assert.equal(message.imageStatus, "正在加载图片");
 });
 
+test("history preserves every distinct photo in selection order and ignores malformed attachments", () => {
+  const message = messageFromAPI(serverMessage({
+    role: "user",
+    attachments: JSON.stringify([
+      null,
+      { file_id: "photo-3", mime_type: "image/jpeg" },
+      { file_id: "document", kind: "document" },
+      { file_id: "photo-1", file_category: "image" },
+      { file_id: "photo-3", kind: "image" },
+      { file_id: "photo-2", kind: "image" },
+    ]),
+  }));
+  assert.ok(message);
+  assert.deepEqual(messageImageFileIDs(message), ["photo-3", "photo-1", "photo-2"]);
+  assert.equal(message.imageFileID, "photo-3");
+  assert.equal(messageImages(message).length, 3);
+});
+
+test("out-of-order downloads keep photo order and failed IDs available for regeneration", () => {
+  const original = messageFromAPI(serverMessage({
+    role: "user",
+    attachments: JSON.stringify([1, 2, 3].map((number) => ({ file_id: `photo-${number}`, kind: "image" }))),
+  }));
+  assert.ok(original);
+  const last = applyMessageImageDownload(original, "photo-3", "temp://three");
+  const failed = applyMessageImageDownload(last, "photo-1", null);
+  const complete = applyMessageImageDownload(failed, "photo-2", "temp://two");
+  assert.deepEqual(messageImages(complete).map((photo) => photo.source), [undefined, "temp://two", "temp://three"]);
+  assert.deepEqual(messageImageFileIDs(complete), ["photo-1", "photo-2", "photo-3"]);
+  assert.equal(complete.imageFileID, undefined);
+  assert.equal(complete.imageStatus, "图片加载失败");
+  const recovered = applyMessageImageDownload(complete, "photo-1", "temp://one");
+  assert.equal(recovered.imageFileID, "photo-1");
+  assert.equal(recovered.imageSource, "temp://one");
+  assert.equal(recovered.images?.[0].status, undefined);
+  assert.equal(original.images?.[0].source, undefined);
+});
+
+test("legacy single photos remain available in history, previews and regeneration", () => {
+  const legacy = { id: "legacy", role: "user" as const, text: "", imageFileID: "photo", imageSource: "temp://photo" };
+  assert.deepEqual(messageImageFileIDs(legacy), ["photo"]);
+  assert.equal(messageImages(legacy)[0].source, "temp://photo");
+});
+
 test("failed persisted image messages remain visible so the Web-compatible retry branch is available", () => {
   const upstreamError = "非常抱歉，生成的图片可能违反了关于轻度性暗示或挑逗性主题的防护限制。";
   const message = messageFromAPI(serverMessage({
@@ -111,6 +158,43 @@ test("image stream progress updates the same pending assistant message", () => {
   assert.ok(pending.createdAt);
   assert.equal(updated.createdAt, pending.createdAt);
   assert.equal(updated.imageStatus, "正在处理图片");
+});
+
+test("resumed image output updates the matching photo without changing another attachment", () => {
+  const pending = messageFromAPI(serverMessage({
+    status: "pending",
+    attachments: JSON.stringify(["first", "second"].map((file_id) => ({ file_id, kind: "image" }))),
+  }));
+  assert.ok(pending);
+  const first = applyMessageImageDownload(pending, "first", "temp://first");
+  const resumed = applyImageProgress(first, { imageFileID: "second", imageSource: "temp://second", pending: false });
+  assert.deepEqual(messageImages(resumed).map((image) => [image.fileID, image.source]), [
+    ["first", "temp://first"], ["second", "temp://second"],
+  ]);
+  assert.equal(resumed.imageFileID, "second");
+  assert.equal(resumed.imageSource, "temp://second");
+  assert.equal(resumed.pending, false);
+  assert.equal(messageImages(first)[1].source, undefined);
+});
+
+test("a new image file ID never reuses the previous image source", () => {
+  const previous = applyImageProgress(createPendingImageTurn("photo", "user", "assistant")[1], {
+    imageFileID: "old-photo", imageSource: "temp://old",
+  });
+  const next = applyImageProgress(previous, { imageFileID: "new-photo" });
+  assert.equal(next.imageFileID, "new-photo");
+  assert.equal(next.imageSource, undefined);
+  assert.deepEqual(messageImages(next).map((image) => [image.fileID, image.source]), [
+    ["old-photo", "temp://old"], ["new-photo", undefined],
+  ]);
+});
+
+test("a generated preview receives its final file ID without a duplicate thumbnail", () => {
+  const preview = applyImageProgress(createPendingImageTurn("photo", "user", "assistant")[1], {
+    imageSource: "temp://preview",
+  });
+  const completed = applyImageProgress(preview, { imageFileID: "persisted-photo", pending: false });
+  assert.deepEqual(messageImages(completed).map((image) => [image.fileID, image.source]), [["persisted-photo", "temp://preview"]]);
 });
 
 test("message time uses Beijing time across dates and explicit timezone offsets", () => {

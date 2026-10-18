@@ -29,7 +29,7 @@ function scrollFixture() {
     CompanionAvatar: () => React.createElement("image", { src: "avatar.png" }),
     MessageTime: () => null,
     COMPANION_NAME: "fixture",
-    timeline: [{ id: "answer", role: "assistant", text: "fixture-reply", images: ["fixture.png"] }],
+    timeline: [{ id: "answer", role: "assistant", text: "fixture-reply", images: [{ source: "fixture.png" }] }],
     state: null,
     reminders: null,
     loading: false,

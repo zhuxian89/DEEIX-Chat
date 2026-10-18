@@ -4,6 +4,8 @@ import Taro from "@tarojs/taro";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Markdown } from "@/components/markdown";
 import { SpeechComposer } from "@/components/speech-input/speech-input";
+import { PhotoTray } from "@/components/chat-photos/photo-tray";
+import { useChatPhotos } from "@/components/chat-photos/use-chat-photos";
 import { canOfferCompanionGreeting, companionBeijingDate, companionImageIDs, type CompanionMemory, type CompanionProactivity, type CompanionState } from "@/product/companion-client";
 import { canOfferCompanionContinuation, companionEntryPreview, CompanionInitiativeVisit, CompanionReadTracker, withCompanionInitiative } from "@/product/companion-initiative";
 import { composerKeyboardHandlers, composerKeyboardStyle } from "@/product/keyboard-layout";
@@ -22,6 +24,7 @@ import { reminderMessages, reminderRequestID, reminderError } from "@/product/co
 
 const COMPANION_NAME = "小禾";
 const COMPANION_BOTTOM_THRESHOLD_PX = 80;
+const COMPANION_PHOTO_LIMIT = 9;
 
 type SharedProps = { session: MiniAppSession; onState(state: CompanionState): void };
 
@@ -121,7 +124,6 @@ export function CompanionEntry({ session, onState, onOpen, lastInteraction, dueR
 }
 
 type DisplayMessage = ConversationMessage & {
-  images?: string[];
   fileIDs?: string[];
   serverID?: number;
   topic?: CompanionState["topic"];
@@ -136,6 +138,7 @@ function toDisplay(message: MessageResponse): DisplayMessage | null {
   return {
     ...normalized,
     fileIDs,
+    images: fileIDs.length ? fileIDs.map((fileID) => ({ fileID, status: "正在加载图片…" })) : normalized.images,
     serverID: message.id,
     createdAt: message.createdAt,
     text: fileIDs.length ? normalized.text.replace(/!\[[^\]]*\]\([^)]*\)/gu, "").trim() : normalized.text,
@@ -170,11 +173,11 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
   const reminderRetry = useRef<{ input: string; requestID: string } | null>(null);
   const [draft, setDraft] = useState("");
   const [speechActive, setSpeechActive] = useState(false);
-  const [attachment, setAttachment] = useState<{ path: string; fileID: string } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [uploading, setUploading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const photoComposer = useChatPhotos(session, { scope: conversation?.publicID || "companion", limit: COMPANION_PHOTO_LIMIT, onError: setError });
+  const { photos, choosing, uploading } = photoComposer;
   const [memoryOpen, setMemoryOpen] = useState(false);
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [editor, setEditor] = useState<{ memory: CompanionMemory; value: string } | null>(null);
@@ -197,8 +200,9 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
   const stateRefreshing = useRef(false);
   const lastInteractionAt = useRef(Date.now());
   const replyVisible = useRef({ id: 0, at: 0 });
-  const initiativeContext = useRef({ state, messages, draft, attachment, busy, uploading, loading, memoryOpen: memoryOpen || reminderOpen, speechActive });
-  initiativeContext.current = { state, messages, draft, attachment, busy, uploading, loading, memoryOpen: memoryOpen || reminderOpen, speechActive };
+  const imageLoads = useRef(new Set<string>());
+  const initiativeContext = useRef({ state, messages, draft, photos, choosing, busy, uploading, loading, memoryOpen: memoryOpen || reminderOpen, speechActive });
+  initiativeContext.current = { state, messages, draft, photos, choosing, busy, uploading, loading, memoryOpen: memoryOpen || reminderOpen, speechActive };
 
   const recordCompanionInteraction = useCallback(() => {
     lastInteractionAt.current = Date.now();
@@ -216,7 +220,7 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
 
   useEffect(() => {
     if (!memoryOpen) measureHistory();
-  }, [memoryOpen, keyboard, attachment, error, loading, measureHistory]);
+  }, [memoryOpen, keyboard, photos, error, loading, measureHistory]);
 
   const updateState = (next: CompanionState) => {
     if (!mounted.current) return;
@@ -232,27 +236,40 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
         ...message,
         text: progress.text,
         activityStatus: progress.status,
-        images: progress.imageSource ? [progress.imageSource] : message.images,
+        images: progress.imageSource ? [{ source: progress.imageSource }] : message.images,
       };
     }));
   };
 
-  const loadImages = async (items: DisplayMessage[]) => {
+  const loadImages = async (items: DisplayMessage[], retryFileID?: string) => {
     // Bound concurrent authenticated downloads. Text is already visible.
     for (const item of items) {
       if (!mounted.current) return;
       if (!item.fileIDs?.length) continue;
-      const results = await Promise.all(item.fileIDs.map((id) => session.downloadMessageImage(id).catch(() => null)));
-      if (mounted.current) {
-        setMessages((current) => current.map((message) => {
-          if (message.id !== item.id) return message;
-          return {
+      await Promise.all(item.fileIDs.map(async (fileID) => {
+        if (retryFileID && retryFileID !== fileID) return;
+        if (item.images?.some((photo) => photo.fileID === fileID && photo.source)) return;
+        const key = `${item.id}:${fileID}`;
+        if (imageLoads.current.has(key)) return;
+        imageLoads.current.add(key);
+        const update = (source?: string, status?: string) => {
+          if (!mounted.current) return;
+          setMessages((current) => current.map((message) => message.id !== item.id ? message : {
             ...message,
-            images: results.filter((path): path is string => Boolean(path)),
-            imageStatus: results.some(Boolean) ? undefined : "图片加载失败，点此重试",
-          };
-        }));
-      }
+            images: (message.images ?? item.fileIDs!.map((id) => ({ fileID: id })))
+              .map((photo) => photo.fileID === fileID ? { ...photo, source, status } : photo),
+          }));
+        };
+        update(undefined, "正在加载图片…");
+        try {
+          const source = await session.downloadMessageImage(fileID);
+          update(source || undefined, source ? undefined : "图片加载失败，点此重试");
+        } catch {
+          update(undefined, "图片加载失败，点此重试");
+        } finally {
+          imageLoads.current.delete(key);
+        }
+      }));
     }
   };
 
@@ -262,7 +279,9 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
       setMessages(items);
       void loadImages(items);
     }
-    await refreshReminders(id);
+    await refreshReminders(id).catch((cause) => {
+      if (mounted.current) setError(errorMessage(cause));
+    });
     return items;
   };
 
@@ -372,7 +391,7 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
       const snapshot = initiativeContext.current;
       const latest = snapshot.messages.at(-1);
       if (mounted.current && initiativeForeground.current && !snapshot.busy && !snapshot.loading && !snapshot.memoryOpen &&
-        !snapshot.draft && !snapshot.attachment && !snapshot.speechActive && !touching.current &&
+        !snapshot.draft && !snapshot.photos.length && !snapshot.choosing && !snapshot.speechActive && !touching.current &&
         Date.now() - lastInteractionAt.current >= 2000 && Date.now() >= stateRefreshAt.current && !stateRefreshing.current) {
         stateRefreshing.current = true;
         stateRefreshAt.current = Date.now() + 15_000;
@@ -393,7 +412,7 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
         if (!mounted.current || !current.state?.initiativeVersion || current.messages.at(-1)?.serverID !== after) return false;
         return canOfferCompanionContinuation({
           foreground: initiativeForeground.current,
-          typing: Boolean(current.draft.length || current.attachment || current.speechActive),
+          typing: Boolean(current.draft.length || current.photos.length || current.choosing || current.speechActive),
           replying: current.busy || busyRef.current,
           readingHistory: !autoFollow.current || touching.current,
           unavailable: current.loading || current.uploading || current.memoryOpen,
@@ -414,24 +433,27 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
 
   const send = async (submittedText?: string) => {
     const content = (submittedText ?? draft).trim();
-    if (!conversation || !state || busyRef.current || uploading || (speechActive && submittedText === undefined) || (!content && !attachment)) return false;
+    const selected = photoComposer.snapshot();
+    if (!conversation || !state || busyRef.current || loading || selected.choosing ||
+      selected.photos.length > selected.limit || selected.photos.some((photo) => photo.status !== "ready" || !photo.fileID) ||
+      (speechActive && submittedText === undefined) || (!content && !selected.photos.length)) return false;
     recordCompanionInteraction();
     busyRef.current = true;
     setBusy(true);
     setError("");
     autoFollow.current = true;
     setFollowing(true);
-    const image = attachment;
+    const images = selected.photos.map((photo) => ({ fileID: photo.fileID!, source: photo.path }));
+    const knownMessageIDs = new Set(messages.map((message) => message.id));
     const id = `companion-local-${Date.now()}`;
     const pendingID = `${id}-reply`;
     setDraft("");
-    setAttachment(null);
     setMessages((current) => [...current,
-      { id, role: "user", text: content, images: image ? [image.path] : undefined, createdAt: new Date().toISOString() },
+      { id, role: "user", text: content, images: images.length ? images : undefined, createdAt: new Date().toISOString() },
       { id: pendingID, role: "assistant", text: "", pending: true, activityStatus: `${COMPANION_NAME}正在想怎么接着聊…`, createdAt: new Date().toISOString() },
     ]);
     try {
-      if (!image) {
+      if (!images.length) {
         const request = reminderRetry.current?.input === content ? reminderRetry.current : { input: content, requestID: reminderRequestID() };
         reminderRetry.current = request;
         reminderVersion.current++;
@@ -448,12 +470,13 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
         state.model,
         content,
         (progress) => updateStreamMessage(pendingID, progress),
-        image ? [image.fileID] : [],
+        images.map((photo) => photo.fileID),
         false,
         { branchReason: "default" },
         true,
       );
       if (!mounted.current) return true;
+      photoComposer.clear();
       const assistant = result.assistantMessage ? toDisplay(result.assistantMessage) : null;
       const user = result.userMessage ? toDisplay(result.userMessage) : null;
       setMessages((current) => current.map((item) => {
@@ -465,19 +488,28 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
           text: assistant?.text ?? result.text,
           pending: false,
           activityStatus: undefined,
-          images: result.imageSource ? [result.imageSource] : item.images,
+          images: result.imageSource ? [{ source: result.imageSource }] : assistant?.images ?? item.images,
         };
       }));
       if (assistant) void loadImages([assistant]);
     } catch (cause) {
+      let photoTurnPersisted = false;
       if (mounted.current) {
         if (reminderRetry.current) setDraft(content);
         setMessages((current) => current.map((item) => item.id === pendingID
           ? { ...item, pending: false, activityStatus: "这条回复没有完成" } : item));
         if (!(cause instanceof MiniAppRequestAbortedError)) setError(errorMessage(cause));
         // Reconcile persisted turns so a retry cannot duplicate a charged run.
-        await loadHistory(conversation.publicID).catch(() => {});
+        const history = await loadHistory(conversation.publicID).catch(() => null);
+        if (mounted.current && images.length) {
+          const persisted = history?.some((message) => message.role === "user" && !knownMessageIDs.has(message.id) &&
+            message.text === (content || "请参考附件") && message.fileIDs?.length === images.length &&
+            message.fileIDs.every((fileID, index) => fileID === images[index].fileID));
+          if (persisted) { photoTurnPersisted = true; photoComposer.clear(); }
+          else setDraft(content);
+        }
       }
+      return !images.length || photoTurnPersisted;
     } finally {
       busyRef.current = false;
       if (mounted.current) setBusy(false);
@@ -486,20 +518,10 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
   };
 
   const chooseImage = async () => {
-    if (busyRef.current || uploading) return;
-    setUploading(true);
+    if (busyRef.current || loading || speechActive || choosing) return;
+    recordCompanionInteraction();
     setError("");
-    try {
-      const selection = await Taro.chooseMedia({ count: 1, mediaType: ["image"], sourceType: ["album", "camera"] });
-      const path = selection.tempFiles[0]?.tempFilePath;
-      if (!path) return;
-      const uploaded = await session.uploadChatImage(path, path.split("/").at(-1) || "photo.jpg");
-      if (mounted.current) setAttachment({ path, fileID: uploaded.fileID });
-    } catch (cause) {
-      if (mounted.current && !String((cause as { errMsg?: string })?.errMsg ?? "").includes("cancel")) setError(errorMessage(cause));
-    } finally {
-      if (mounted.current) setUploading(false);
-    }
+    await photoComposer.choose();
   };
 
   const runMemoryAction = async (action: () => Promise<void>) => {
@@ -708,8 +730,16 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
                     </View>
                   </View>
                 )}
-                {message.images?.map((source, index) => <Image key={`${message.id}-${index}`} className="companionImage" src={source} mode="widthFix" onLoad={() => { if (autoFollow.current) setScrollTop(nextChatBottomScrollTop); }} onClick={() => void Taro.previewImage({ current: source, urls: message.images! })} />)}
-                {!message.images?.length && Boolean(message.fileIDs?.length) && <Text className="companionImageRetry" onClick={() => void loadImages([message])}>{message.imageStatus || "正在加载图片…"}</Text>}
+                {Boolean(message.images?.length) && <View className={`companionImages${message.images!.length > 1 ? " companionImages--multiple" : ""}`}>
+                  {message.images!.map((photo, index) => photo.source
+                    ? <Image key={photo.fileID || `${message.id}-${index}`} className="companionImage" src={photo.source} mode={message.images!.length > 1 ? "aspectFill" : "widthFix"}
+                      onLoad={() => { if (autoFollow.current) setScrollTop(nextChatBottomScrollTop); }}
+                      onClick={() => void Taro.previewImage({ current: photo.source, urls: message.images!.flatMap((image) => image.source ? [image.source] : []) }).catch(() => setError("图片预览失败，请稍后重试"))} />
+                    : <View key={photo.fileID || `${message.id}-${index}`} className="companionImagePlaceholder" onClick={() => { if (photo.fileID) void loadImages([message], photo.fileID); }}>
+                      <Text className="companionImageNumber">照片 {index + 1}</Text>
+                      <Text className="companionImageRetry">{photo.status || "正在加载图片…"}</Text>
+                    </View>)}
+                </View>}
                 {message.pending && <Text className="companionActivity">{message.activityStatus || `${COMPANION_NAME}正在回复…`}</Text>}
               </View>
             </View>)}
@@ -718,10 +748,13 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
           <Text className="companionFollow" style={{ display: following ? "none" : "block" }} onClick={() => { autoFollow.current = true; setFollowing(true); setScrollTop(nextChatBottomScrollTop); }}>回到最新消息 ↓</Text>
         </View>
         <View className="companionComposer" style={composerKeyboardStyle(keyboard)}>
-          {attachment && <View className="companionAttachment"><Image src={attachment.path} mode="aspectFill" /><Text onClick={() => setAttachment(null)}>移除图片</Text></View>}
+          <PhotoTray photos={photos} limit={photoComposer.limit} tone="companion" disabled={busy || loading || speechActive || choosing}
+            onAdd={() => void chooseImage()}
+            onRemove={(id) => { if (busyRef.current) return; recordCompanionInteraction(); photoComposer.remove(id); }}
+            onRetry={(id) => { if (busyRef.current) return; recordCompanionInteraction(); void photoComposer.retry(id); }} />
           <View className="companionInputRow">
-            <Button className="companionPhoto" disabled={busy || uploading || loading || speechActive} onClick={() => void chooseImage()}>{uploading ? "…" : "图片"}</Button>
-            <SpeechComposer client={session.speech} draft={draft} disabled={busy || uploading || loading || memoryOpen}
+            <Button className="companionPhoto" disabled={busy || choosing || loading || speechActive} onClick={() => void chooseImage()}>{choosing ? "…" : "图片"}</Button>
+            <SpeechComposer client={session.speech} draft={draft} disabled={busy || photoComposer.blocked || loading || memoryOpen}
               onSend={(text) => send(text)}
               onActive={(active) => { recordCompanionInteraction(); setSpeechActive(active); }} onError={setError}>
               <Textarea className="companionInput"
@@ -736,7 +769,7 @@ export function CompanionPanel({ session, onState, onBack, initial, reminderInbo
                 }}
                 value={draft} placeholder="随口说点什么…" maxlength={8000} autoHeight adjustPosition={false} showConfirmBar={false} disabled={busy || loading || speechActive} onLineChange={measureHistory} onInput={(event) => { recordCompanionInteraction(); setDraft(event.detail.value); }} />
             </SpeechComposer>
-            <Button className="companionSend" disabled={loading || uploading || speechActive || (!busy && !draft.trim() && !attachment)} onClick={() => {
+            <Button className="companionSend" disabled={loading || speechActive || (!busy && (photoComposer.blocked || choosing || (!draft.trim() && !photos.length)))} onClick={() => {
               if (busy) { void session.cancelActiveGeneration().catch((cause) => setError(errorMessage(cause))); return; }
               void subscriptions.request();
               void send();

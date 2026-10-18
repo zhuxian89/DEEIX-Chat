@@ -572,6 +572,11 @@ export class MiniAppSession {
     }
   }
 
+  async getChatPhotoLimit(): Promise<number> {
+    const policy = await this.request<{ maxMessageFiles: number }>({ path: "/api/v1/runtime/chat-file-policy" });
+    return policy.maxMessageFiles;
+  }
+
   async uploadChatImage(filePath: string, fileName: string): Promise<FileObjectResponse> {
     await this.ensureAccessToken();
     let upload = await this.performUpload(filePath, fileName);
